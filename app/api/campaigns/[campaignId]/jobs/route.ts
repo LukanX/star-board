@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUser, getCampaignRole } from "@/lib/auth/permissions";
+import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
+import { addCampaignArtUrls, removeCampaignArtIfUnreferenced } from "@/lib/storage/campaign-art";
 import { createJobSchema } from "@/lib/validation/job";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
@@ -16,9 +17,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
     }
 
-    const role = await getCampaignRole(context.supabase, campaignId, context.user.id);
+    const membership = await getCampaignMembership(context.supabase, campaignId, context.user.id);
 
-    if (!role) {
+    if (!membership) {
       return NextResponse.json({ error: "Campaign membership is required." }, { status: 403 });
     }
 
@@ -48,7 +49,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
       votesByJob.set(vote.job_id, current);
     }
 
-    const jobs = (jobsResult.data ?? []).map((job) => {
+    const jobsWithArt = await addCampaignArtUrls(context.supabase, jobsResult.data ?? []);
+    const jobs = jobsWithArt.map((job) => {
       const votes = votesByJob.get(job.id) ?? { count: 0, voted: false };
       const giver = job.giver_npc_id
         ? { type: "NPC", id: job.giver_npc_id, name: npcs.get(job.giver_npc_id) ?? "Unknown contact" }
@@ -57,7 +59,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return { ...job, giver, votes: votes.count, voted: votes.voted };
     });
 
-    return NextResponse.json({ role, jobs });
+    return NextResponse.json({ role: membership.role, displayName: membership.displayName, jobs });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
@@ -112,7 +114,124 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unable to create job." }, { status: 400 });
     }
 
-    return NextResponse.json({ job: data }, { status: 201 });
+    const [job] = await addCampaignArtUrls(context.supabase, [data]);
+    return NextResponse.json({ job }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
+  }
+}
+
+export async function PATCH(request: Request, { params }: RouteContext) {
+  const { campaignId } = await params;
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+  }
+
+  const input = createJobSchema.safeParse(body);
+  const jobId = typeof body === "object" && body !== null && "jobId" in body && typeof body.jobId === "string" ? body.jobId : null;
+
+  if (!jobId || !input.success) {
+    return NextResponse.json({ error: "Job details are invalid.", issues: input.success ? undefined : input.error.flatten() }, { status: 400 });
+  }
+
+  try {
+    const context = await getAuthenticatedUser();
+
+    if (!context) {
+      return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
+    }
+
+    const role = await getCampaignRole(context.supabase, campaignId, context.user.id);
+
+    if (role !== "gm") {
+      return NextResponse.json({ error: "GM access is required." }, { status: 403 });
+    }
+
+    const { data: previousJob, error: previousJobError } = await context.supabase
+      .from("jobs")
+      .select("art_path")
+      .eq("id", jobId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+
+    if (previousJobError) {
+      return NextResponse.json({ error: "Unable to load job art." }, { status: 503 });
+    }
+
+    const { data, error } = await context.supabase
+      .from("jobs")
+      .update({
+        title: input.data.title,
+        summary: input.data.summary,
+        player_notes_markdown: input.data.playerNotesMarkdown,
+        status: input.data.status,
+        giver_npc_id: input.data.giverType === "npc" ? input.data.giverId : null,
+        giver_faction_id: input.data.giverType === "faction" ? input.data.giverId : null,
+        art_path: input.data.artPath ?? null,
+        art_prompt: input.data.artPrompt ?? null,
+        art_provider: input.data.artProvider ?? null,
+        updated_by: context.user.id,
+      })
+      .eq("id", jobId)
+      .eq("campaign_id", campaignId)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: "Unable to update job." }, { status: 400 });
+    }
+
+    if (previousJob?.art_path !== data.art_path) {
+      await removeCampaignArtIfUnreferenced(context.supabase, campaignId, previousJob?.art_path);
+    }
+
+    const [job] = await addCampaignArtUrls(context.supabase, [data]);
+    return NextResponse.json({ job });
+  } catch {
+    return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
+  }
+}
+
+export async function DELETE(request: Request, { params }: RouteContext) {
+  const { campaignId } = await params;
+  const jobId = new URL(request.url).searchParams.get("jobId");
+
+  if (!jobId) {
+    return NextResponse.json({ error: "Job ID is required." }, { status: 400 });
+  }
+
+  try {
+    const context = await getAuthenticatedUser();
+
+    if (!context) {
+      return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
+    }
+
+    const role = await getCampaignRole(context.supabase, campaignId, context.user.id);
+
+    if (role !== "gm") {
+      return NextResponse.json({ error: "GM access is required." }, { status: 403 });
+    }
+
+    const { data, error } = await context.supabase
+      .from("jobs")
+      .delete()
+      .eq("id", jobId)
+      .eq("campaign_id", campaignId)
+      .select("id, art_path")
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ error: "Unable to delete job." }, { status: 400 });
+    }
+
+    await removeCampaignArtIfUnreferenced(context.supabase, campaignId, data.art_path);
+
+    return new NextResponse(null, { status: 204 });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }

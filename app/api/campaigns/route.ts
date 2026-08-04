@@ -14,7 +14,7 @@ export async function GET() {
 
     const { data, error } = await context.supabase
       .from("campaign_members")
-      .select("role, campaign:campaigns(id, name, system, description, created_by)")
+      .select("role, display_name, campaign:campaigns(id, name, system, description, created_by)")
       .eq("user_id", context.user.id);
 
     if (error) {

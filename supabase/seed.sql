@@ -1,0 +1,1 @@
+-- Optional local seed data. Keep this file empty until deterministic demo records are needed.

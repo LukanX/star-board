@@ -35,6 +35,12 @@ export function buildNpcPrompt(input: NpcGenerationInput) {
   ].filter(Boolean).join("\n");
 }
 
-export function buildArtPrompt(subject: string, campaignStyle?: string) {
-  return [ART_STYLE_PREFIX, campaignStyle, subject].filter(Boolean).join(" ");
+export function buildArtPrompt(subject: string, campaignStyle?: string, refinement?: string, currentPrompt?: string) {
+  return [
+    ART_STYLE_PREFIX,
+    campaignStyle,
+    currentPrompt ? `Refine this existing visual direction: ${currentPrompt}` : "",
+    refinement ? `Focused refinement request: ${refinement}` : "",
+    `Subject: ${subject}`,
+  ].filter(Boolean).join(" ");
 }
