@@ -7,7 +7,7 @@ type RouteContext = { params: Promise<{ campaignId: string; npcId: string }> };
 
 export const runtime = "nodejs";
 
-const npcColumns = "id, author_id, name, species, role, description, player_notes_markdown, art_path, art_prompt, art_provider, created_at, updated_at";
+const npcColumns = "id, author_id, name, species, role, description, player_notes_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId, npcId } = await params;
@@ -108,6 +108,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       ...(input.data.role === undefined ? {} : { role: input.data.role }),
       ...(input.data.description === undefined ? {} : { description: input.data.description }),
       ...(input.data.playerNotesMarkdown === undefined ? {} : { player_notes_markdown: input.data.playerNotesMarkdown }),
+      ...(input.data.artSubject === undefined ? {} : { art_subject: input.data.artSubject }),
       ...(input.data.artPath === undefined ? {} : { art_path: input.data.artPath }),
       ...(input.data.artPrompt === undefined ? {} : { art_prompt: input.data.artPrompt }),
       ...(input.data.artProvider === undefined ? {} : { art_provider: input.data.artProvider }),

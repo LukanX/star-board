@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const [jobsResult, votesResult, npcsResult, factionsResult] = await Promise.all([
       context.supabase
         .from("jobs")
-        .select("id, title, summary, player_notes_markdown, giver_npc_id, giver_faction_id, status, art_path, art_prompt, art_provider, created_at, updated_at")
+        .select("id, title, summary, player_notes_markdown, giver_npc_id, giver_faction_id, status, hook, art_subject, art_path, art_prompt, art_provider, created_at, updated_at")
         .eq("campaign_id", campaignId)
         .order("created_at", { ascending: false }),
       context.supabase.from("job_votes").select("job_id, user_id").eq("campaign_id", campaignId),
@@ -50,13 +50,24 @@ export async function GET(_request: Request, { params }: RouteContext) {
     }
 
     const jobsWithArt = await addCampaignArtUrls(context.supabase, jobsResult.data ?? []);
+    const jobIds = (jobsResult.data ?? []).map((job) => job.id);
+    const { data: jobNotes, error: jobNotesError } = membership.role === "gm" && jobIds.length
+      ? await context.supabase.from("job_gm_notes").select("job_id, body_markdown").in("job_id", jobIds)
+      : { data: [], error: null };
+
+    if (jobNotesError) {
+      return NextResponse.json({ error: "Unable to load job private notes." }, { status: 503 });
+    }
+
+    const notesByJob = new Map((jobNotes ?? []).map((note) => [note.job_id, note.body_markdown]));
     const jobs = jobsWithArt.map((job) => {
       const votes = votesByJob.get(job.id) ?? { count: 0, voted: false };
       const giver = job.giver_npc_id
         ? { type: "NPC", id: job.giver_npc_id, name: npcs.get(job.giver_npc_id) ?? "Unknown contact" }
         : { type: "FACTION", id: job.giver_faction_id, name: factions.get(job.giver_faction_id ?? "") ?? "Unknown faction" };
 
-      return { ...job, giver, votes: votes.count, voted: votes.voted };
+      const { hook, ...publicJob } = job;
+      return { ...publicJob, giver, votes: votes.count, voted: votes.voted, ...(membership.role === "gm" ? { hook, gm_notes_markdown: notesByJob.get(job.id) ?? "" } : {}) };
     });
 
     return NextResponse.json({ role: membership.role, displayName: membership.displayName, jobs });
@@ -100,6 +111,8 @@ export async function POST(request: Request, { params }: RouteContext) {
       title: input.data.title,
       summary: input.data.summary,
       player_notes_markdown: input.data.playerNotesMarkdown,
+      hook: input.data.hook,
+      art_subject: input.data.artSubject ?? null,
       status: input.data.status,
       giver_npc_id: input.data.giverType === "npc" ? input.data.giverId : null,
       giver_faction_id: input.data.giverType === "faction" ? input.data.giverId : null,
@@ -114,7 +127,19 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unable to create job." }, { status: 400 });
     }
 
-    const [job] = await addCampaignArtUrls(context.supabase, [data]);
+    if (input.data.gmNotesMarkdown) {
+      const { error: notesError } = await context.supabase.from("job_gm_notes").insert({
+        job_id: data.id,
+        body_markdown: input.data.gmNotesMarkdown,
+        updated_by: context.user.id,
+      });
+
+      if (notesError) {
+        return NextResponse.json({ error: "Job created, but private notes could not be saved." }, { status: 400 });
+      }
+    }
+
+    const [job] = await addCampaignArtUrls(context.supabase, [{ ...data, gm_notes_markdown: input.data.gmNotesMarkdown }]);
     return NextResponse.json({ job }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
@@ -168,6 +193,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         title: input.data.title,
         summary: input.data.summary,
         player_notes_markdown: input.data.playerNotesMarkdown,
+        hook: input.data.hook,
+        art_subject: input.data.artSubject ?? null,
         status: input.data.status,
         giver_npc_id: input.data.giverType === "npc" ? input.data.giverId : null,
         giver_faction_id: input.data.giverType === "faction" ? input.data.giverId : null,
@@ -189,7 +216,17 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       await removeCampaignArtIfUnreferenced(context.supabase, campaignId, previousJob?.art_path);
     }
 
-    const [job] = await addCampaignArtUrls(context.supabase, [data]);
+    const { error: notesError } = await context.supabase.from("job_gm_notes").upsert({
+      job_id: jobId,
+      body_markdown: input.data.gmNotesMarkdown,
+      updated_by: context.user.id,
+    }, { onConflict: "job_id" });
+
+    if (notesError) {
+      return NextResponse.json({ error: "Job updated, but private notes could not be saved." }, { status: 400 });
+    }
+
+    const [job] = await addCampaignArtUrls(context.supabase, [{ ...data, gm_notes_markdown: input.data.gmNotesMarkdown }]);
     return NextResponse.json({ job });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });

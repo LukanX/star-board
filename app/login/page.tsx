@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, startTransition, useEffect, useState } from "react";
 import { ArrowUpRight, KeyRound, Orbit, Radio, ShieldCheck, Sparkles } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
@@ -14,6 +14,11 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isCreatingAccount = mode === "create";
   const isResettingPassword = mode === "reset";
+
+  useEffect(() => {
+    const requestedMode = new URLSearchParams(window.location.search).get("mode");
+    if (requestedMode === "signin" || requestedMode === "reset") startTransition(() => setMode(requestedMode));
+  }, []);
 
   function getNextPath() {
     const requestedNext = new URLSearchParams(window.location.search).get("next");

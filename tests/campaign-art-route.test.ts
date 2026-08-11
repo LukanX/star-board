@@ -10,7 +10,7 @@ vi.mock("@/lib/auth/permissions", () => ({
   getCampaignMembership: mocks.getCampaignMembership,
 }));
 
-import { GET, POST } from "@/app/api/campaigns/[campaignId]/art/route";
+import { DELETE, GET, POST } from "@/app/api/campaigns/[campaignId]/art/route";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -18,12 +18,22 @@ const validPath = `${campaignId}/${userId}/npc-art.png`;
 
 function createSupabaseMock() {
   const upload = vi.fn().mockResolvedValue({ error: null });
+  const remove = vi.fn().mockResolvedValue({ error: null });
   const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl: "https://storage.example/signed-art" }, error: null });
-  const from = vi.fn().mockReturnValue({ upload, createSignedUrl });
+  const storageFrom = vi.fn().mockReturnValue({ upload, remove, createSignedUrl });
+  const tableQuery = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+  };
+  tableQuery.select.mockReturnValue(tableQuery);
+  tableQuery.eq.mockReturnValue(tableQuery);
+  const from = vi.fn().mockReturnValue(tableQuery);
 
   return {
-    supabase: { storage: { from } },
+    supabase: { from, storage: { from: storageFrom } },
     upload,
+    remove,
     createSignedUrl,
   };
 }
@@ -87,5 +97,35 @@ describe("campaign art routes", () => {
       upsert: false,
     });
     expect(createSignedUrl).toHaveBeenCalledWith(payload.asset.path, 3600);
+  });
+
+  it("does not remove an asset that is already referenced by a campaign record", async () => {
+    const { supabase, remove } = createSupabaseMock();
+    const referencedQuery = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      limit: vi.fn().mockResolvedValue({ data: [{ art_path: validPath }], error: null }),
+    };
+    referencedQuery.select.mockReturnValue(referencedQuery);
+    referencedQuery.eq.mockReturnValue(referencedQuery);
+    supabase.from.mockReturnValue(referencedQuery);
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "Captain" });
+
+    const response = await DELETE(new Request(`http://localhost/api/campaigns/${campaignId}/art?path=${encodeURIComponent(validPath)}`, { method: "DELETE" }), params());
+
+    expect(response.status).toBe(204);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("removes an unreferenced member asset", async () => {
+    const { supabase, remove } = createSupabaseMock();
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "Captain" });
+
+    const response = await DELETE(new Request(`http://localhost/api/campaigns/${campaignId}/art?path=${encodeURIComponent(validPath)}`, { method: "DELETE" }), params());
+
+    expect(response.status).toBe(204);
+    expect(remove).toHaveBeenCalledWith([validPath]);
   });
 });

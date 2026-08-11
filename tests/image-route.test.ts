@@ -4,16 +4,15 @@ const mocks = vi.hoisted(() => ({
   generateImage: vi.fn(),
   getServerEnv: vi.fn(),
   requireCampaignGM: vi.fn(),
-}));
-
-vi.mock("openai", () => ({
-  default: class OpenAIMock {
-    images = { generate: mocks.generateImage };
-  },
+  loadCampaignAiSettings: vi.fn(),
+  getAiModelCatalog: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
+vi.mock("@/lib/ai/client", () => ({ generateImage: mocks.generateImage }));
+vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
+vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
 
 import { POST } from "@/app/api/ai/image/route";
 
@@ -40,14 +39,6 @@ function createSupabaseMock() {
   campaignQuery.select.mockReturnValue(campaignQuery);
   campaignQuery.eq.mockReturnValue(campaignQuery);
 
-  const rateLimitQuery = {
-    select: vi.fn(),
-    eq: vi.fn(),
-    gte: vi.fn().mockResolvedValue({ count: 0, error: null }),
-  };
-  rateLimitQuery.select.mockReturnValue(rateLimitQuery);
-  rateLimitQuery.eq.mockReturnValue(rateLimitQuery);
-
   const generationInsert = {
     insert: vi.fn(),
     select: vi.fn(),
@@ -62,7 +53,6 @@ function createSupabaseMock() {
   return {
     from: vi.fn()
       .mockReturnValueOnce(campaignQuery)
-      .mockReturnValueOnce(rateLimitQuery)
       .mockReturnValueOnce(generationInsert),
     generationInsert,
   };
@@ -100,21 +90,28 @@ describe("POST /api/ai/image", () => {
   it("returns a validated draft with a canonical timestamp and audit run", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENAI_API_KEY: "test-key", OPENAI_IMAGE_MODEL: "gpt-image-1" });
-    mocks.generateImage.mockResolvedValue({ data: [{ b64_json: "aW1hZ2U=" }] });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini", "google/gemini-2.5-flash", "openai/gpt-4o", "openai/gpt-image-1", "google/gemini-2.5-flash-image", "bytedance-seed/seedream-4.5"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [
+      { id: "openai/gpt-image-1", capability: "image", compatible: true },
+      { id: "google/gemini-2.5-flash-image", capability: "image", compatible: true },
+    ] });
+    mocks.generateImage.mockResolvedValue({ image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" }, model: "openai/gpt-image-1" });
 
     const response = await POST(createRequest({
       campaignId,
       mode: "create",
       targetKind: "npc",
       subject: "A masked station broker",
+      model: "openai/gpt-image-1",
     }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(mocks.generateImage).toHaveBeenCalledWith(expect.stringContaining("masked station broker"), "openai/gpt-image-1");
     expect(payload.draft).toMatchObject({
       generationRunId: "00000000-0000-4000-8000-000000000003",
-      image: { base64: "aW1hZ2U=", url: null },
+      image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" },
       createdAt: "2026-08-03T12:34:56.000Z",
     });
     expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({

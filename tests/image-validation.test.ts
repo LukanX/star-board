@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { imageDraftSchema, imageGenerationInputSchema } from "@/lib/validation/image";
+import { buildArtPrompt } from "@/lib/ai/prompts";
+import { imageDraftSchema, imageGenerationInputSchema, imagePromptMaxLength } from "@/lib/validation/image";
 
 const validDraft = {
   generationRunId: "00000000-0000-4000-8000-000000000001",
@@ -7,9 +8,9 @@ const validDraft = {
   mode: "create" as const,
   subject: "A masked station broker",
   prompt: "A masked station broker in a crowded orbital bazaar.",
-  image: { base64: "aW1hZ2U=", url: null },
-  provider: "openai" as const,
-  model: "gpt-image-1",
+  image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" },
+  provider: "openrouter" as const,
+  model: "openai/gpt-image-1",
   createdAt: "2026-08-03T12:34:56.000Z",
 };
 
@@ -45,5 +46,30 @@ describe("image generation schemas", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a full previously generated prompt for refinement", () => {
+    const result = imageGenerationInputSchema.safeParse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      mode: "refine",
+      targetKind: "character",
+      subject: "A pilot with a cracked visor",
+      currentPrompt: "x".repeat(2000),
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("keeps a refined prompt within the image draft limit", () => {
+    const prompt = buildArtPrompt(
+      "A pilot with a cracked visor",
+      "A long campaign style brief. ".repeat(100),
+      "Make the overcoat white and add salt and pepper to the fur.",
+      "Existing visual direction. ".repeat(200),
+    );
+
+    expect(prompt.length).toBeLessThanOrEqual(imagePromptMaxLength);
+    expect(prompt).toContain("Make the overcoat white");
+    expect(prompt).toContain("Subject: A pilot with a cracked visor");
   });
 });

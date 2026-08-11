@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import AiArtStudio from "@/components/archive/AiArtStudio";
-import { ImagePlus, LoaderCircle, X } from "lucide-react";
+import { ImagePlus, LoaderCircle, Sparkles, X } from "lucide-react";
 
 type ArtKind = "character" | "npc" | "faction" | "job";
 
@@ -11,8 +11,12 @@ export type CampaignArtEditorTarget = {
   kind: ArtKind;
   value: string | null;
   url?: string | null;
+  subject?: string;
+  currentPrompt?: string | null;
+  onSubjectChange?: (subject: string) => void;
   onChange: (path: string | null) => void;
   onUrlChange: (url: string | null) => void;
+  onApproved?: (asset: { path: string; signedUrl: string; prompt: string; provider: string }) => void;
 };
 
 const listeners = new Set<() => void>();
@@ -43,14 +47,25 @@ export function useCampaignArtEditor(target: CampaignArtEditorTarget | null) {
 
 export function CampaignArtEditorSlot() {
   const target = useSyncExternalStore(subscribe, getTarget, () => null);
-  return target ? <CampaignArtField key={`${target.kind}:${target.value ?? ""}:${target.url ?? ""}`} {...target} /> : null;
+  return target ? <CampaignArtField key={target.kind} {...target} /> : null;
 }
 
-export default function CampaignArtField({ campaignId, kind, value, url, onChange, onUrlChange }: CampaignArtEditorTarget) {
+export default function CampaignArtField({ campaignId, kind, value, url, subject, currentPrompt, onSubjectChange, onChange, onUrlChange, onApproved }: CampaignArtEditorTarget) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploadedPathsRef = useRef(new Set<string>());
+  const persistedPathRef = useRef<string | null>(value && !value.startsWith("http") ? value : null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(url ?? (value?.startsWith("http") ? value : null));
+  const [artStudioOpen, setArtStudioOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => () => {
+    if (!campaignId) return;
+    const pathsToRemove = [...uploadedPathsRef.current].filter((path) => path !== persistedPathRef.current);
+    for (const path of pathsToRemove) {
+      void fetch(`/api/campaigns/${encodeURIComponent(campaignId ?? "")}/art?path=${encodeURIComponent(path)}`, { method: "DELETE" });
+    }
+  }, [campaignId]);
 
   useEffect(() => {
     if (url || value?.startsWith("http") || !campaignId || !value) return;
@@ -88,6 +103,7 @@ export default function CampaignArtField({ campaignId, kind, value, url, onChang
 
       onChange(result.asset.path);
       onUrlChange(result.asset.signedUrl);
+      uploadedPathsRef.current.add(result.asset.path);
       setPreviewUrl(result.asset.signedUrl);
     } catch (uploadError: unknown) {
       setError(uploadError instanceof Error ? uploadError.message : "Unable to upload campaign art.");
@@ -104,5 +120,5 @@ export default function CampaignArtField({ campaignId, kind, value, url, onChang
     setError(null);
   };
 
-  return <div className="campaign-art-stack"><div className="campaign-art-field"><div aria-label="Campaign art preview" className="campaign-art-preview" role="img" style={previewUrl ? { backgroundImage: `url(${previewUrl})` } : undefined}>{previewUrl ? null : <ImagePlus size={22} />}</div><div className="campaign-art-copy"><p className="eyebrow">CAMPAIGN ART</p><strong>{previewUrl ? "ART ASSET READY" : "NO ART ASSET"}</strong><span>JPEG, PNG, WebP, or GIF - 5 MB maximum</span><div className="campaign-art-actions"><input ref={inputRef} accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); }} type="file" /><button className="button button-secondary" disabled={isUploading} onClick={() => inputRef.current?.click()} type="button">{isUploading ? <><LoaderCircle className="spin" size={14} /> UPLOADING...</> : <><ImagePlus size={14} /> {previewUrl ? "REPLACE ART" : "UPLOAD ART"}</>}</button>{previewUrl ? <button aria-label="Remove campaign art" className="icon-button" disabled={isUploading} onClick={clear} title="Remove campaign art" type="button"><X size={16} /></button> : null}</div>{error ? <span className="form-error" role="alert">{error}</span> : null}</div></div>{campaignId ? <AiArtStudio campaignId={campaignId} kind={kind} onApproved={(asset) => { onChange(asset.path); onUrlChange(asset.signedUrl); setPreviewUrl(asset.signedUrl); setError(null); }} /> : null}</div>;
+  return <div className="campaign-art-stack"><div className="campaign-art-field"><div aria-label="Campaign art preview" className="campaign-art-preview" role="img" style={previewUrl ? { backgroundImage: `url(${previewUrl})` } : undefined}>{previewUrl ? null : <ImagePlus size={22} />}</div><div className="campaign-art-copy"><p className="eyebrow">CAMPAIGN ART</p><strong>{previewUrl ? "ART ASSET READY" : "NO ART ASSET"}</strong><span>JPEG, PNG, WebP, or GIF - 5 MB maximum</span><div className="campaign-art-actions"><input ref={inputRef} accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); }} type="file" /><button className="button button-secondary" disabled={isUploading} onClick={() => inputRef.current?.click()} type="button">{isUploading ? <><LoaderCircle className="spin" size={14} /> UPLOADING...</> : <><ImagePlus size={14} /> {previewUrl ? "REPLACE ART" : "UPLOAD ART"}</>}</button><button aria-expanded={artStudioOpen} className={`button ${artStudioOpen ? "button-secondary" : "button-ai"}`} onClick={() => setArtStudioOpen((current) => !current)} type="button"><Sparkles size={14} /> {artStudioOpen ? "HIDE GENERATOR" : "GENERATE ART"}</button>{previewUrl ? <button aria-label="Remove campaign art" className="icon-button" disabled={isUploading} onClick={clear} title="Remove campaign art" type="button"><X size={16} /></button> : null}</div>{error ? <span className="form-error" role="alert">{error}</span> : null}</div></div>{campaignId && artStudioOpen ? <div className="campaign-art-generator"><AiArtStudio campaignId={campaignId} kind={kind} subject={subject} currentPrompt={currentPrompt} onSubjectChange={onSubjectChange} onApproved={(asset) => { onChange(asset.path); onUrlChange(asset.signedUrl); uploadedPathsRef.current.add(asset.path); onApproved?.(asset); setPreviewUrl(asset.signedUrl); setError(null); }} /></div> : null}</div>;
 }

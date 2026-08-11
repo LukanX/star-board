@@ -7,7 +7,7 @@ type RouteContext = { params: Promise<{ campaignId: string; factionId: string }>
 
 export const runtime = "nodejs";
 
-const factionColumns = "id, author_id, name, description, status, art_path, art_prompt, created_at, updated_at";
+const factionColumns = "id, author_id, name, description, status, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId, factionId } = await params;
@@ -91,8 +91,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       ...(input.data.name === undefined ? {} : { name: input.data.name }),
       ...(input.data.description === undefined ? {} : { description: input.data.description }),
       ...(input.data.status === undefined ? {} : { status: input.data.status }),
+      ...(input.data.artSubject === undefined ? {} : { art_subject: input.data.artSubject }),
       ...(input.data.artPath === undefined ? {} : { art_path: input.data.artPath }),
       ...(input.data.artPrompt === undefined ? {} : { art_prompt: input.data.artPrompt }),
+      ...(input.data.artProvider === undefined ? {} : { art_provider: input.data.artProvider }),
       updated_by: context.user.id,
     };
     const { data, error } = await context.supabase

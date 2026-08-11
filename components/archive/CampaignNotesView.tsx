@@ -40,7 +40,6 @@ type NoteDraft = {
 type Props = {
   notes: CampaignNote[];
   campaignId: string | null;
-  isPersistent: boolean;
   isGM: boolean;
   episodes: CampaignNoteEpisode[];
   onNotesChange: Dispatch<SetStateAction<CampaignNote[]>>;
@@ -64,7 +63,7 @@ function normalizeNote(note: ApiCampaignNote, existing: CampaignNote | undefined
   return { ...note, accent: existing?.accent ?? accents[index % accents.length], age: existing?.age };
 }
 
-export default function CampaignNotesView({ notes, campaignId, isPersistent, isGM, episodes, onNotesChange, onAction }: Props) {
+export default function CampaignNotesView({ notes, campaignId, isGM, episodes, onNotesChange, onAction }: Props) {
   const [filter, setFilter] = useState<"all" | "global" | "episodes" | "gm">("all");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<CampaignNote | null>(null);
@@ -90,10 +89,7 @@ export default function CampaignNotesView({ notes, campaignId, isPersistent, isG
 
   const saveNote = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!campaignId) {
-      onAction("Note editor becomes persistent when a campaign is selected.");
-      return;
-    }
+    if (!campaignId) return;
 
     setIsSaving(true);
     setError(null);
@@ -140,7 +136,7 @@ export default function CampaignNotesView({ notes, campaignId, isPersistent, isG
     }
   };
 
-  return <PageLayout eyebrow="CAMPAIGN LOG // SHARED MEMORY" title="Campaign notes" description="Global context and episode notes, with authorship and visibility kept visible." action={isPersistent ? "ADD NOTE" : "ADD NOTE"} onAction={() => isPersistent ? openEditor() : onAction("Note editor becomes persistent when a campaign is selected.")}>
+  return <PageLayout eyebrow="CAMPAIGN LOG // SHARED MEMORY" title="Campaign notes" description="Global context and episode notes, with authorship and visibility kept visible." action="ADD NOTE" onAction={() => openEditor()}>
     {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">{isGM ? "GM / PLAYER NOTE" : "PLAYER NOTE"}</p><h2>{editingNote ? `Edit ${editingNote.title}` : "Add a campaign note"}</h2></div><button className="icon-button" aria-label="Close note editor" onClick={() => setEditorOpen(false)} title="Close note editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveNote}><label>Title<input required maxLength={160} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label><label>Note body<textarea maxLength={20000} placeholder="Record what the campaign should remember." value={draft.bodyMarkdown} onChange={(event) => setDraft((current) => ({ ...current, bodyMarkdown: event.target.value }))} /></label><label>Episode<select value={draft.episodeId ?? ""} onChange={(event) => setDraft((current) => ({ ...current, episodeId: event.target.value || null }))}><option value="">Global campaign note</option>{episodes.map((episode) => <option key={episode.id} value={episode.id}>{episode.title} ({episode.status})</option>)}</select></label>{isGM ? <label className="note-visibility-toggle"><input type="checkbox" checked={draft.visibility === "gm"} onChange={(event) => setDraft((current) => ({ ...current, visibility: event.target.checked ? "gm" : "player" }))} /><span><LockKeyhole size={13} /> GM ONLY</span></label> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingNote ? "SAVE CHANGES" : "ADD NOTE"}</button>{editingNote?.permissions.canDelete ? <button className="button button-danger" disabled={isSaving} onClick={deleteNote} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
     <div className="notes-toolbar"><div className="filter-tabs"><button className={`filter-tab ${filter === "all" ? "filter-tab-active" : ""}`} onClick={() => setFilter("all")} type="button">ALL NOTES <span>{notes.length.toString().padStart(2, "0")}</span></button><button className={`filter-tab ${filter === "global" ? "filter-tab-active" : ""}`} onClick={() => setFilter("global")} type="button">GLOBAL</button><button className={`filter-tab ${filter === "episodes" ? "filter-tab-active" : ""}`} onClick={() => setFilter("episodes")} type="button">EPISODES</button></div>{isGM ? <button className={`visibility-toggle ${filter === "gm" ? "visibility-toggle-active" : ""}`} onClick={() => setFilter(filter === "gm" ? "all" : "gm")} type="button"><LockKeyhole size={14} /> GM ONLY</button> : null}</div>
     {filteredNotes.length ? <div className="notes-list">{filteredNotes.map((note) => <article className="note-row" key={note.id}><span className={`accent-mark accent-${note.accent}`} /><div className="note-main"><div className="note-meta"><span>{note.episode_id ? "EPISODE" : "GLOBAL"}</span><span className={`note-visibility ${note.visibility === "gm" ? "note-private" : ""}`}>{note.visibility === "gm" ? <LockKeyhole size={12} /> : <BookOpen size={12} />} {note.visibility === "gm" ? "GM ONLY" : "PLAYER"}</span></div><h3>{note.title}</h3><p>Added by <strong>{note.author.displayName}</strong> <span className="meta-divider" /> {noteAge(note)}</p></div><button className="icon-button" aria-label={`Open note ${note.title}`} onClick={() => note.permissions.canEdit ? openEditor(note) : setSelectedNote(note)} title={note.permissions.canEdit ? `Edit ${note.title}` : `Open ${note.title}`} type="button"><ChevronRight size={17} /></button></article>)}</div> : <div className="character-empty"><FileText size={22} /><h2>No notes in this view yet.</h2><p>Record the next piece of campaign memory when it becomes important.</p></div>}

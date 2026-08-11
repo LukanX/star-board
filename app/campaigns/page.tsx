@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { ArrowUpRight, Check, CirclePlus, Hexagon, Orbit, Radio, ShieldCheck } from "lucide-react";
+import SignOutButton from "@/components/auth/SignOutButton";
 
 type Campaign = {
   id: string;
@@ -112,7 +113,7 @@ export default function CampaignsPage() {
       <section className="campaigns-frame">
         <header className="campaigns-header">
           <div className="auth-brand"><span className="auth-brand-symbol"><Orbit size={23} /></span><span><strong>STAR BOARD</strong><small>CAMPAIGN OPERATIONS</small></span></div>
-          <span className="campaigns-clearance"><ShieldCheck size={14} /> AUTHENTICATED CREW</span>
+          <div className="campaigns-header-actions"><span className="campaigns-clearance"><ShieldCheck size={14} /> AUTHENTICATED CREW</span><SignOutButton className="button button-secondary" /></div>
         </header>
         <div className="campaigns-intro"><p className="eyebrow eyebrow-bright"><span className="live-dot" /> CAMPAIGN MANIFEST</p><h1>Choose or create a campaign.</h1><p>Anyone with an account can open a new campaign. A GM invite is only needed to join an existing one.</p></div>
         <div className="campaigns-layout">

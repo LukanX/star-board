@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { CampaignArtEditorSlot, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
+import AuthPrompt from "@/components/auth/AuthPrompt";
+import SignOutButton from "@/components/auth/SignOutButton";
+import CampaignArtField, { CampaignArtEditorSlot, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
+import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
+import CampaignAiSettings from "@/components/archive/CampaignAiSettings";
 import CampaignNotesView, { type ApiCampaignNote, type CampaignNote } from "@/components/archive/CampaignNotesView";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   ArrowUpRight,
-  Bell,
   BookOpen,
   Bot,
   BriefcaseBusiness,
@@ -21,29 +24,40 @@ import {
   FolderKanban,
   Gauge,
   Hexagon,
-  ImagePlus,
   LockKeyhole,
-  Mail,
   Map,
   Menu,
   MoreHorizontal,
   Network,
   Orbit,
+  Pencil,
   Plus,
   Radio,
-  Search,
   Send,
-  Settings2,
-  ShieldCheck,
   Sparkles,
   UserRound,
   UsersRound,
   Vote,
   X,
   Zap,
+  SlidersHorizontal,
 } from "lucide-react";
 
-type NavId = "overview" | "characters" | "npcs" | "factions" | "jobs" | "episodes" | "notes" | "members";
+type NavId = "overview" | "characters" | "npcs" | "factions" | "jobs" | "episodes" | "notes" | "members" | "settings";
+
+type CampaignRecord = {
+  id: string;
+  name: string;
+  system: string;
+  description: string;
+  created_by: string;
+};
+
+type CampaignMembership = {
+  role: "gm" | "player";
+  display_name: string;
+  campaign: CampaignRecord | CampaignRecord[] | null;
+};
 
 type Mission = {
   id: string;
@@ -53,10 +67,8 @@ type Mission = {
   giver: string;
   giverType: "NPC" | "FACTION";
   votes: number;
-  eta: string;
-  region: string;
   accent: "cyan" | "pink" | "amber";
-  image: string;
+  image: string | null;
   voted: boolean;
   status: "draft" | "open" | "promoted" | "archived";
   playerNotesMarkdown: string;
@@ -65,6 +77,9 @@ type Mission = {
   artUrl?: string | null;
   artPrompt?: string | null;
   artProvider?: string | null;
+  hook?: string;
+  gmNotesMarkdown?: string;
+  artSubject?: string | null;
 };
 
 type ApiJob = {
@@ -73,9 +88,12 @@ type ApiJob = {
   summary: string;
   status: "draft" | "open" | "promoted" | "archived";
   player_notes_markdown: string;
+  hook?: string;
+  gm_notes_markdown?: string;
   giver_npc_id: string | null;
   giver_faction_id: string | null;
   art_path: string | null;
+  art_subject: string | null;
   art_url?: string | null;
   art_prompt: string | null;
   art_provider: string | null;
@@ -106,6 +124,7 @@ type ApiNpc = {
   description: string;
   player_notes_markdown: string;
   gm_notes_markdown?: string;
+  art_subject: string | null;
   art_path: string | null;
   art_url?: string | null;
   art_prompt: string | null;
@@ -118,9 +137,11 @@ type ApiFaction = {
   name: string;
   description: string;
   status: string;
+  art_subject: string | null;
   art_path: string | null;
   art_url?: string | null;
   art_prompt: string | null;
+  art_provider?: string | null;
 };
 
 type ApiEpisode = {
@@ -166,7 +187,7 @@ type Character = {
   subtitle: string;
   detail: string;
   color: "pink" | "cyan" | "purple" | "amber";
-  image: string;
+  image: string | null;
   status: "ACTIVE" | "RESTING";
   backstoryMarkdown: string;
   artPath?: string | null;
@@ -184,15 +205,9 @@ type CharacterDraft = {
   artUrl: string | null;
   artPrompt: string | null;
 };
-const persistentMissionImages = [
-  "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1000&q=85",
-  "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1000&q=85",
-  "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1000&q=85",
-];
-
 function mapApiJob(job: ApiJob, index: number): Mission {
   const accent = (["cyan", "pink", "amber"] as const)[index % 3];
-  const image = job.art_url ?? (job.art_path?.startsWith("http") ? job.art_path : persistentMissionImages[index % persistentMissionImages.length]);
+  const image = job.art_url ?? (job.art_path?.startsWith("http") ? job.art_path : null);
 
   return {
     id: job.id,
@@ -202,8 +217,6 @@ function mapApiJob(job: ApiJob, index: number): Mission {
     giver: job.giver.name,
     giverType: job.giver.type,
     votes: job.votes,
-    eta: "UNSCHEDULED",
-    region: "CAMPAIGN SPACE",
     accent,
     image,
     voted: job.voted,
@@ -214,7 +227,30 @@ function mapApiJob(job: ApiJob, index: number): Mission {
     artUrl: job.art_url ?? null,
     artPrompt: job.art_prompt,
     artProvider: job.art_provider,
+    hook: job.hook ?? undefined,
+    gmNotesMarkdown: job.gm_notes_markdown ?? "",
+    artSubject: job.art_subject,
   };
+}
+
+function getCampaignRecord(membership: CampaignMembership) {
+  return Array.isArray(membership.campaign) ? membership.campaign[0] : membership.campaign;
+}
+
+async function fetchCampaignManifest() {
+  const response = await fetch("/api/campaigns");
+
+  if (response.status === 401) {
+    return { authenticated: false, campaigns: [] as CampaignMembership[] };
+  }
+
+  const result = (await response.json()) as { error?: string; campaigns?: CampaignMembership[] };
+
+  if (!response.ok) {
+    throw new Error(result.error ?? "Unable to load your campaigns.");
+  }
+
+  return { authenticated: true, campaigns: result.campaigns ?? [] };
 }
 
 async function fetchCampaignJobs(campaignId: string) {
@@ -347,34 +383,23 @@ async function fetchCampaignMembers(campaignId: string) {
   return { role: result.role ?? "player", displayName: result.displayName ?? "Crew member", members: result.members ?? [] };
 }
 
+async function fetchCampaignAiUsage(campaignId: string) {
+  try {
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/ai-usage`);
+    const result = (await response.json()) as { totalTokens?: number };
+    return response.ok && typeof result.totalTokens === "number" ? result.totalTokens : null;
+  } catch {
+    return null;
+  }
+}
+
 type NavItem = { id: NavId; label: string; icon: LucideIcon; count?: string };
 
 const navItems: { label: string; items: NavItem[] }[] = [
   { label: "Command", items: [{ id: "overview", label: "Overview", icon: Gauge }, { id: "jobs", label: "Job board", icon: BriefcaseBusiness, count: "03" }, { id: "episodes", label: "Episodes", icon: FolderKanban, count: "08" }] },
   { label: "Archive", items: [{ id: "characters", label: "Characters", icon: UsersRound, count: "06" }, { id: "npcs", label: "NPCs", icon: UserRound, count: "14" }, { id: "factions", label: "Factions", icon: Network, count: "05" }, { id: "notes", label: "Campaign notes", icon: FileText, count: "21" }] },
+  { label: "Control", items: [{ id: "settings", label: "Campaign settings", icon: SlidersHorizontal }] },
 ];
-
-const missionsSeed: Mission[] = [
-  { id: "nightglass", title: "The Nightglass Relay", category: "SALVAGE / HIGH RISK", summary: "A dead comms relay just woke up beyond the Drift lane. Its signal is repeating a distress call in a language no archive can place.", giver: "Sera Vonn", giverType: "NPC", votes: 5, eta: "2–3 sessions", region: "Gallowglass Reach", accent: "cyan", image: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1000&q=85", voted: true, status: "open", playerNotesMarkdown: "", giverId: "" },
-  { id: "velvet", title: "A Favor in Velvet", category: "DIPLOMACY / SOCIAL", summary: "The Red Ledger wants one quiet evening at the embassy. Quiet is not usually how the crew leaves a room.", giver: "The Red Ledger", giverType: "FACTION", votes: 3, eta: "1 session", region: "Absalom Station", accent: "pink", image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1000&q=85", voted: false, status: "open", playerNotesMarkdown: "", giverId: "" },
-  { id: "hollow", title: "Hollow Moon Protocol", category: "EXPLORATION / UNKNOWN", summary: "A survey drone has mapped a second interior to a moon that should be solid all the way through.", giver: "Dr. Ilyra Quell", giverType: "NPC", votes: 1, eta: "3+ sessions", region: "Veskarium Fringe", accent: "amber", image: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1000&q=85", voted: false, status: "open", playerNotesMarkdown: "", giverId: "" },
-];
-
-const crew = [
-  { name: "Kaia Vex", role: "Operative", initials: "KV", color: "#ff5c9a", online: true },
-  { name: "Rook-7", role: "Mechanic", initials: "R7", color: "#62e8ff", online: true },
-  { name: "Mira Sol", role: "Mystic", initials: "MS", color: "#b992ff", online: false },
-  { name: "Jax Tallow", role: "Envoy", initials: "JT", color: "#f5b84b", online: true },
-];
-
-const charactersSeed: Character[] = [
-  { id: "kaia-vex", name: "Kaia Vex", species: "Human", className: "Operative", subtitle: "Human Operative", detail: "Ghost // Level 4", color: "pink", image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80", status: "ACTIVE", backstoryMarkdown: "Kaia keeps a list of every station where the lights flickered before someone disappeared." },
-  { id: "rook-7", name: "Rook-7", species: "Android", className: "Mechanic", subtitle: "Android Mechanic", detail: "Exocortex // Level 4", color: "cyan", image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=600&q=80", status: "ACTIVE", backstoryMarkdown: "Rook remembers every machine they have repaired, including the ones that never existed." },
-  { id: "mira-sol", name: "Mira Sol", species: "Lashunta", className: "Mystic", subtitle: "Lashunta Mystic", detail: "Xenodruid // Level 4", color: "purple", image: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=600&q=80", status: "RESTING", backstoryMarkdown: "Mira hears a second heartbeat whenever the crew enters the Drift." },
-  { id: "jax-tallow", name: "Jax Tallow", species: "Ysoki", className: "Envoy", subtitle: "Ysoki Envoy", detail: "Celebrity // Level 4", color: "amber", image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80", status: "ACTIVE", backstoryMarkdown: "Jax can turn a bad docking fine into a standing ovation, given enough witnesses." },
-];
-
-const persistentCharacterImages = charactersSeed.map((character) => character.image);
 
 function mapApiCharacter(character: ApiCharacter, index: number): Character {
   const colors = ["pink", "cyan", "purple", "amber"] as const;
@@ -389,7 +414,7 @@ function mapApiCharacter(character: ApiCharacter, index: number): Character {
     subtitle,
     detail,
     color: colors[index % colors.length],
-    image: character.art_url ?? (character.art_path?.startsWith("http") ? character.art_path : persistentCharacterImages[index % persistentCharacterImages.length]),
+    image: character.art_url ?? (character.art_path?.startsWith("http") ? character.art_path : null),
     status: "ACTIVE",
     backstoryMarkdown: character.backstory_markdown,
     artPath: character.art_path,
@@ -436,7 +461,7 @@ function getOverviewMetrics(missions: Mission[], members: ApiCampaignMember[], n
 
   return {
     openJobs: missions.filter((mission) => mission.status === "open").length,
-    activeVotes: missions.some((mission) => mission.voted) ? 1 : 0,
+    activeVotes: missions.filter((mission) => mission.voted).length,
     episodes: episodes.length,
     members: members.length,
     players: members.filter((member) => member.role === "player").length,
@@ -454,39 +479,17 @@ function toCharacterDraft(character: Character): CharacterDraft {
   return { name: character.name, species: character.species, className: character.className, level: Number(character.detail.match(/Level (\d+)/)?.[1] ?? 1), backstoryMarkdown: character.backstoryMarkdown, artPath: character.artPath ?? null, artUrl: character.artUrl ?? null, artPrompt: character.artPrompt ?? null };
 }
 
-const npcs = [
-  { name: "Sera Vonn", subtitle: "Independent salvager", status: "TRUSTED", location: "Absalom Station", color: "cyan" },
-  { name: "Dr. Ilyra Quell", subtitle: "Xenobiologist / contract lead", status: "UNKNOWN", location: "Veskarium Fringe", color: "amber" },
-  { name: "The Glass Cardinal", subtitle: "Masked information broker", status: "HOSTILE", location: "Unknown", color: "pink" },
-];
-
-const factions = [
-  { name: "The Red Ledger", type: "Trade syndicate", members: "1,200+", status: "ACTIVE", color: "pink" },
-  { name: "Helix Cartography", type: "Drift survey collective", members: "86", status: "ALLIED", color: "cyan" },
-  { name: "Veskarium Fringe Authority", type: "Colonial administration", members: "4,800", status: "TENSE", color: "amber" },
-];
-
-const fallbackNpcRecords: NpcRecord[] = npcs.map((npc, index) => ({ ...npc, id: `seed-${index}`, author_id: "", species: "", role: npc.subtitle, description: npc.location, player_notes_markdown: "", gm_notes_markdown: "", art_path: null, art_prompt: null, color: (["cyan", "amber", "pink"] as const)[index % 3] }));
-const fallbackFactionRecords: FactionRecord[] = factions.map((faction, index) => ({ ...faction, id: `seed-${index}`, author_id: "", description: faction.type, status: faction.status.toLowerCase(), art_path: null, art_prompt: null, color: (["pink", "cyan", "amber"] as const)[index % 3] }));
-
-const episodes = [
-  { number: "08", title: "The Last Safe Harbor", date: "JUL 11, 2026", status: "CURRENT", summary: "A station lockdown, three missing cargo manifests, and one very expensive hourglass." },
-  { number: "07", title: "Static in the Green", date: "JUN 28, 2026", status: "ARCHIVED", summary: "The crew followed a signal into a living nebula and came back with a new passenger." },
-  { number: "06", title: "Dead Reckoning", date: "JUN 14, 2026", status: "ARCHIVED", summary: "An old nav beacon offered a shortcut. The shortcut had opinions." },
-];
-
-const notes = [
-  { title: "The station has a second sun", scope: "GLOBAL", author: "Mira Sol", age: "12m ago", visibility: "PLAYER", accent: "cyan" },
-  { title: "Ask Sera about the blue key", scope: "EP. 08", author: "Jax Tallow", age: "1h ago", visibility: "PLAYER", accent: "pink" },
-  { title: "The Cardinal knows Rook's original designation", scope: "EP. 08", author: "GM / Arlen", age: "3h ago", visibility: "GM ONLY", accent: "amber" },
-  { title: "Drift route: Gallowglass to Absalom", scope: "GLOBAL", author: "Kaia Vex", age: "Yesterday", visibility: "PLAYER", accent: "purple" },
-];
-
-function VisualAsset({ src, label, className = "" }: { src: string; label: string; className?: string }) {
-  return <div aria-label={label} className={`visual-asset ${className}`} role="img" style={{ backgroundImage: `url(${src})` }} />;
+function VisualAsset({ src, label, className = "" }: { src: string | null; label: string; className?: string }) {
+  return <div aria-label={label} className={`visual-asset ${className} ${src ? "has-asset" : "no-asset"}`} role={src ? "img" : undefined} style={src ? { backgroundImage: `url(${src})` } : undefined} />;
 }
 
-function AccentMark({ color }: { color: string }) { return <span aria-hidden="true" className={`accent-mark accent-${color}`} />; }
+function getAttachedArtUrl(artUrl: string | null | undefined, artPath: string | null | undefined) {
+  return artUrl ?? (artPath?.startsWith("http") ? artPath : null);
+}
+
+function RecordPortrait({ src, label, className = "" }: { src: string | null; label: string; className?: string }) {
+  return <div aria-label={label} className={`${className} ${src ? "has-portrait" : "no-portrait"}`} role={src ? "img" : undefined} style={src ? { backgroundImage: `url(${src})` } : undefined}>{src ? null : <UserRound size={19} />}</div>;
+}
 
 function StatusPill({ children, color = "cyan" }: { children: React.ReactNode; color?: string }) {
   return <span className={`status-pill status-${color}`}>{children}</span>;
@@ -496,92 +499,99 @@ function SectionHeading({ eyebrow, title, action, onAction }: { eyebrow: string;
   return <div className="section-heading"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div>{action && onAction ? <button className="text-action" onClick={onAction} type="button">{action} <ArrowUpRight size={14} /></button> : null}</div>;
 }
 
+function AppStatus({ title, message, action }: { title: string; message: string; action?: React.ReactNode }) {
+  return <main className="app-status-shell"><section className="app-status-panel"><p className="eyebrow eyebrow-bright"><span className="live-dot" /> STAR BOARD</p><h1>{title}</h1><p>{message}</p>{action}</section></main>;
+}
+
 export default function Home() {
   const [activeView, setActiveView] = useState<NavId>("overview");
-  const [missions, setMissions] = useState(missionsSeed);
-  const [characters, setCharacters] = useState(charactersSeed);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [npcRecords, setNpcRecords] = useState<NpcRecord[]>([]);
   const [factionRecords, setFactionRecords] = useState<FactionRecord[]>([]);
   const [noteRecords, setNoteRecords] = useState<CampaignNote[]>([]);
   const [episodeRecords, setEpisodeRecords] = useState<EpisodeRecord[]>([]);
   const [memberRecords, setMemberRecords] = useState<ApiCampaignMember[]>([]);
-  const [isGM, setIsGM] = useState(true);
-  const [displayName, setDisplayName] = useState("Arlen Rook");
+  const [aiTokensThisWeek, setAiTokensThisWeek] = useState<number | null>(null);
+  const [isGM, setIsGM] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [campaign, setCampaign] = useState<CampaignRecord | null>(null);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const campaignIdRef = useRef<string | null>(null);
-  const [isPersistent, setIsPersistent] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [requestedPath, setRequestedPath] = useState("/");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const notify = (message: string) => setToast(message);
   useEffect(() => {
+    let cancelled = false;
     const requestedCampaignId = new URLSearchParams(window.location.search).get("campaignId");
+    const currentPath = `${window.location.pathname}${window.location.search}`;
+    startTransition(() => setRequestedPath(currentPath));
 
-    if (!requestedCampaignId) return;
+    async function loadCampaign() {
+      try {
+        const manifest = await fetchCampaignManifest();
 
-    campaignIdRef.current = requestedCampaignId;
-    void fetchCampaignJobs(requestedCampaignId).then((result) => {
-      setMissions(result.jobs.map(mapApiJob));
-      setIsGM(result.role === "gm");
-      setDisplayName(result.displayName);
-      setCampaignId(requestedCampaignId);
-      setIsPersistent(true);
-    }).catch((error: unknown) => {
-      notify(error instanceof Error ? error.message : "Unable to load campaign jobs.");
-    });
-    void fetchCampaignCharacters(requestedCampaignId).then((result) => {
-      setCharacters(result.characters.map(mapApiCharacter));
-      setIsGM(result.role === "gm");
-      setDisplayName(result.displayName);
-      setCampaignId(requestedCampaignId);
-      setIsPersistent(true);
-    }).catch((error: unknown) => {
-      notify(error instanceof Error ? error.message : "Unable to load campaign characters.");
-    });
-    void fetchCampaignNpcs(requestedCampaignId).then((result) => {
-      setNpcRecords(result.npcs.map(mapApiNpc));
-      setIsGM(result.role === "gm");
-      setDisplayName(result.displayName);
-      setCampaignId(requestedCampaignId);
-      setIsPersistent(true);
-    }).catch((error: unknown) => {
-      notify(error instanceof Error ? error.message : "Unable to load campaign NPCs.");
-    });
-    void fetchCampaignFactions(requestedCampaignId).then((result) => {
-      setFactionRecords(result.factions.map(mapApiFaction));
-      setIsGM(result.role === "gm");
-      setDisplayName(result.displayName);
-      setCampaignId(requestedCampaignId);
-      setIsPersistent(true);
-    }).catch((error: unknown) => {
-      notify(error instanceof Error ? error.message : "Unable to load campaign factions.");
-    });
-    void fetchCampaignNotes(requestedCampaignId).then((result) => {
-      setNoteRecords(result.notes.map(mapApiNote));
-      setIsGM(result.role === "gm");
-      setDisplayName(result.displayName);
-      setCampaignId(requestedCampaignId);
-      setIsPersistent(true);
-    }).catch((error: unknown) => {
-      notify(error instanceof Error ? error.message : "Unable to load campaign notes.");
-    });
-    void fetchCampaignEpisodes(requestedCampaignId).then((result) => {
-      setEpisodeRecords(result.episodes.map(mapApiEpisode));
-      setIsGM(result.role === "gm");
-      setDisplayName(result.displayName);
-      setCampaignId(requestedCampaignId);
-      setIsPersistent(true);
-    }).catch((error: unknown) => {
-      notify(error instanceof Error ? error.message : "Unable to load campaign episodes.");
-    });
-    void fetchCampaignMembers(requestedCampaignId).then((result) => {
-      setMemberRecords(result.members);
-      setIsGM(result.role === "gm");
-      setDisplayName(result.displayName);
-      setCampaignId(requestedCampaignId);
-      setIsPersistent(true);
-    }).catch((error: unknown) => {
-      notify(error instanceof Error ? error.message : "Unable to load campaign members.");
-    });
+        if (!manifest.authenticated) {
+          if (!cancelled) {
+            setAuthRequired(true);
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        if (!requestedCampaignId) {
+          window.location.assign("/campaigns");
+          return;
+        }
+
+        const membership = manifest.campaigns.find((entry) => getCampaignRecord(entry)?.id === requestedCampaignId);
+        const selectedCampaign = membership ? getCampaignRecord(membership) : null;
+
+        if (!membership || !selectedCampaign) {
+          window.location.assign("/campaigns");
+          return;
+        }
+
+        const [jobsResult, charactersResult, npcsResult, factionsResult, notesResult, episodesResult, membersResult, aiUsageResult] = await Promise.all([
+          fetchCampaignJobs(requestedCampaignId),
+          fetchCampaignCharacters(requestedCampaignId),
+          fetchCampaignNpcs(requestedCampaignId),
+          fetchCampaignFactions(requestedCampaignId),
+          fetchCampaignNotes(requestedCampaignId),
+          fetchCampaignEpisodes(requestedCampaignId),
+          fetchCampaignMembers(requestedCampaignId),
+          membership.role === "gm" ? fetchCampaignAiUsage(requestedCampaignId) : Promise.resolve(null),
+        ]);
+
+        if (cancelled) return;
+
+        campaignIdRef.current = requestedCampaignId;
+        setCampaign(selectedCampaign);
+        setCampaignId(requestedCampaignId);
+        setIsGM(membership.role === "gm");
+        setDisplayName(membership.display_name || "Crew member");
+        setMissions(jobsResult.jobs.map(mapApiJob));
+        setCharacters(charactersResult.characters.map(mapApiCharacter));
+        setNpcRecords(npcsResult.npcs.map(mapApiNpc));
+        setFactionRecords(factionsResult.factions.map(mapApiFaction));
+        setNoteRecords(notesResult.notes.map(mapApiNote));
+        setEpisodeRecords(episodesResult.episodes.map(mapApiEpisode));
+        setMemberRecords(membersResult.members);
+        setAiTokensThisWeek(aiUsageResult);
+        setIsLoading(false);
+      } catch (error: unknown) {
+        if (cancelled) return;
+        setLoadError(error instanceof Error ? error.message : "Unable to load this campaign.");
+        setIsLoading(false);
+      }
+    }
+
+    void loadCampaign();
+    return () => { cancelled = true; };
   }, []);
   const handleVote = (id: string) => {
     const chosen = missions.find((mission) => mission.id === id);
@@ -623,90 +633,98 @@ export default function Home() {
     }
   };
   const selectView = (id: NavId) => { setActiveView(id); setMobileNavOpen(false); };
-  const overviewMetrics = isPersistent ? getOverviewMetrics(missions, memberRecords, noteRecords, episodeRecords) : null;
-  const countByNavId: Partial<Record<NavId, number>> = overviewMetrics ? {
+  const overviewMetrics = getOverviewMetrics(missions, memberRecords, noteRecords, episodeRecords);
+  const countByNavId: Partial<Record<NavId, number>> = {
     jobs: overviewMetrics.openJobs,
     episodes: overviewMetrics.episodes,
     characters: characters.length,
     npcs: npcRecords.length,
     factions: factionRecords.length,
     notes: overviewMetrics.notes,
-  } : {};
-  const displayedNavItems = isPersistent ? navItems.map((group) => ({
+  };
+  const displayedNavItems = navItems.map((group) => ({
     ...group,
-    items: group.items.map((item) => ({ ...item, count: String(countByNavId[item.id] ?? 0).padStart(2, "0") })),
-  })) : navItems;
+    items: group.items.filter((item) => item.id !== "settings" || isGM).map((item) => ({ ...item, count: String(countByNavId[item.id] ?? 0).padStart(2, "0") })),
+  }));
   const activeLabel = navItems.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Overview";
+
+  if (authRequired) return <AuthPrompt nextPath={requestedPath} />;
+  if (isLoading) return <AppStatus title="Loading campaign signal." message="Checking your access and assembling the campaign records." />;
+  if (loadError) return <AppStatus title="Campaign signal unavailable." message={loadError} action={<button className="button button-secondary" onClick={() => window.location.reload()} type="button">RETRY LOAD</button>} />;
 
   return (
     <main className="app-shell">
       <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
         <div className="brand-lockup"><div className="brand-symbol"><Orbit size={21} strokeWidth={1.8} /></div><div><p className="brand-name">STAR BOARD</p><p className="brand-subtitle">CAMPAIGN OPERATIONS</p></div><button aria-label="Close navigation" className="mobile-close icon-button" onClick={() => setMobileNavOpen(false)} title="Close navigation" type="button"><X size={18} /></button></div>
-        <div className="campaign-switcher"><div className="campaign-orb"><Hexagon size={18} /></div><div className="campaign-switcher-copy"><span className="micro-label">ACTIVE CAMPAIGN</span><strong>Signal / Noise</strong></div><ChevronDown size={15} className="muted-icon" /></div>
+        <button className="campaign-switcher" onClick={() => window.location.assign("/campaigns")} type="button"><div className="campaign-orb"><Hexagon size={18} /></div><div className="campaign-switcher-copy"><span className="micro-label">ACTIVE CAMPAIGN</span><strong>{campaign?.name}</strong></div><ChevronDown size={15} className="muted-icon" /></button>
         <nav className="side-nav" aria-label="Campaign navigation">{displayedNavItems.map((group) => <div className="nav-group" key={group.label}><p className="nav-group-label">{group.label}</p>{group.items.map((item) => { const Icon = item.icon; return <button className={`nav-item ${activeView === item.id ? "nav-item-active" : ""}`} key={item.id} onClick={() => selectView(item.id)} type="button"><Icon size={17} strokeWidth={activeView === item.id ? 2.1 : 1.7} /><span>{item.label}</span>{item.count ? <span className="nav-count">{item.count}</span> : null}</button>; })}</div>)}</nav>
-        <div className="side-footer"><div className="sync-status"><span className="live-dot" /> {isPersistent ? "SUPABASE SYNC ACTIVE" : "ALL SYSTEMS NOMINAL"}</div><button className="nav-item" onClick={() => notify("Campaign settings are queued for the next build.")} type="button"><Settings2 size={17} /><span>Campaign settings</span></button><div className="profile-row"><div className="avatar avatar-user">{displayName.slice(0, 2).toUpperCase()}</div><div><strong>{displayName}</strong><span>{isGM ? "GAME MASTER" : "PLAYER"}</span></div><MoreHorizontal size={17} className="muted-icon" /></div></div>
+        <div className="side-footer"><div className="sync-status"><span className="live-dot" /> SUPABASE SYNC ACTIVE</div><div className="profile-row"><div className="avatar avatar-user">{displayName.slice(0, 2).toUpperCase()}</div><div><strong>{displayName}</strong><span>{isGM ? "GAME MASTER" : "PLAYER"}</span></div></div><SignOutButton className="nav-item signout-nav-item" label="Sign out" /></div>
       </aside>
 
       <div className="app-content">
-        <header className="topbar"><div className="topbar-left"><button aria-label="Open navigation" className="mobile-menu icon-button" onClick={() => setMobileNavOpen(true)} title="Open navigation" type="button"><Menu size={20} /></button><div className="crumb-mark"><Command size={14} /></div><span className="crumb-muted">SIGNAL / NOISE</span><ChevronRight size={14} className="muted-icon" /><span className="crumb-current">{activeLabel.toUpperCase()}</span></div><div className="topbar-right"><button className="search-trigger" onClick={() => notify("Search will scan campaign records.")} type="button"><Search size={16} /><span>Search records</span><kbd>⌘ K</kbd></button><button aria-label="Notifications" className="icon-button notification-button" onClick={() => notify("No new priority signals.")} title="Notifications" type="button"><Bell size={17} /><span className="notification-dot" /></button><button className={`role-switch ${isGM ? "role-gm" : "role-player"}`} onClick={() => { setIsGM((current) => !current); notify(isGM ? "Player view enabled" : "GM view enabled"); }} type="button"><ShieldCheck size={15} /> {isGM ? "GM MODE" : "PLAYER MODE"}</button></div></header>
-        <div className="content-frame">{activeView === "overview" ? <OverviewView missions={missions} members={memberRecords} notes={noteRecords} episodes={episodeRecords} isPersistent={isPersistent} isGM={isGM} onVote={handleVote} onAction={notify} /> : activeView === "jobs" ? <JobsView missions={missions} campaignId={campaignId} isPersistent={isPersistent} isGM={isGM} npcs={npcRecords} factions={factionRecords} onMissionsChange={setMissions} onVote={handleVote} onPromote={handlePromote} onAction={notify} /> : activeView === "characters" ? <CharactersView characters={characters} campaignId={campaignId} isPersistent={isPersistent} isGM={isGM} onCharactersChange={setCharacters} onAction={notify} /> : activeView === "npcs" ? <NpcsView npcs={isPersistent ? npcRecords : fallbackNpcRecords} campaignId={campaignId} isPersistent={isPersistent} isGM={isGM} onNpcsChange={setNpcRecords} onAction={notify} /> : activeView === "factions" ? <FactionsView factions={isPersistent ? factionRecords : fallbackFactionRecords} campaignId={campaignId} isPersistent={isPersistent} isGM={isGM} onFactionsChange={setFactionRecords} onAction={notify} /> : activeView === "episodes" ? <EpisodesView episodes={episodeRecords} campaignId={campaignId} isPersistent={isPersistent} onAction={notify} /> : activeView === "notes" ? isPersistent ? <CampaignNotesView notes={noteRecords} episodes={episodeRecords} campaignId={campaignId} isPersistent={isPersistent} isGM={isGM} onNotesChange={setNoteRecords} onAction={notify} /> : <NotesView isGM={isGM} onAction={notify} /> : <MembersView members={memberRecords} campaignId={campaignId} isPersistent={isPersistent} isGM={isGM} onMembersChange={setMemberRecords} onAction={notify} />}</div>
+        <header className="topbar"><div className="topbar-left"><button aria-label="Open navigation" className="mobile-menu icon-button" onClick={() => setMobileNavOpen(true)} title="Open navigation" type="button"><Menu size={20} /></button><div className="crumb-mark"><Command size={14} /></div><span className="crumb-muted">{campaign?.name}</span><ChevronRight size={14} className="muted-icon" /><span className="crumb-current">{activeLabel.toUpperCase()}</span></div><div className="topbar-right"><SignOutButton compact className="icon-button" /></div></header>
+        <div className="content-frame">{activeView === "overview" ? <OverviewView campaign={campaign!} missions={missions} characters={characters} npcs={npcRecords} factions={factionRecords} members={memberRecords} notes={noteRecords} episodes={episodeRecords} aiTokensThisWeek={aiTokensThisWeek} isGM={isGM} onVote={handleVote} onOpenView={selectView} /> : activeView === "jobs" ? <JobsView missions={missions} campaignId={campaignId} isGM={isGM} npcs={npcRecords} factions={factionRecords} onMissionsChange={setMissions} onNpcsChange={setNpcRecords} onFactionsChange={setFactionRecords} onVote={handleVote} onPromote={handlePromote} onAction={notify} /> : activeView === "characters" ? <CharactersView characters={characters} campaignId={campaignId} isGM={isGM} onCharactersChange={setCharacters} onAction={notify} /> : activeView === "npcs" ? <NpcsView npcs={npcRecords} campaignId={campaignId} isGM={isGM} onNpcsChange={setNpcRecords} onAction={notify} /> : activeView === "factions" ? <FactionsView factions={factionRecords} campaignId={campaignId} isGM={isGM} onFactionsChange={setFactionRecords} onAction={notify} /> : activeView === "episodes" ? <EpisodesView episodes={episodeRecords} campaignId={campaignId} /> : activeView === "notes" ? <CampaignNotesView notes={noteRecords} episodes={episodeRecords} campaignId={campaignId} isGM={isGM} onNotesChange={setNoteRecords} onAction={notify} /> : activeView === "settings" ? <CampaignSettingsView campaignId={campaignId} /> : <MembersView members={memberRecords} campaignId={campaignId} isGM={isGM} onMembersChange={setMemberRecords} onAction={notify} />}</div>
       </div>
       {toast ? <div className="toast"><span className="toast-icon"><Radio size={14} /></span><span>{toast}</span><button aria-label="Dismiss notification" onClick={() => setToast(null)} title="Dismiss notification" type="button"><X size={14} /></button></div> : null}
     </main>
   );
 }
 
-function OverviewView({ missions, members, notes, episodes, isPersistent, isGM, onVote, onAction }: { missions: Mission[]; members: ApiCampaignMember[]; notes: CampaignNote[]; episodes: EpisodeRecord[]; isPersistent: boolean; isGM: boolean; onVote: (id: string) => void; onAction: (message: string) => void }) {
-  const metrics = isPersistent ? getOverviewMetrics(missions, members, notes, episodes) : null;
-  const openJobs = metrics?.openJobs ?? 3;
-  const activeVotes = metrics?.activeVotes ?? 1;
-  const episodeCount = metrics?.episodes ?? 8;
-  const rosterCount = metrics?.members ?? 6;
-  const noteCount = metrics?.notes ?? 21;
-  const draftSignalCount = metrics?.draftSignals ?? 4;
-  const rosterDetail = metrics ? `${metrics.players} players / ${metrics.gms} GM${metrics.gms === 1 ? "" : "s"}` : "4 active / 2 resting";
-  const noteDetail = metrics ? `${metrics.notesThisWeek} added this week` : "3 added this week";
-  const episodeLabel = metrics ? "Episodes logged" : "Next episode";
-  const episodeDetail = metrics ? metrics.latestEpisodeTitle ?? "No episodes logged" : "Last safe harbor";
-  const signalDetail = metrics ? `${draftSignalCount} drafts / ${openJobs} open` : "2 need your review";
-  const roster: Array<{ name: string; role: string; initials: string; color: string; online: boolean }> = isPersistent
-    ? members.map((member, index) => ({ name: member.displayName, role: member.role === "gm" ? "GAME MASTER" : "PLAYER", initials: member.displayName.slice(0, 2).toUpperCase(), color: ["#f5b84b", "#ff5c9a", "#62e8ff", "#b992ff"][index % 4], online: true }))
-    : crew;
-
-  return <><div className="page-intro overview-intro"><div><p className="eyebrow eyebrow-bright"><span className="live-dot" /> LIVE CAMPAIGN // SEASON 02</p><h1>Good evening, Arlen.</h1><p className="intro-copy">The crew is between jumps. {openJobs} signal{openJobs === 1 ? " is" : "s are"} waiting for a decision.</p></div><div className="intro-actions"><div className="last-sync"><span>LAST SYNC</span><strong>18:42:07 UTC</strong></div><button className="button button-primary" onClick={() => onAction(isGM ? "New mission draft opened." : "Only a GM can create a mission.")} type="button"><Plus size={16} /> NEW SIGNAL</button></div></div>
-    <div className="signal-strip"><div className="signal-strip-pattern" /><div className="signal-copy"><span className="micro-label">CURRENT OBJECTIVE</span><strong>Decide what gets the crew off-station next.</strong></div><div className="signal-stats"><span><strong>{String(openJobs).padStart(2, "0")}</strong> OPEN JOBS</span><span><strong>{String(activeVotes).padStart(2, "0")}</strong> ACTIVE VOTE</span><span><strong>{String(episodeCount).padStart(2, "0")}</strong> EPISODES LOGGED</span></div><Zap size={18} className="signal-zap" /></div>
-    <div className="metric-grid"><MetricCard label="Crew roster" value={String(rosterCount).padStart(2, "0")} detail={rosterDetail} icon={UsersRound} accent="cyan" /><MetricCard label="Campaign notes" value={String(noteCount).padStart(2, "0")} detail={noteDetail} icon={FileText} accent="pink" /><MetricCard label={episodeLabel} value={String(episodeCount).padStart(2, "0")} detail={episodeDetail} icon={FolderKanban} accent="amber" /><MetricCard label="GM signals" value={String(draftSignalCount).padStart(2, "0")} detail={signalDetail} icon={Bot} accent="purple" /></div>
-    <div className="dashboard-grid"><section className="panel panel-jobboard"><div className="panel-topline"><div><p className="eyebrow">MISSION CONTROL</p><h2>Job board</h2></div><button className="icon-button" aria-label="Job board options" onClick={() => onAction("Job board filters are ready for the next build.")} title="Job board options" type="button"><MoreHorizontal size={18} /></button></div><div className="job-list">{missions.map((mission, index) => <MissionCard key={mission.id} mission={mission} isGM={isGM} index={index} onVote={onVote} onAction={onAction} compact />)}</div><button className="panel-footer-action" onClick={() => onAction("Full job board selected.")} type="button">VIEW ALL JOBS <ArrowUpRight size={14} /></button></section>
-      <aside className="right-rail"><section className="panel crew-panel"><SectionHeading eyebrow="CREW MANIFEST" title="On the roster" action="Manage" onAction={() => onAction("Crew management selected.")} /><div className="crew-list">{roster.map((member) => <div className="crew-row" key={member.name}><div className="avatar" style={{ backgroundColor: member.color }}>{member.initials}</div><div className="crew-copy"><strong>{member.name}</strong><span>{member.role}</span></div><span className={`online-indicator ${member.online ? "is-online" : ""}`} title={member.online ? "Online" : "Away"} /></div>)}</div><button className="invite-row" onClick={() => onAction("Invite link copied to clipboard.")} type="button"><Mail size={15} /> INVITE PLAYER <Plus size={14} /></button></section><section className="panel pulse-panel"><div className="panel-topline"><div><p className="eyebrow">CAMPAIGN PULSE</p><h2>Signal strength</h2></div><Activity size={17} className="accent-icon-cyan" /></div><div className="pulse-visual"><div className="pulse-grid" /><div className="pulse-wave pulse-wave-one" /><div className="pulse-wave pulse-wave-two" /><span className="pulse-label pulse-label-left">EP. 01</span><span className="pulse-label pulse-label-right">NOW</span></div><div className="pulse-legend"><span><i className="legend-dot dot-cyan" /> Momentum</span><strong>78%</strong></div></section></aside></div>
-    <section className="feed-section"><SectionHeading eyebrow="RECENT TRANSMISSIONS" title="Signal feed" action="Open archive" onAction={() => onAction("Signal archive selected.")} /><div className="feed-grid"><FeedItem icon={Sparkles} accent="pink" title="Mission promoted to episode 08" detail="The Last Safe Harbor is now part of the campaign record." age="2h ago" /><FeedItem icon={BookOpen} accent="cyan" title="Mira added a campaign note" detail="The station has a second sun // player visible" age="4h ago" /><FeedItem icon={ImagePlus} accent="amber" title="New art asset generated" detail="The Glass Cardinal // visual profile v2" age="Yesterday" /></div></section></>;
+function CampaignSettingsView({ campaignId }: { campaignId: string | null }) {
+  return <><div className="page-intro"><div><p className="eyebrow eyebrow-bright"><span className="live-dot" /> GAME MASTER CONTROL</p><h1>Campaign settings</h1><p className="intro-copy">Shape which AI models are available when this campaign creates text drafts and visual art.</p></div></div><CampaignAiSettings campaignId={campaignId} /></>;
 }
 
-function MetricCard({ label, value, detail, icon: Icon, accent }: { label: string; value: string; detail: string; icon: LucideIcon; accent: string }) { return <div className={`metric-card metric-${accent}`}><div className="metric-head"><span>{label}</span><Icon size={16} /></div><strong>{value}</strong><small>{detail}</small><div className="metric-bar"><span /></div></div>; }
+function OverviewView({ campaign, missions, characters, npcs, factions, members, notes, episodes, aiTokensThisWeek, isGM, onVote, onOpenView }: { campaign: CampaignRecord; missions: Mission[]; characters: Character[]; npcs: NpcRecord[]; factions: FactionRecord[]; members: ApiCampaignMember[]; notes: CampaignNote[]; episodes: EpisodeRecord[]; aiTokensThisWeek: number | null; isGM: boolean; onVote: (id: string) => void; onOpenView: (id: NavId) => void }) {
+  const metrics = getOverviewMetrics(missions, members, notes, episodes);
+  const roster = members.map((member, index) => ({ ...member, initials: member.displayName.slice(0, 2).toUpperCase(), color: ["#f5b84b", "#ff5c9a", "#62e8ff", "#b992ff"][index % 4] }));
 
-function MissionCard({ mission, isGM, index, onVote, onAction, onEdit, onPromote, compact = false }: { mission: Mission; isGM: boolean; index: number; onVote: (id: string) => void; onAction: (message: string) => void; onEdit?: () => void; onPromote?: (id: string) => void; compact?: boolean }) {
-  return <article className={`mission-card mission-${mission.accent} ${compact ? "mission-compact" : ""}`}><VisualAsset src={mission.image} label={`${mission.title} artwork`} className="mission-art" /><div className="mission-art-overlay" /><div className="mission-index">0{index + 1}</div><div className="mission-content"><div className="mission-meta"><StatusPill color={mission.accent}>{mission.category}</StatusPill><span>{mission.region}</span></div><h3>{mission.title}</h3><p>{mission.summary}</p><div className="mission-footer"><span className="giver"><span className="giver-glyph">{mission.giverType === "NPC" ? "N" : "F"}</span><span><small>{mission.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}</small><strong>{mission.giver}</strong></span></span><span className="mission-eta"><Clock3 size={13} /> {mission.eta}</span></div></div><div className="mission-vote"><span><strong>{mission.votes.toString().padStart(2, "0")}</strong> votes</span><button className={`vote-button ${mission.voted ? "vote-active" : ""}`} onClick={() => onVote(mission.id)} type="button"><Vote size={15} /> {mission.voted ? "VOTED" : "VOTE"}</button>{isGM ? <><button className="mission-more icon-button" aria-label={`Edit ${mission.title}`} onClick={() => onEdit ? onEdit() : onAction(`${mission.title} options opened.`)} title={onEdit ? "Edit mission" : "Mission options"} type="button"><MoreHorizontal size={16} /></button>{mission.status === "open" && onPromote ? <button className="mission-more mission-promote icon-button" aria-label={`Promote ${mission.title} to an episode`} onClick={() => onPromote(mission.id)} title="Promote to episode" type="button"><Sparkles size={16} /></button> : null}</> : null}</div></article>;
+  return <><div className="page-intro overview-intro"><div><p className="eyebrow eyebrow-bright"><span className="live-dot" /> {campaign.system.toUpperCase()} {"//"} CAMPAIGN OVERVIEW</p><h1>{campaign.name}</h1><p className="intro-copy">{campaign.description || "No campaign brief recorded yet."}</p></div><div className="intro-actions"><div className="last-sync"><span>CAMPAIGN RECORDS</span><strong>LIVE</strong></div><button className="button button-primary" onClick={() => onOpenView("jobs")} type="button"><Plus size={16} /> {isGM ? "OPEN JOB BOARD" : "VIEW JOB BOARD"}</button></div></div>
+    <div className="signal-strip"><div className="signal-strip-pattern" /><div className="signal-copy"><span className="micro-label">CAMPAIGN BRIEF</span><strong>{campaign.description || "No public campaign brief recorded yet."}</strong></div><div className="signal-stats"><span><strong>{String(metrics.openJobs).padStart(2, "0")}</strong> OPEN JOBS</span><span><strong>{String(metrics.activeVotes).padStart(2, "0")}</strong> VOTED JOBS</span><span><strong>{String(metrics.episodes).padStart(2, "0")}</strong> EPISODES</span></div><Zap size={18} className="signal-zap" /></div>
+    <div className="metric-grid"><MetricCard label="Crew roster" value={String(metrics.members).padStart(2, "0")} detail={`${metrics.players} players / ${metrics.gms} GM${metrics.gms === 1 ? "" : "s"}`} icon={UsersRound} accent="cyan" /><MetricCard label="Campaign notes" value={String(metrics.notes).padStart(2, "0")} detail={`${metrics.notesThisWeek} updated this week`} icon={FileText} accent="pink" /><MetricCard label="Episodes logged" value={String(metrics.episodes).padStart(2, "0")} detail={metrics.latestEpisodeTitle ?? "No episodes logged"} icon={FolderKanban} accent="amber" /><MetricCard label="GM signals" value={String(metrics.draftSignals).padStart(2, "0")} detail={`${metrics.draftSignals} drafts / ${metrics.openJobs} open`} icon={Bot} accent="purple" />{isGM ? <MetricCard label="OpenRouter tokens this week" value={formatTokenCount(aiTokensThisWeek)} detail="Input + output, last 7 days" help="Counts input and output tokens recorded for this campaign's OpenRouter AI runs over the last 7 days. It is not your account-wide OpenRouter balance." icon={Zap} accent="cyan" /> : null}</div>
+    <div className="dashboard-grid"><section className="panel panel-jobboard"><div className="panel-topline"><div><p className="eyebrow">MISSION CONTROL</p><h2>Job board</h2></div></div>{missions.length ? <div className="job-list">{missions.map((mission, index) => <MissionCard key={mission.id} mission={mission} isGM={isGM} index={index} onVote={onVote} compact />)}</div> : <div className="character-empty overview-empty"><BriefcaseBusiness size={22} /><h2>No jobs recorded yet.</h2><p>{isGM ? "Open the job board to create the campaign's first signal." : "The GM has not posted a job yet."}</p></div>}<button className="panel-footer-action" onClick={() => onOpenView("jobs")} type="button">VIEW ALL JOBS <ArrowUpRight size={14} /></button></section>
+      <aside className="right-rail"><section className="panel crew-panel"><SectionHeading eyebrow="CREW MANIFEST" title="On the roster" action="Manage" onAction={() => onOpenView("members")} />{roster.length ? <div className="crew-list">{roster.map((member) => <div className="crew-row" key={member.userId}><div className="avatar" style={{ backgroundColor: member.color }}>{member.initials}</div><div className="crew-copy"><strong>{member.displayName}</strong><span>{member.role === "gm" ? "GAME MASTER" : "PLAYER"}</span></div></div>)}</div> : <div className="character-empty overview-empty"><UsersRound size={22} /><h2>No crew members yet.</h2><p>Campaign access has not been established.</p></div>}</section><section className="panel snapshot-panel"><div className="panel-topline"><div><p className="eyebrow">CAMPAIGN SNAPSHOT</p><h2>Record coverage</h2></div><Activity size={17} className="accent-icon-cyan" /></div><div className="snapshot-list"><button onClick={() => onOpenView("characters")} type="button"><UsersRound size={15} /> <span>Characters</span><strong>{characters.length}</strong></button><button onClick={() => onOpenView("npcs")} type="button"><UserRound size={15} /> <span>NPCs</span><strong>{npcs.length}</strong></button><button onClick={() => onOpenView("factions")} type="button"><Network size={15} /> <span>Factions</span><strong>{factions.length}</strong></button></div></section></aside></div></>;
 }
 
-type JobDraft = { title: string; summary: string; playerNotesMarkdown: string; giverType: "npc" | "faction"; giverId: string; status: "draft" | "open" | "archived"; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
-const emptyJobDraft: JobDraft = { title: "", summary: "", playerNotesMarkdown: "", giverType: "npc", giverId: "", status: "draft", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
+function MetricCard({ label, value, detail, help, icon: Icon, accent }: { label: string; value: string; detail: string; help?: string; icon: LucideIcon; accent: string }) { return <div className={`metric-card metric-${accent}`}><div className="metric-head"><span>{label}</span><span className="metric-head-actions"><Icon size={16} />{help ? <button aria-label={help} className="metric-help" title={help} type="button">?</button> : null}</span></div><strong>{value}</strong><small>{detail}</small><div className="metric-bar"><span /></div></div>; }
 
-function JobsView({ missions, campaignId, isPersistent, isGM, npcs, factions, onMissionsChange, onVote, onPromote, onAction }: { missions: Mission[]; campaignId: string | null; isPersistent: boolean; isGM: boolean; npcs: NpcRecord[]; factions: FactionRecord[]; onMissionsChange: Dispatch<SetStateAction<Mission[]>>; onVote: (id: string) => void; onPromote: (id: string) => void; onAction: (message: string) => void }) {
+function formatTokenCount(tokens: number | null) {
+  return tokens === null ? "--" : tokens.toLocaleString();
+}
+
+function MissionCard({ mission, isGM, index, onVote, onEdit, onPromote, compact = false }: { mission: Mission; isGM: boolean; index: number; onVote: (id: string) => void; onEdit?: () => void; onPromote?: (id: string) => void; compact?: boolean }) {
+  return <article className={`mission-card mission-${mission.accent} ${compact ? "mission-compact" : ""}`}><VisualAsset src={mission.image} label={`${mission.title} artwork`} className="mission-art" /><div className="mission-art-overlay" /><div className="mission-index">0{index + 1}</div><div className="mission-content"><div className="mission-meta"><StatusPill color={mission.accent}>{mission.category}</StatusPill></div><h3>{mission.title}</h3><p>{mission.summary}</p><div className="mission-footer"><span className="giver"><span className="giver-glyph">{mission.giverType === "NPC" ? "N" : "F"}</span><span><small>{mission.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}</small><strong>{mission.giver}</strong></span></span></div></div><div className="mission-vote"><span><strong>{mission.votes.toString().padStart(2, "0")}</strong> votes</span><button className={`vote-button ${mission.voted ? "vote-active" : ""}`} onClick={() => onVote(mission.id)} type="button"><Vote size={15} /> {mission.voted ? "VOTED" : "VOTE"}</button>{isGM && onEdit ? <button className="mission-more icon-button" aria-label={`Edit ${mission.title}`} onClick={onEdit} title="Edit mission" type="button"><MoreHorizontal size={16} /></button> : null}{isGM && mission.status === "open" && onPromote ? <button className="mission-more mission-promote icon-button" aria-label={`Promote ${mission.title} to an episode`} onClick={() => onPromote(mission.id)} title="Promote to episode" type="button"><Sparkles size={16} /></button> : null}</div></article>;
+}
+
+type JobDraft = { title: string; summary: string; playerNotesMarkdown: string; gmNotesMarkdown: string; hook: string; giverType: "npc" | "faction"; giverId: string; status: "draft" | "open" | "archived"; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
+type SuggestedGiver = { type: "npc" | "faction"; name: string };
+const emptyJobDraft: JobDraft = { title: "", summary: "", playerNotesMarkdown: "", gmNotesMarkdown: "", hook: "", giverType: "npc", giverId: "", status: "draft", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
+
+function JobsView({ missions, campaignId, isGM, npcs, factions, onMissionsChange, onNpcsChange, onFactionsChange, onVote, onPromote, onAction }: { missions: Mission[]; campaignId: string | null; isGM: boolean; npcs: NpcRecord[]; factions: FactionRecord[]; onMissionsChange: Dispatch<SetStateAction<Mission[]>>; onNpcsChange: Dispatch<SetStateAction<NpcRecord[]>>; onFactionsChange: Dispatch<SetStateAction<FactionRecord[]>>; onVote: (id: string) => void; onPromote: (id: string) => void; onAction: (message: string) => void }) {
   const [filter, setFilter] = useState<"open" | "archived" | "drafts">("open");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [draft, setDraft] = useState<JobDraft>(emptyJobDraft);
+  const [suggestedGiver, setSuggestedGiver] = useState<SuggestedGiver | null>(null);
+  const [nestedGiverKind, setNestedGiverKind] = useState<"npc" | "faction" | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useCampaignArtEditor(editorOpen ? { campaignId, kind: "job", value: draft.artPath, url: draft.artUrl, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })) } : null);
+  const jobAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/mission" entityLabel="job" mode={editingMission ? "refine" : "create"} requestFields={{ title: draft.title }} currentDraft={{ title: draft.title, summary: draft.summary, playerNotes: draft.playerNotesMarkdown, gmNotes: draft.gmNotesMarkdown, hook: draft.hook, thumbnailDescription: draft.artSubject }} fields={[{ key: "title", label: "Title", maxLength: 160 }, { key: "summary", label: "Summary", maxLength: 4000, multiline: true }, { key: "playerNotes", label: "Player context", maxLength: 20000, multiline: true }, { key: "gmNotes", label: "GM notes", maxLength: 20000, multiline: true }, { key: "hook", label: "Hook", maxLength: 1200, multiline: true }, { key: "thumbnailDescription", label: "Thumbnail description", maxLength: 1600, multiline: true }, { key: "suggestedGiverType", label: "Suggested giver type", maxLength: 20, readOnly: true }, { key: "suggestedGiverName", label: "Suggested giver", maxLength: 160, readOnly: true }]} onApply={(candidate) => { setDraft((current) => ({ ...current, title: candidate.title ?? current.title, summary: candidate.summary ?? current.summary, playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown, gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown, hook: candidate.hook ?? current.hook, artSubject: candidate.thumbnailDescription ?? current.artSubject })); setSuggestedGiver(candidate.suggestedGiverType === "npc" || candidate.suggestedGiverType === "faction" ? { type: candidate.suggestedGiverType, name: candidate.suggestedGiverName ?? "" } : null); }} /> : null;
+  const jobGiverTools = editorOpen ? <>{suggestedGiver ? <JobGiverRecommendation suggestion={suggestedGiver} npcs={npcs} factions={factions} onUseExisting={(type, id) => { setDraft((current) => ({ ...current, giverType: type, giverId: id })); setNestedGiverKind(null); }} onCreate={(type) => setNestedGiverKind(type)} /> : null}{nestedGiverKind ? <GiverCreator campaignId={campaignId} kind={nestedGiverKind} suggestedName={suggestedGiver?.name ?? ""} onCancel={() => setNestedGiverKind(null)} onSaved={(result) => { if (result.kind === "npc") { onNpcsChange((current) => [mapApiNpc(result.record, current.length), ...current]); } else { onFactionsChange((current) => [mapApiFaction(result.record, current.length), ...current]); } setDraft((current) => ({ ...current, giverType: result.kind, giverId: result.record.id })); setSuggestedGiver(null); setNestedGiverKind(null); onAction(`${result.record.name} is ready as the mission giver.`); }} /> : null}</> : null;
+  const jobAdditionalFields = editorOpen ? <><label>Hook<textarea maxLength={1200} value={draft.hook} onChange={(event) => setDraft((current) => ({ ...current, hook: event.target.value }))} /></label><label>GM notes <span className="field-lock"><LockKeyhole size={11} /> PRIVATE</span><textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, gmNotesMarkdown: event.target.value }))} /></label></> : null;
+  useCampaignArtEditor(editorOpen ? { campaignId, kind: "job", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onApproved: (asset) => setDraft((current) => ({ ...current, artPath: asset.path, artUrl: asset.signedUrl, artPrompt: asset.prompt, artProvider: asset.provider })) } : null);
 
   const filteredMissions = missions.filter((mission) => filter === "drafts" ? mission.status === "draft" : mission.status === filter);
   const openEditor = (mission?: Mission) => {
-    if (!isPersistent || !isGM) {
-      onAction(isGM ? "Mission editor becomes persistent when a campaign is selected." : "Only a GM can edit missions.");
+    if (!isGM) {
+      onAction("Only a GM can edit missions.");
       return;
     }
     setEditingMission(mission ?? null);
-    setDraft(mission ? { title: mission.title, summary: mission.summary, playerNotesMarkdown: mission.playerNotesMarkdown, giverType: mission.giverType.toLowerCase() as JobDraft["giverType"], giverId: mission.giverId, status: mission.status === "promoted" ? "open" : mission.status, artPath: mission.artPath ?? null, artUrl: mission.artUrl ?? null, artPrompt: mission.artPrompt ?? null, artProvider: mission.artProvider ?? null } : emptyJobDraft);
+    setSuggestedGiver(null);
+    setNestedGiverKind(null);
+    setAssistantOpen(false);
+    setDraft(mission ? { title: mission.title, summary: mission.summary, playerNotesMarkdown: mission.playerNotesMarkdown, gmNotesMarkdown: mission.gmNotesMarkdown ?? "", hook: mission.hook ?? "", giverType: mission.giverType.toLowerCase() as JobDraft["giverType"], giverId: mission.giverId, status: mission.status === "promoted" ? "open" : mission.status, artSubject: mission.artSubject ?? "", artPath: mission.artPath ?? null, artUrl: mission.artUrl ?? null, artPrompt: mission.artPrompt ?? null, artProvider: mission.artProvider ?? null } : emptyJobDraft);
     setError(null);
     setEditorOpen(true);
   };
@@ -754,20 +772,65 @@ function JobsView({ missions, campaignId, isPersistent, isGM, npcs, factions, on
   const filterCount = (status: "open" | "archived" | "draft") => missions.filter((mission) => mission.status === status).length.toString().padStart(2, "0");
 
   return <PageLayout eyebrow={`MISSION CONTROL // ${filterCount("open")} OPEN`} title="Job board" description="Potential missions, ranked by the crew. Choose the signal that pulls hardest." action={isGM ? "NEW MISSION" : undefined} onAction={() => openEditor()}>
-    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM MISSION EDITOR</p><h2>{editingMission ? `Edit ${editingMission.title}` : "New mission"}</h2></div><button className="icon-button" aria-label="Close mission editor" onClick={() => setEditorOpen(false)} title="Close mission editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveJob}><div className="character-form-grid"><label>Title<input required maxLength={160} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label><label>Status<select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as JobDraft["status"] }))}><option value="draft">DRAFT</option><option value="open">OPEN</option><option value="archived">ARCHIVED</option></select></label><label>Giver type<select value={draft.giverType} onChange={(event) => setDraft((current) => ({ ...current, giverType: event.target.value as JobDraft["giverType"], giverId: "" }))}><option value="npc">NPC</option><option value="faction">FACTION</option></select></label><label>Giver<select required value={draft.giverId} onChange={(event) => setDraft((current) => ({ ...current, giverId: event.target.value }))}><option value="">Select a giver</option>{(draft.giverType === "npc" ? npcs : factions).map((giver) => <option key={giver.id} value={giver.id}>{giver.name}</option>)}</select></label></div><label>Summary<textarea maxLength={4000} value={draft.summary} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} /></label><label>Player context<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingMission ? "SAVE CHANGES" : "ADD MISSION"}</button>{editingMission && editingMission.status !== "promoted" ? <button className="button button-danger" disabled={isSaving} onClick={() => void deleteJob()} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
-    <div className="view-toolbar"><div className="filter-tabs"><button className={`filter-tab ${filter === "open" ? "filter-tab-active" : ""}`} onClick={() => setFilter("open")} type="button">OPEN <span>{filterCount("open")}</span></button><button className={`filter-tab ${filter === "archived" ? "filter-tab-active" : ""}`} onClick={() => setFilter("archived")} type="button">ARCHIVED <span>{filterCount("archived")}</span></button>{isGM ? <button className={`filter-tab ${filter === "drafts" ? "filter-tab-active" : ""}`} onClick={() => setFilter("drafts")} type="button">DRAFTS <span>{filterCount("draft")}</span></button> : null}</div><button className="button button-ai" onClick={() => onAction("AI mission studio is queued for the review editor.")} type="button"><Sparkles size={15} /> AI MISSION STUDIO</button></div>
-    {filteredMissions.length ? <div className="jobs-grid">{filteredMissions.map((mission, index) => <MissionCard key={mission.id} mission={mission} isGM={isGM} index={index} onVote={onVote} onEdit={isPersistent && isGM ? () => openEditor(mission) : undefined} onPromote={isPersistent ? onPromote : undefined} onAction={onAction} />)}</div> : <div className="character-empty"><BriefcaseBusiness size={22} /><h2>No missions in this view.</h2><p>{filter === "drafts" ? "Draft the next signal when the GM is ready." : "The campaign board has no missions here yet."}</p></div>}
+    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM MISSION EDITOR</p><h2>{editingMission ? `Edit ${editingMission.title}` : "New mission"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE JOB"}</button><button className="icon-button" aria-label="Close mission editor" onClick={() => setEditorOpen(false)} title="Close mission editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? jobAssistant : null}{jobGiverTools}<form className="character-form" onSubmit={saveJob}><div className="job-title-row"><label>Title<input required maxLength={160} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label></div><div className="job-assignment-row"><label>Status<select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as JobDraft["status"] }))}><option value="draft">DRAFT</option><option value="open">OPEN</option><option value="archived">ARCHIVED</option></select></label><label>Giver type<select value={draft.giverType} onChange={(event) => setDraft((current) => ({ ...current, giverType: event.target.value as JobDraft["giverType"], giverId: "" }))}><option value="npc">NPC</option><option value="faction">FACTION</option></select></label><label>Giver<select required value={draft.giverId} onChange={(event) => setDraft((current) => ({ ...current, giverId: event.target.value }))}><option value="">Select a giver</option>{(draft.giverType === "npc" ? npcs : factions).map((giver) => <option key={giver.id} value={giver.id}>{giver.name}</option>)}</select></label></div><label>Summary<textarea maxLength={4000} value={draft.summary} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} /></label><label>Player context<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label>{jobAdditionalFields}{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingMission ? "SAVE CHANGES" : "ADD MISSION"}</button>{editingMission && editingMission.status !== "promoted" ? <button className="button button-danger" disabled={isSaving} onClick={() => void deleteJob()} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
+    <div className="view-toolbar"><div className="filter-tabs"><button className={`filter-tab ${filter === "open" ? "filter-tab-active" : ""}`} onClick={() => setFilter("open")} type="button">OPEN <span>{filterCount("open")}</span></button><button className={`filter-tab ${filter === "archived" ? "filter-tab-active" : ""}`} onClick={() => setFilter("archived")} type="button">ARCHIVED <span>{filterCount("archived")}</span></button>{isGM ? <button className={`filter-tab ${filter === "drafts" ? "filter-tab-active" : ""}`} onClick={() => setFilter("drafts")} type="button">DRAFTS <span>{filterCount("draft")}</span></button> : null}</div></div>
+    {filteredMissions.length ? <div className="jobs-grid">{filteredMissions.map((mission, index) => <MissionCard key={mission.id} mission={mission} isGM={isGM} index={index} onVote={onVote} onEdit={isGM ? () => openEditor(mission) : undefined} onPromote={isGM ? onPromote : undefined} />)}</div> : <div className="character-empty"><BriefcaseBusiness size={22} /><h2>No missions in this view.</h2><p>{filter === "drafts" ? "Draft the next signal when the GM is ready." : "The campaign board has no missions here yet."}</p></div>}
   </PageLayout>;
 }
 
-function CharactersView({ characters, campaignId, isPersistent, isGM, onCharactersChange, onAction }: { characters: Character[]; campaignId: string | null; isPersistent: boolean; isGM: boolean; onCharactersChange: Dispatch<SetStateAction<Character[]>>; onAction: (message: string) => void }) {
+function JobGiverRecommendation({ suggestion, npcs, factions, onUseExisting, onCreate }: { suggestion: SuggestedGiver; npcs: NpcRecord[]; factions: FactionRecord[]; onUseExisting: (type: SuggestedGiver["type"], id: string) => void; onCreate: (type: SuggestedGiver["type"]) => void }) {
+  const records = suggestion.type === "npc" ? npcs : factions;
+  const existing = records.find((record) => record.name.trim().toLowerCase() === suggestion.name.trim().toLowerCase());
+  const label = suggestion.type === "npc" ? "NPC" : "FACTION";
+
+  return <section className="ai-giver-recommendation"><div><p className="eyebrow">AI RECOMMENDATION // MISSION GIVER</p><strong>{suggestion.name || `Unnamed ${label.toLowerCase()}`}</strong><span>{label} suggested for this job.</span></div><div className="ai-draft-actions">{existing ? <button className="button button-secondary" onClick={() => onUseExisting(suggestion.type, existing.id)} type="button">USE EXISTING {label}</button> : null}<button className="button button-ai" onClick={() => onCreate(suggestion.type)} type="button"><Sparkles size={14} /> GENERATE {label}</button></div></section>;
+}
+
+type GiverDraft = { name: string; species: string; role: string; description: string; playerNotesMarkdown: string; gmNotesMarkdown: string; status: string; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
+type GiverCreatorResult = { kind: "npc"; record: ApiNpc } | { kind: "faction"; record: ApiFaction };
+
+function GiverCreator({ campaignId, kind, suggestedName, onCancel, onSaved }: { campaignId: string | null; kind: "npc" | "faction"; suggestedName: string; onCancel: () => void; onSaved: (result: GiverCreatorResult) => void }) {
+  const [draft, setDraft] = useState<GiverDraft>(() => kind === "npc" ? { name: suggestedName, species: "", role: "", description: "", playerNotesMarkdown: "", gmNotesMarkdown: "", status: "active", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null } : { name: suggestedName, species: "", role: "", description: "", playerNotesMarkdown: "", gmNotesMarkdown: "", status: "active", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null });
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isNpc = kind === "npc";
+  const entityLabel = isNpc ? "NPC" : "faction";
+  const assistant = <AiDraftAssistant campaignId={campaignId} endpoint={isNpc ? "/api/ai/npc" : "/api/ai/faction"} entityLabel={entityLabel} mode="create" requestFields={isNpc ? { name: draft.name, species: draft.species, role: draft.role } : { name: draft.name, status: draft.status }} currentDraft={isNpc ? { name: draft.name, species: draft.species, role: draft.role, shortDescription: draft.description, playerNotes: draft.playerNotesMarkdown, gmNotes: draft.gmNotesMarkdown, visualPrompt: draft.artSubject } : { name: draft.name, status: draft.status, description: draft.description, visualPrompt: draft.artSubject }} fields={isNpc ? [{ key: "name", label: "Name", maxLength: 160 }, { key: "species", label: "Species", maxLength: 120 }, { key: "role", label: "Role", maxLength: 160 }, { key: "shortDescription", label: "Description", maxLength: 4000, multiline: true }, { key: "playerNotes", label: "Player notes", maxLength: 20000, multiline: true }, { key: "gmNotes", label: "GM notes", maxLength: 20000, multiline: true }, { key: "visualPrompt", label: "Portrait description", maxLength: 1600, multiline: true }] : [{ key: "name", label: "Name", maxLength: 160 }, { key: "status", label: "Status", maxLength: 80 }, { key: "description", label: "Public description", maxLength: 4000, multiline: true }, { key: "visualPrompt", label: "Emblem or scene description", maxLength: 1600, multiline: true }]} onApply={(candidate) => setDraft((current) => ({ ...current, name: candidate.name ?? current.name, species: candidate.species ?? current.species, role: candidate.role ?? current.role, description: candidate.shortDescription ?? candidate.description ?? current.description, playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown, gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown, status: candidate.status ?? current.status, artSubject: candidate.visualPrompt ?? current.artSubject }))} />;
+
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!campaignId) {
+      setError("Select a campaign before creating a giver.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/${isNpc ? "npcs" : "factions"}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(isNpc ? draft : { name: draft.name, description: draft.description, status: draft.status, artSubject: draft.artSubject, artPath: draft.artPath, artUrl: draft.artUrl, artPrompt: draft.artPrompt, artProvider: draft.artProvider }) });
+      const result = (await response.json()) as { error?: string; npc?: ApiNpc; faction?: ApiFaction };
+      if (!response.ok || (isNpc ? !result.npc : !result.faction)) throw new Error(result.error ?? `${entityLabel} could not be saved.`);
+      if (isNpc) onSaved({ kind: "npc", record: result.npc! });
+      else onSaved({ kind: "faction", record: result.faction! });
+    } catch (saveError: unknown) {
+      setError(saveError instanceof Error ? saveError.message : `${entityLabel} could not be saved.`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return <section className="giver-creator"><div className="editor-heading"><div><p className="eyebrow">NEW {isNpc ? "NPC" : "FACTION"} - MISSION GIVER</p><h3>{draft.name || `Create a ${entityLabel}`}</h3></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : `GENERATE ${isNpc ? "NPC" : "FACTION"}`}</button><button className="icon-button" aria-label={`Close ${entityLabel} creator`} onClick={onCancel} title={`Close ${entityLabel} creator`} type="button"><X size={16} /></button></div></div>{assistantOpen ? assistant : null}<CampaignArtField campaignId={campaignId} kind={kind} value={draft.artPath} url={draft.artUrl} subject={draft.artSubject} currentPrompt={draft.artPrompt} onSubjectChange={(subject) => setDraft((current) => ({ ...current, artSubject: subject }))} onChange={(path) => setDraft((current) => ({ ...current, artPath: path }))} onUrlChange={(url) => setDraft((current) => ({ ...current, artUrl: url }))} onApproved={(asset) => setDraft((current) => ({ ...current, artPath: asset.path, artUrl: asset.signedUrl, artPrompt: asset.prompt, artProvider: asset.provider }))} /><form className="character-form" onSubmit={save}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>{isNpc ? <><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Role<input maxLength={160} value={draft.role} onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value }))} /></label></> : <label>Status<input required maxLength={80} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))} /></label>}</div><label>{isNpc ? "Description" : "Public description"}<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label>{isNpc ? <><label>Player notes<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label><label>GM notes <span className="field-lock"><LockKeyhole size={11} /> PRIVATE</span><textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, gmNotesMarkdown: event.target.value }))} /></label></> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : `SAVE ${isNpc ? "NPC" : "FACTION"}`}</button><button className="text-action" disabled={isSaving} onClick={onCancel} type="button">CANCEL</button></div></form></section>;
+}
+
+function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAction }: { characters: Character[]; campaignId: string | null; isGM: boolean; onCharactersChange: Dispatch<SetStateAction<Character[]>>; onAction: (message: string) => void }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
   const [draft, setDraft] = useState<CharacterDraft>(emptyCharacterDraft);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useCampaignArtEditor(editorOpen ? { campaignId, kind: "character", value: draft.artPath, url: draft.artUrl, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })) } : null);
-  const featuredCharacter = characters[0] ?? charactersSeed[0];
+  const featuredCharacter = characters[0] ?? null;
 
   const openEditor = (character?: Character) => {
     setEditingCharacter(character ?? null);
@@ -786,7 +849,7 @@ function CharactersView({ characters, campaignId, isPersistent, isGM, onCharacte
     event.preventDefault();
 
     if (!campaignId) {
-      onAction("Character editor becomes persistent when a campaign is selected.");
+      onAction("Campaign is unavailable. Return to the campaign selector and try again.");
       return;
     }
 
@@ -842,10 +905,10 @@ function CharactersView({ characters, campaignId, isPersistent, isGM, onCharacte
     }
   };
 
-  return <PageLayout eyebrow="ARCHIVE // CREW ROSTER" title="Characters" description="The people, androids, and mysteries currently flying under the Signal / Noise flag." action="ADD CHARACTER" onAction={() => isPersistent ? openEditor() : onAction("Character editor becomes persistent when a campaign is selected.")}>
+  return <PageLayout eyebrow="ARCHIVE // CREW ROSTER" title="Characters" description="The people, androids, and mysteries currently recorded in this campaign." action="ADD CHARACTER" onAction={() => openEditor()}>
     {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">{isGM ? "GM / PLAYER RECORD" : "PLAYER RECORD"}</p><h2>{editingCharacter ? `Edit ${editingCharacter.name}` : "Add a character"}</h2></div><button className="icon-button" aria-label="Close character editor" onClick={closeEditor} title="Close character editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveCharacter}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Class<input maxLength={160} value={draft.className} onChange={(event) => setDraft((current) => ({ ...current, className: event.target.value }))} /></label><label>Level<input type="number" min="1" max="20" value={draft.level} onChange={(event) => setDraft((current) => ({ ...current, level: Number(event.target.value) }))} /></label></div><label>Backstory<textarea maxLength={20000} placeholder="Write what the crew knows about this character." value={draft.backstoryMarkdown} onChange={(event) => setDraft((current) => ({ ...current, backstoryMarkdown: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingCharacter ? "SAVE CHANGES" : "ADD TO ROSTER"}</button>{editingCharacter ? <button className="button button-danger" disabled={isSaving} onClick={deleteCharacter} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={closeEditor} type="button">CANCEL</button></div></form></section> : null}
-    {characters.length ? <div className="character-grid">{characters.map((character) => <article className="character-card" key={character.id}><VisualAsset src={character.image} label={`${character.name} portrait`} className={`character-art character-${character.color}`} /><div className="character-body"><div className="card-status-row"><StatusPill color={character.status === "ACTIVE" ? "cyan" : "muted"}>{character.status}</StatusPill><button className="icon-button" aria-label={`Open ${character.name} options`} onClick={() => isPersistent ? openEditor(character) : onAction(`${character.name} options opened.`)} title="Character options" type="button"><MoreHorizontal size={16} /></button></div><h3>{character.name}</h3><p>{character.subtitle}</p><span className="mono-detail">{character.detail}</span><button className="card-link" onClick={() => isPersistent ? openEditor(character) : onAction(`${character.name} character sheet opened.`)} type="button">OPEN RECORD <ArrowUpRight size={13} /></button></div></article>)}</div> : <div className="character-empty"><UsersRound size={22} /><h2>No characters in the roster yet.</h2><p>Add the first crew record to begin the campaign manifest.</p></div>}
-    <section className="lower-band"><div className="lower-copy"><p className="eyebrow">PLAYER VIEW</p><h2>Everyone has a story in the archive.</h2><p>Characters can carry a portrait, a Markdown backstory, and the notes their players want the crew to know.</p></div><div className="markdown-preview"><div className="preview-toolbar"><FileText size={14} /> BACKSTORY.MD <span>PLAYER VISIBLE</span></div><p>{featuredCharacter.backstoryMarkdown || "No public backstory recorded yet."}</p></div></section>
+    {characters.length ? <div className="character-grid">{characters.map((character) => <article className="character-card" key={character.id}><VisualAsset src={character.image} label={`${character.name} portrait`} className={`character-art character-${character.color}`} /><div className="character-body"><div className="card-status-row"><StatusPill color={character.status === "ACTIVE" ? "cyan" : "muted"}>{character.status}</StatusPill><button className="icon-button" aria-label={`Open ${character.name} options`} onClick={() => openEditor(character)} title="Character options" type="button"><MoreHorizontal size={16} /></button></div><h3>{character.name}</h3><p>{character.subtitle}</p><span className="mono-detail">{character.detail}</span><button className="card-link" onClick={() => openEditor(character)} type="button">OPEN RECORD <ArrowUpRight size={13} /></button></div></article>)}</div> : <div className="character-empty"><UsersRound size={22} /><h2>No characters in the roster yet.</h2><p>Add the first crew record to begin the campaign manifest.</p></div>}
+    {featuredCharacter ? <section className="lower-band"><div className="lower-copy"><p className="eyebrow">PLAYER VIEW</p><h2>{featuredCharacter.name}&apos;s public record.</h2><p>Characters can carry a portrait, a Markdown backstory, and the notes their players want the crew to know.</p></div><div className="markdown-preview"><div className="preview-toolbar"><FileText size={14} /> BACKSTORY.MD <span>PLAYER VISIBLE</span></div><p>{featuredCharacter.backstoryMarkdown || "No public backstory recorded yet."}</p></div></section> : null}
   </PageLayout>;
 }
 
@@ -856,27 +919,31 @@ type NpcDraft = {
   description: string;
   playerNotesMarkdown: string;
   gmNotesMarkdown: string;
+  artSubject: string;
   artPath: string | null;
   artUrl: string | null;
   artPrompt: string | null;
   artProvider: string | null;
 };
 
-const emptyNpcDraft: NpcDraft = { name: "", species: "", role: "", description: "", playerNotesMarkdown: "", gmNotesMarkdown: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
+const emptyNpcDraft: NpcDraft = { name: "", species: "", role: "", description: "", playerNotesMarkdown: "", gmNotesMarkdown: "", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
 
-function NpcsView({ npcs: npcRecords, campaignId, isPersistent, isGM, onNpcsChange, onAction }: { npcs: NpcRecord[]; campaignId: string | null; isPersistent: boolean; isGM: boolean; onNpcsChange: Dispatch<SetStateAction<NpcRecord[]>>; onAction: (message: string) => void }) {
+function NpcsView({ npcs: npcRecords, campaignId, isGM, onNpcsChange, onAction }: { npcs: NpcRecord[]; campaignId: string | null; isGM: boolean; onNpcsChange: Dispatch<SetStateAction<NpcRecord[]>>; onAction: (message: string) => void }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingNpc, setEditingNpc] = useState<NpcRecord | null>(null);
   const [selectedNpc, setSelectedNpc] = useState<NpcRecord | null>(null);
   const [draft, setDraft] = useState<NpcDraft>(emptyNpcDraft);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useCampaignArtEditor(editorOpen ? { campaignId, kind: "npc", value: draft.artPath, url: draft.artUrl, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })) } : null);
+  const npcAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/npc" entityLabel="NPC" mode={editingNpc ? "refine" : "create"} requestFields={{ name: draft.name, species: draft.species, role: draft.role }} currentDraft={{ name: draft.name, species: draft.species, role: draft.role, shortDescription: draft.description, playerNotes: draft.playerNotesMarkdown, gmNotes: draft.gmNotesMarkdown, visualPrompt: draft.artSubject }} fields={[{ key: "name", label: "Name", maxLength: 160 }, { key: "species", label: "Species", maxLength: 120 }, { key: "role", label: "Role", maxLength: 160 }, { key: "shortDescription", label: "Description", maxLength: 4000, multiline: true }, { key: "playerNotes", label: "Player notes", maxLength: 20000, multiline: true }, { key: "gmNotes", label: "GM notes", maxLength: 20000, multiline: true }, { key: "visualPrompt", label: "Portrait description", maxLength: 1600, multiline: true }]} onApply={(candidate) => { setDraft((current) => ({ ...current, name: candidate.name ?? current.name, species: candidate.species ?? current.species, role: candidate.role ?? current.role, description: candidate.shortDescription ?? current.description, playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown, gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown, artSubject: candidate.visualPrompt ?? current.artSubject })); }} /> : null;
+  useCampaignArtEditor(editorOpen ? { campaignId, kind: "npc", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onApproved: (asset) => setDraft((current) => ({ ...current, artPath: asset.path, artUrl: asset.signedUrl, artPrompt: asset.prompt, artProvider: asset.provider })) } : null);
 
   const openEditor = (npc?: NpcRecord) => {
     setEditingNpc(npc ?? null);
     setSelectedNpc(npc ?? null);
-    setDraft(npc ? { name: npc.name, species: npc.species, role: npc.role, description: npc.description, playerNotesMarkdown: npc.player_notes_markdown, gmNotesMarkdown: npc.gm_notes_markdown ?? "", artPath: npc.art_path ?? null, artUrl: npc.art_url ?? null, artPrompt: npc.art_prompt, artProvider: npc.art_provider ?? null } : emptyNpcDraft);
+    setDraft(npc ? { name: npc.name, species: npc.species, role: npc.role, description: npc.description, playerNotesMarkdown: npc.player_notes_markdown, gmNotesMarkdown: npc.gm_notes_markdown ?? "", artSubject: npc.art_subject ?? "", artPath: npc.art_path ?? null, artUrl: npc.art_url ?? null, artPrompt: npc.art_prompt, artProvider: npc.art_provider ?? null } : emptyNpcDraft);
+    setAssistantOpen(false);
     setError(null);
     setEditorOpen(true);
   };
@@ -884,7 +951,7 @@ function NpcsView({ npcs: npcRecords, campaignId, isPersistent, isGM, onNpcsChan
   const saveNpc = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!campaignId) {
-      onAction("NPC editor becomes persistent when a campaign is selected.");
+      onAction("Campaign is unavailable. Return to the campaign selector and try again.");
       return;
     }
 
@@ -932,38 +999,44 @@ function NpcsView({ npcs: npcRecords, campaignId, isPersistent, isGM, onNpcsChan
     }
   };
 
-  return <PageLayout eyebrow="ARCHIVE // CONTACTS" title="NPCs" description="People worth knowing, watching, or avoiding. Their private context stays behind the GM lock." action={isGM ? "ADD NPC" : undefined} onAction={() => isPersistent && isGM ? openEditor() : onAction(isGM ? "NPC editor becomes persistent when a campaign is selected." : "Only a GM can create NPCs.")}>
-    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM CONTACT RECORD</p><h2>{editingNpc ? `Edit ${editingNpc.name}` : "Add an NPC"}</h2></div><button className="icon-button" aria-label="Close NPC editor" onClick={() => setEditorOpen(false)} title="Close NPC editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveNpc}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Role<input maxLength={160} value={draft.role} onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value }))} /></label></div><label>Description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label><label>Player notes<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label><label>GM notes <span className="field-lock"><LockKeyhole size={11} /> PRIVATE</span><textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, gmNotesMarkdown: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingNpc ? "SAVE CHANGES" : "ADD CONTACT"}</button>{editingNpc ? <button className="button button-danger" disabled={isSaving} onClick={deleteNpc} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
-    <div className="record-list">{npcRecords.map((npc) => <article className="record-row" key={npc.id}><div className={`record-icon record-icon-${npc.color}`}><UserRound size={19} /></div><div className="record-main"><div className="record-title-row"><h3>{npc.name}</h3><StatusPill color={npc.color}>{npc.role || "CONTACT"}</StatusPill></div><p>{npc.description || npc.species || "No public profile recorded."}</p><span className="record-meta"><Map size={13} /> {npc.species || "Unclassified contact"}</span></div><div className="record-visibility"><span><BookOpen size={14} /> PLAYER NOTES</span>{isGM ? <span className="private-note"><LockKeyhole size={13} /> GM NOTES</span> : null}</div><button className="icon-button" aria-label={`Open ${npc.name}`} onClick={() => isGM ? openEditor(npc) : setSelectedNpc(npc)} title={`Open ${npc.name}`} type="button"><ChevronRight size={17} /></button></article>)}</div>
-    {selectedNpc && !editorOpen ? <section className="record-detail"><div><p className="eyebrow">PUBLIC CONTACT FILE</p><h2>{selectedNpc.name}</h2><p className="record-detail-meta">{selectedNpc.species || "Unclassified"}{" // "}{selectedNpc.role || "Contact"}</p></div><p>{selectedNpc.description || "No public description recorded yet."}</p><div className="markdown-preview"><div className="preview-toolbar"><BookOpen size={14} /> PLAYER NOTES</div><p>{selectedNpc.player_notes_markdown || "No player notes recorded yet."}</p></div></section> : null}
-    {isGM ? <div className="ai-callout"><div className="ai-callout-icon"><Bot size={20} /></div><div><p className="eyebrow">GM TOOL // AI ASSIST</p><h3>Build a contact from a single signal.</h3><p>Generate a whole NPC or refine one detail while you are in the editor. Every suggestion stays a draft until you approve it.</p></div><button className="button button-ai" onClick={() => onAction("AI NPC studio opened.")} type="button"><Sparkles size={15} /> OPEN STUDIO</button></div> : null}
+  return <PageLayout eyebrow="ARCHIVE // CONTACTS" title="NPCs" description="People worth knowing, watching, or avoiding. Their private context stays behind the GM lock." action={isGM ? "ADD NPC" : undefined} onAction={() => openEditor()}>
+    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM CONTACT RECORD</p><h2>{editingNpc ? `Edit ${editingNpc.name}` : "Add an NPC"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE NPC"}</button><button className="icon-button" aria-label="Close NPC editor" onClick={() => setEditorOpen(false)} title="Close NPC editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? npcAssistant : null}<form className="character-form" onSubmit={saveNpc}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Role<input maxLength={160} value={draft.role} onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value }))} /></label></div><label>Description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label><label>Player notes<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label><label>GM notes <span className="field-lock"><LockKeyhole size={11} /> PRIVATE</span><textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, gmNotesMarkdown: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingNpc ? "SAVE CHANGES" : "ADD CONTACT"}</button>{editingNpc ? <button className="button button-danger" disabled={isSaving} onClick={deleteNpc} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
+    {npcRecords.length ? <div className="record-list">{npcRecords.map((npc) => <article aria-label={`Open public file for ${npc.name}`} className="record-row npc-record-row" key={npc.id} onClick={() => setSelectedNpc(npc)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedNpc(npc); } }} role="button" tabIndex={0}><RecordPortrait src={getAttachedArtUrl(npc.art_url, npc.art_path)} label={`${npc.name} portrait`} className={`record-icon record-icon-${npc.color} record-portrait`} /><div className="record-main"><div className="record-title-row"><h3>{npc.name}</h3><StatusPill color={npc.color}>{npc.role || "CONTACT"}</StatusPill></div><p>{npc.description || npc.species || "No public profile recorded."}</p><span className="record-meta"><Map size={13} /> {npc.species || "Unclassified contact"}</span></div><div className="record-visibility"><span><BookOpen size={14} /> PLAYER NOTES</span>{isGM ? <span className="private-note"><LockKeyhole size={13} /> GM NOTES</span> : null}</div>{isGM ? <div className="record-row-actions"><button className="icon-button" aria-label={`Edit ${npc.name}`} onClick={(event) => { event.stopPropagation(); openEditor(npc); }} title={`Edit ${npc.name}`} type="button"><Pencil size={15} /></button></div> : null}</article>)}</div> : <div className="character-empty"><UserRound size={22} /><h2>No NPCs recorded yet.</h2><p>{isGM ? "Add the first contact to this campaign archive." : "The GM has not recorded any contacts yet."}</p></div>}
+    {selectedNpc && !editorOpen ? <section className="record-detail npc-record-detail"><div className="npc-detail-preview">{getAttachedArtUrl(selectedNpc.art_url, selectedNpc.art_path) ? <RecordPortrait src={getAttachedArtUrl(selectedNpc.art_url, selectedNpc.art_path)} label={`${selectedNpc.name} portrait`} className="npc-detail-portrait record-portrait" /> : null}<div className="npc-detail-copy"><div><p className="eyebrow">PUBLIC CONTACT FILE</p><h2>{selectedNpc.name}</h2><p className="record-detail-meta">{selectedNpc.species || "Unclassified"}{" // "}{selectedNpc.role || "Contact"}</p></div><p>{selectedNpc.description || "No public description recorded yet."}</p></div><div className="npc-detail-notes markdown-preview"><div className="preview-toolbar"><BookOpen size={14} /> PLAYER NOTES</div><p>{selectedNpc.player_notes_markdown || "No player notes recorded yet."}</p></div></div></section> : null}
   </PageLayout>;
 }
 
-type FactionDraft = { name: string; description: string; status: string; artPath: string | null; artUrl: string | null; artPrompt: string | null };
-const emptyFactionDraft: FactionDraft = { name: "", description: "", status: "active", artPath: null, artUrl: null, artPrompt: null };
+type FactionDraft = { name: string; description: string; status: string; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
+const emptyFactionDraft: FactionDraft = { name: "", description: "", status: "active", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
 
-function FactionsView({ factions: factionRecords, campaignId, isPersistent, isGM, onFactionsChange, onAction }: { factions: FactionRecord[]; campaignId: string | null; isPersistent: boolean; isGM: boolean; onFactionsChange: Dispatch<SetStateAction<FactionRecord[]>>; onAction: (message: string) => void }) {
+function FactionsView({ factions: factionRecords, campaignId, isGM, onFactionsChange, onAction }: { factions: FactionRecord[]; campaignId: string | null; isGM: boolean; onFactionsChange: Dispatch<SetStateAction<FactionRecord[]>>; onAction: (message: string) => void }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingFaction, setEditingFaction] = useState<FactionRecord | null>(null);
   const [selectedFaction, setSelectedFaction] = useState<FactionRecord | null>(null);
   const [draft, setDraft] = useState<FactionDraft>(emptyFactionDraft);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useCampaignArtEditor(editorOpen ? { campaignId, kind: "faction", value: draft.artPath, url: draft.artUrl, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })) } : null);
+  useCampaignArtEditor(editorOpen ? { campaignId, kind: "faction", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onApproved: (asset) => setDraft((current) => ({ ...current, artPath: asset.path, artUrl: asset.signedUrl, artPrompt: asset.prompt, artProvider: asset.provider })) } : null);
 
   const openEditor = (faction?: FactionRecord) => {
     setEditingFaction(faction ?? null);
     setSelectedFaction(faction ?? null);
-    setDraft(faction ? { name: faction.name, description: faction.description, status: faction.status, artPath: faction.art_path ?? null, artUrl: faction.art_url ?? null, artPrompt: faction.art_prompt } : emptyFactionDraft);
+    setDraft(faction ? { name: faction.name, description: faction.description, status: faction.status, artSubject: faction.art_subject ?? "", artPath: faction.art_path ?? null, artUrl: faction.art_url ?? null, artPrompt: faction.art_prompt, artProvider: faction.art_provider ?? null } : emptyFactionDraft);
+    setAssistantOpen(false);
     setError(null);
     setEditorOpen(true);
+  };
+
+  const applyFactionCandidate = (candidate: Record<string, string>) => {
+    setDraft((current) => ({ ...current, name: candidate.name ?? current.name, status: candidate.status ?? current.status, description: candidate.description ?? current.description, artSubject: candidate.visualPrompt ?? current.artSubject }));
+    setAssistantOpen(false);
   };
 
   const saveFaction = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!campaignId) {
-      onAction("Faction editor becomes persistent when a campaign is selected.");
+      onAction("Campaign is unavailable. Return to the campaign selector and try again.");
       return;
     }
     setIsSaving(true);
@@ -1006,15 +1079,14 @@ function FactionsView({ factions: factionRecords, campaignId, isPersistent, isGM
     }
   };
 
-  return <PageLayout eyebrow="ARCHIVE // POWER MAP" title="Factions" description="The groups shaping the lanes around Signal / Noise. Use them as mission givers and campaign context." action={isGM ? "ADD FACTION" : undefined} onAction={() => isPersistent && isGM ? openEditor() : onAction(isGM ? "Faction editor becomes persistent when a campaign is selected." : "Only a GM can create factions.")}>
-    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM FACTION RECORD</p><h2>{editingFaction ? `Edit ${editingFaction.name}` : "Add a faction"}</h2></div><button className="icon-button" aria-label="Close faction editor" onClick={() => setEditorOpen(false)} title="Close faction editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveFaction}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Status<input required maxLength={80} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))} /></label></div><label>Public description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingFaction ? "SAVE CHANGES" : "ADD FACTION"}</button>{editingFaction ? <button className="button button-danger" disabled={isSaving} onClick={deleteFaction} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
-    <div className="faction-grid">{factionRecords.map((faction) => <article className={`faction-card faction-${faction.color}`} key={faction.id}><div className="faction-top"><div className="faction-emblem"><Network size={20} /></div><StatusPill color={faction.color}>{faction.status.toUpperCase()}</StatusPill></div><h3>{faction.name}</h3><p>{faction.description || "No public description recorded."}</p><div className="faction-footer"><span><strong>CAMPAIGN</strong><small>MISSION CONTEXT</small></span><button className="icon-button" aria-label={`Open ${faction.name}`} onClick={() => isGM ? openEditor(faction) : setSelectedFaction(faction)} title={`Open ${faction.name}`} type="button"><ArrowUpRight size={16} /></button></div></article>)}</div>
+  return <PageLayout eyebrow="ARCHIVE // POWER MAP" title="Factions" description="The groups shaping this campaign. Use them as mission givers and campaign context." action={isGM ? "ADD FACTION" : undefined} onAction={() => openEditor()}>
+    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM FACTION RECORD</p><h2>{editingFaction ? `Edit ${editingFaction.name}` : "Add a faction"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE FACTION"}</button><button className="icon-button" aria-label="Close faction editor" onClick={() => setEditorOpen(false)} title="Close faction editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/faction" entityLabel="faction" mode={editingFaction ? "refine" : "create"} requestFields={{ name: draft.name, status: draft.status }} currentDraft={{ name: draft.name, status: draft.status, description: draft.description, visualPrompt: draft.artSubject }} fields={[{ key: "name", label: "Name", maxLength: 160 }, { key: "status", label: "Status", maxLength: 80 }, { key: "description", label: "Public description", maxLength: 4000, multiline: true }, { key: "visualPrompt", label: "Emblem or scene description", maxLength: 1600, multiline: true }]} onApply={applyFactionCandidate} /> : null}<form className="character-form" onSubmit={saveFaction}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Status<input required maxLength={80} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))} /></label></div><label>Public description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label><label>Emblem or scene description<textarea maxLength={1600} placeholder="Describe the visual identity the GM wants to review." value={draft.artSubject} onChange={(event) => setDraft((current) => ({ ...current, artSubject: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingFaction ? "SAVE CHANGES" : "ADD FACTION"}</button>{editingFaction ? <button className="button button-danger" disabled={isSaving} onClick={deleteFaction} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
+    {factionRecords.length ? <div className="faction-grid">{factionRecords.map((faction) => <article aria-label={`Open public file for ${faction.name}`} className={`faction-card faction-${faction.color}`} key={faction.id} onClick={() => setSelectedFaction(faction)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedFaction(faction); } }} role="button" tabIndex={0}><div className="faction-top"><div className="faction-emblem"><Network size={20} /></div><StatusPill color={faction.color}>{faction.status.toUpperCase()}</StatusPill></div><h3>{faction.name}</h3><p>{faction.description || "No public description recorded."}</p><div className="faction-footer"><span><strong>CAMPAIGN</strong><small>MISSION CONTEXT</small></span>{isGM ? <button className="icon-button" aria-label={`Edit ${faction.name}`} onClick={(event) => { event.stopPropagation(); openEditor(faction); }} title={`Edit ${faction.name}`} type="button"><Pencil size={15} /></button> : null}</div></article>)}</div> : <div className="character-empty"><Network size={22} /><h2>No factions recorded yet.</h2><p>{isGM ? "Add the first faction to establish campaign context." : "The GM has not recorded any factions yet."}</p></div>}
     {selectedFaction && !editorOpen ? <section className="record-detail"><div><p className="eyebrow">PUBLIC FACTION FILE</p><h2>{selectedFaction.name}</h2><p className="record-detail-meta">{selectedFaction.status.toUpperCase()}</p></div><p>{selectedFaction.description || "No public description recorded yet."}</p></section> : null}
-    <div className="map-panel"><div className="map-copy"><p className="eyebrow">RELATIONSHIP MAP</p><h2>The board has a gravity well.</h2><p>Every favor, debt, and cold shoulder can become the next mission. Faction relationships are campaign context, not a spreadsheet.</p><button className="text-action" onClick={() => onAction("Faction relationship map selected.")} type="button">OPEN MAP <ArrowUpRight size={14} /></button></div><div className="map-visual"><div className="map-lines" /><div className="map-node map-node-one">RL</div><div className="map-node map-node-two">HC</div><div className="map-node map-node-three">VA</div><span className="map-label map-label-one">RED LEDGER</span><span className="map-label map-label-two">HELIX</span></div></div>
   </PageLayout>;
 }
 
-function EpisodesView({ episodes: episodeRecords, campaignId, isPersistent, onAction }: { episodes: EpisodeRecord[]; campaignId: string | null; isPersistent: boolean; onAction: (message: string) => void }) {
+function EpisodesView({ episodes: episodeRecords, campaignId }: { episodes: EpisodeRecord[]; campaignId: string | null }) {
   const [selectedEpisode, setSelectedEpisode] = useState<EpisodeRecord | null>(null);
   const [episodeNotes, setEpisodeNotes] = useState<EpisodeNote[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -1023,11 +1095,7 @@ function EpisodesView({ episodes: episodeRecords, campaignId, isPersistent, onAc
   const openEpisode = async (episode: EpisodeRecord) => {
     setSelectedEpisode(episode);
     setError(null);
-
-    if (!campaignId || !isPersistent) {
-      onAction(`Episode ${episode.title} opened.`);
-      return;
-    }
+    if (!campaignId) return;
 
     setIsLoading(true);
     try {
@@ -1041,28 +1109,21 @@ function EpisodesView({ episodes: episodeRecords, campaignId, isPersistent, onAc
     }
   };
 
-  return <PageLayout eyebrow="CAMPAIGN LOG // EPISODES" title="Episodes" description="The campaign record, one transmission at a time." action="NEW EPISODE" onAction={() => onAction(isPersistent ? "Episodes are created by promoting an open job." : "Episode archive becomes persistent when a campaign is selected.")}>
-    {isPersistent ? <>
-      {error ? <p className="form-error" role="alert">{error}</p> : null}
-      {episodeRecords.length ? <div className="episode-list">{episodeRecords.map((episode) => <article className={`episode-row ${episode.status === "active" ? "episode-current" : ""}`} key={episode.id}><div className={`episode-number episode-number-${episode.accent}`}><span>EP.</span><strong>{episodeRecords.indexOf(episode) + 1}</strong></div><div className="episode-info"><div className="record-title-row"><h3>{episode.title}</h3><StatusPill color={episode.status === "active" ? "cyan" : "muted"}>{episode.status.toUpperCase()}</StatusPill></div><p>{episode.summary || "No public episode brief recorded."}</p><span className="record-meta"><Clock3 size={13} /> {new Date(episode.created_at).toLocaleDateString()} <span className="meta-divider" /> <FileText size={13} /> {episode.noteCount} {episode.noteCount === 1 ? "note" : "notes"}</span></div><button className="episode-open" disabled={isLoading} onClick={() => void openEpisode(episode)} type="button">OPEN <ArrowUpRight size={14} /></button></article>)}</div> : <div className="character-empty"><FolderKanban size={22} /><h2>No episodes logged yet.</h2><p>Promote an open job when the crew is ready to make it part of the campaign record.</p></div>}
-      {selectedEpisode ? <section className="record-detail"><div className="editor-heading"><div><p className="eyebrow">EPISODE DETAIL // {selectedEpisode.status.toUpperCase()}</p><h2>{selectedEpisode.title}</h2><p className="record-detail-meta">{selectedEpisode.noteCount} {selectedEpisode.noteCount === 1 ? "note" : "notes"} in this episode</p></div><button className="icon-button" aria-label="Close episode detail" onClick={() => { setSelectedEpisode(null); setEpisodeNotes([]); }} title="Close episode detail" type="button"><X size={17} /></button></div><p>{selectedEpisode.player_context_markdown || selectedEpisode.summary || "No public episode context recorded yet."}</p>{episodeNotes.length ? <div className="record-list">{episodeNotes.map((note) => <article className="record-row" key={note.id}><div className="record-main"><div className="record-title-row"><h3>{note.title}</h3><span className="record-meta">{note.visibility === "gm" ? "GM ONLY" : "PLAYER"}</span></div><p>{note.body_markdown || "No note body recorded yet."}</p><span className="record-meta">Added by {note.author.displayName}</span></div></article>)}</div> : <p className="record-detail-meta">No visible notes are attached to this episode.</p>}</section> : null}
-    </> : <><div className="episode-list">{episodes.map((episode, index) => <article className={`episode-row ${index === 0 ? "episode-current" : ""}`} key={episode.number}><div className="episode-number"><span>EP.</span><strong>{episode.number}</strong></div><div className="episode-info"><div className="record-title-row"><h3>{episode.title}</h3><StatusPill color={index === 0 ? "cyan" : "muted"}>{episode.status}</StatusPill></div><p>{episode.summary}</p><span className="record-meta"><Clock3 size={13} /> {episode.date} <span className="meta-divider" /> <FileText size={13} /> {index === 0 ? "3 notes" : "6 notes"}</span></div><button className="episode-open" onClick={() => onAction(`Episode ${episode.number} opened.`)} type="button">OPEN <ArrowUpRight size={14} /></button></article>)}</div><div className="promotion-card"><div className="promotion-icon"><Sparkles size={18} /></div><div><p className="eyebrow">PROMOTE A SIGNAL</p><h3>The job board is where episodes begin.</h3><p>When the crew is ready, a GM can promote an open mission into the campaign log with its public context preserved.</p></div><button className="button button-secondary" onClick={() => onAction("Open missions ready to promote: 3.")} type="button">REVIEW JOBS <ArrowUpRight size={14} /></button></div></>}
+  return <PageLayout eyebrow="CAMPAIGN LOG // EPISODES" title="Episodes" description="The campaign record, one transmission at a time.">
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    {episodeRecords.length ? <div className="episode-list">{episodeRecords.map((episode) => <article className={`episode-row ${episode.status === "active" ? "episode-current" : ""}`} key={episode.id}><div className={`episode-number episode-number-${episode.accent}`}><span>EP.</span><strong>{episodeRecords.indexOf(episode) + 1}</strong></div><div className="episode-info"><div className="record-title-row"><h3>{episode.title}</h3><StatusPill color={episode.status === "active" ? "cyan" : "muted"}>{episode.status.toUpperCase()}</StatusPill></div><p>{episode.summary || "No public episode brief recorded."}</p><span className="record-meta"><Clock3 size={13} /> {new Date(episode.created_at).toLocaleDateString()} <span className="meta-divider" /> <FileText size={13} /> {episode.noteCount} {episode.noteCount === 1 ? "note" : "notes"}</span></div><button className="episode-open" disabled={isLoading} onClick={() => void openEpisode(episode)} type="button">OPEN <ArrowUpRight size={14} /></button></article>)}</div> : <div className="character-empty"><FolderKanban size={22} /><h2>No episodes logged yet.</h2><p>Promote an open job when the crew is ready to make it part of the campaign record.</p></div>}
+    {selectedEpisode ? <section className="record-detail"><div className="editor-heading"><div><p className="eyebrow">EPISODE DETAIL // {selectedEpisode.status.toUpperCase()}</p><h2>{selectedEpisode.title}</h2><p className="record-detail-meta">{selectedEpisode.noteCount} {selectedEpisode.noteCount === 1 ? "note" : "notes"} in this episode</p></div><button className="icon-button" aria-label="Close episode detail" onClick={() => { setSelectedEpisode(null); setEpisodeNotes([]); }} title="Close episode detail" type="button"><X size={17} /></button></div><p>{selectedEpisode.player_context_markdown || selectedEpisode.summary || "No public episode context recorded yet."}</p>{episodeNotes.length ? <div className="record-list">{episodeNotes.map((note) => <article className="record-row" key={note.id}><div className="record-main"><div className="record-title-row"><h3>{note.title}</h3><span className="record-meta">{note.visibility === "gm" ? "GM ONLY" : "PLAYER"}</span></div><p>{note.body_markdown || "No note body recorded yet."}</p><span className="record-meta">Added by {note.author.displayName}</span></div></article>)}</div> : <p className="record-detail-meta">No visible notes are attached to this episode.</p>}</section> : null}
   </PageLayout>;
 }
 
-function NotesView({ isGM, onAction }: { isGM: boolean; onAction: (message: string) => void }) { return <PageLayout eyebrow="CAMPAIGN LOG // SHARED MEMORY" title="Campaign notes" description="Global context and episode notes, with authorship and visibility kept visible." action="ADD NOTE" onAction={() => onAction("Note editor opened.")}><div className="notes-toolbar"><div className="filter-tabs"><button className="filter-tab filter-tab-active" type="button">ALL NOTES <span>21</span></button><button className="filter-tab" onClick={() => onAction("Global notes selected.")} type="button">GLOBAL <span>12</span></button><button className="filter-tab" onClick={() => onAction("Episode notes selected.")} type="button">EPISODES <span>09</span></button></div>{isGM ? <button className="visibility-toggle" onClick={() => onAction("GM-only filter enabled.")} type="button"><LockKeyhole size={14} /> GM ONLY</button> : null}</div><div className="notes-list">{notes.map((note) => <article className="note-row" key={note.title}><AccentMark color={note.accent} /><div className="note-main"><div className="note-meta"><span>{note.scope}</span><span className={`note-visibility ${note.visibility === "GM ONLY" ? "note-private" : ""}`}>{note.visibility === "GM ONLY" ? <LockKeyhole size={12} /> : <BookOpen size={12} />} {note.visibility}</span></div><h3>{note.title}</h3><p>Added by <strong>{note.author}</strong> <span className="meta-divider" /> {note.age}</p></div><button className="icon-button" aria-label={`Open note ${note.title}`} onClick={() => onAction(`${note.title} opened.`)} title="Open note" type="button"><ChevronRight size={17} /></button></article>)}</div></PageLayout>; }
-
-function MembersView({ members, campaignId, isPersistent, isGM, onMembersChange, onAction }: { members: ApiCampaignMember[]; campaignId: string | null; isPersistent: boolean; isGM: boolean; onMembersChange: Dispatch<SetStateAction<ApiCampaignMember[]>>; onAction: (message: string) => void }) {
+function MembersView({ members, campaignId, isGM, onMembersChange, onAction }: { members: ApiCampaignMember[]; campaignId: string | null; isGM: boolean; onMembersChange: Dispatch<SetStateAction<ApiCampaignMember[]>>; onAction: (message: string) => void }) {
   const [selectedMember, setSelectedMember] = useState<ApiCampaignMember | null>(null);
   const [joinUrl, setJoinUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const createJoinLink = async () => {
-    if (!campaignId) {
-      onAction("Crew access becomes persistent when a campaign is selected.");
-      return;
-    }
+    if (!campaignId) return;
 
     setIsSaving(true);
     setError(null);
@@ -1125,17 +1186,12 @@ function MembersView({ members, campaignId, isPersistent, isGM, onMembersChange,
     }
   };
 
-  const demoMembers = [{ name: "Arlen Rook", role: "GAME MASTER", status: "OWNER", initials: "AR", color: "#f5b84b" }, ...crew.map((member) => ({ name: member.name, role: "PLAYER", status: "ACTIVE", initials: member.initials, color: member.color }))];
-
   return <PageLayout eyebrow="CAMPAIGN ADMIN // MEMBERS" title="Crew access" description="Manage who can see the campaign and who is trusted to shape it." action={isGM ? "CREATE JOIN LINK" : undefined} onAction={() => isGM ? void createJoinLink() : onAction("Only a GM can create join links.")}>
     <div className="member-summary"><div><p className="eyebrow">ACCESS MODEL</p><h2>One campaign. Two levels of clearance.</h2><p>Player-visible content is shared by default. GM notes, mission controls, and campaign administration stay behind the command lock.</p></div><div className="clearance-key"><span><i className="legend-dot dot-cyan" /> PLAYER VISIBLE</span><span><i className="legend-dot dot-pink" /> GM ONLY</span></div></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
-    {isPersistent ? members.length ? <div className="member-list">{members.map((member, index) => <div className="member-row" key={member.userId}><div className="avatar" style={{ backgroundColor: ["#f5b84b", "#ff5c9a", "#62e8ff", "#b992ff"][index % 4] }}>{member.displayName.slice(0, 2).toUpperCase()}</div><div className="member-copy"><strong>{member.displayName}</strong><span>{member.role === "gm" ? "GAME MASTER" : "PLAYER"}</span></div><StatusPill color={member.role === "gm" ? "amber" : "cyan"}>{member.role === "gm" ? "OWNER" : "ACTIVE"}</StatusPill><span className="member-last">Joined {new Date(member.joinedAt).toLocaleDateString()}</span>{isGM ? <button className="icon-button" aria-label={`Open ${member.displayName} options`} onClick={() => { setSelectedMember(member); setError(null); }} title="Member options" type="button"><MoreHorizontal size={17} /></button> : null}</div>)}</div> : <div className="character-empty"><UsersRound size={22} /><h2>No campaign members yet.</h2><p>Invite a player to establish the crew manifest.</p></div> : <div className="member-list">{demoMembers.map((member) => <div className="member-row" key={member.name}><div className="avatar" style={{ backgroundColor: member.color }}>{member.initials}</div><div className="member-copy"><strong>{member.name}</strong><span>{member.role}</span></div><StatusPill color={member.role === "GAME MASTER" ? "amber" : "cyan"}>{member.status}</StatusPill><span className="member-last">Last active 24m ago</span><button className="icon-button" aria-label={`Open ${member.name} options`} onClick={() => onAction(`${member.name} access options opened.`)} title="Member options" type="button"><MoreHorizontal size={17} /></button></div>)}</div>}
+    {members.length ? <div className="member-list">{members.map((member, index) => <div className="member-row" key={member.userId}><div className="avatar" style={{ backgroundColor: ["#f5b84b", "#ff5c9a", "#62e8ff", "#b992ff"][index % 4] }}>{member.displayName.slice(0, 2).toUpperCase()}</div><div className="member-copy"><strong>{member.displayName}</strong><span>{member.role === "gm" ? "GAME MASTER" : "PLAYER"}</span></div><StatusPill color={member.role === "gm" ? "amber" : "cyan"}>{member.role === "gm" ? "OWNER" : "ACTIVE"}</StatusPill><span className="member-last">Joined {new Date(member.joinedAt).toLocaleDateString()}</span>{isGM ? <button className="icon-button" aria-label={`Open ${member.displayName} options`} onClick={() => { setSelectedMember(member); setError(null); }} title="Member options" type="button"><MoreHorizontal size={17} /></button> : null}</div>)}</div> : <div className="character-empty"><UsersRound size={22} /><h2>No campaign members yet.</h2><p>Invite a player to establish the crew manifest.</p></div>}
     {selectedMember ? <section className="record-detail"><div className="editor-heading"><div><p className="eyebrow">MEMBER ACCESS // {selectedMember.role.toUpperCase()}</p><h2>{selectedMember.displayName}</h2><p className="record-detail-meta">Joined {new Date(selectedMember.joinedAt).toLocaleDateString()}</p></div><button className="icon-button" aria-label="Close member details" onClick={() => setSelectedMember(null)} title="Close member details" type="button"><X size={17} /></button></div><div className="character-form-actions"><button className="button button-secondary" disabled={isSaving || selectedMember.role === "gm"} onClick={() => void updateMemberRole("gm")} type="button">MAKE GM</button><button className="button button-secondary" disabled={isSaving || selectedMember.role === "player"} onClick={() => void updateMemberRole("player")} type="button">MAKE PLAYER</button><button className="button button-danger" disabled={isSaving} onClick={() => void removeMember()} type="button">REMOVE</button></div></section> : null}
-    {joinUrl ? <div className="join-link-card"><div className="join-link-icon"><Send size={18} /></div><div><p className="eyebrow">PLAYER JOIN LINK</p><h3>{joinUrl}</h3><p>One use · no expiration</p></div><button className="button button-secondary" disabled={isSaving} onClick={() => void copyJoinLink()} type="button">COPY LINK</button></div> : !isPersistent ? <div className="join-link-card"><div className="join-link-icon"><Send size={18} /></div><div><p className="eyebrow">PLAYER JOIN LINK</p><h3>signalnoise.starboard.app/join/8QF-29K</h3><p>Created 2 days ago · Expires in 5 days · 1 use remaining</p></div><button className="button button-secondary" onClick={() => onAction("Join link copied to clipboard.")} type="button">COPY LINK</button></div> : null}
+    {joinUrl ? <div className="join-link-card"><div className="join-link-icon"><Send size={18} /></div><div><p className="eyebrow">PLAYER JOIN LINK</p><h3>{joinUrl}</h3><p>One use · no expiration</p></div><button className="button button-secondary" disabled={isSaving} onClick={() => void copyJoinLink()} type="button">COPY LINK</button></div> : null}
   </PageLayout>;
 }
-
-function PageLayout({ eyebrow, title, description, action, onAction, children }: { eyebrow: string; title: string; description: string; action?: string; onAction: () => void; children: React.ReactNode }) { return <><CampaignArtEditorSlot /><div className="page-intro"><div><p className="eyebrow eyebrow-bright">{eyebrow}</p><h1>{title}</h1><p className="intro-copy">{description}</p></div>{action ? <button className="button button-primary" onClick={onAction} type="button"><CirclePlus size={16} /> {action}</button> : null}</div>{children}</>; }
-
-function FeedItem({ icon: Icon, accent, title, detail, age }: { icon: LucideIcon; accent: string; title: string; detail: string; age: string }) { return <article className="feed-item"><div className={`feed-icon feed-icon-${accent}`}><Icon size={16} /></div><div><h3>{title}</h3><p>{detail}</p></div><span>{age}</span></article>; }
+function PageLayout({ eyebrow, title, description, action, onAction, children }: { eyebrow: string; title: string; description: string; action?: string; onAction?: () => void; children: React.ReactNode }) { return <><CampaignArtEditorSlot /><div className="page-intro"><div><p className="eyebrow eyebrow-bright">{eyebrow}</p><h1>{title}</h1><p className="intro-copy">{description}</p></div>{action && onAction ? <button className="button button-primary" onClick={onAction} type="button"><CirclePlus size={16} /> {action}</button> : null}</div>{children}</>; }

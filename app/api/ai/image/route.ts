@@ -1,15 +1,15 @@
 import { createHash } from "node:crypto";
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { generateImage } from "@/lib/ai/client";
 import { buildArtPrompt } from "@/lib/ai/prompts";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
+import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
+import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { imageDraftSchema, imageGenerationInputSchema } from "@/lib/validation/image";
+import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 
 export const runtime = "nodejs";
-
-const imageGenerationLimit = 10;
-const imageGenerationWindowMs = 60 * 60 * 1000;
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -35,8 +35,21 @@ export async function POST(request: Request) {
 
     const env = getServerEnv();
 
-    if (!env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: "OpenAI image generation is not configured." }, { status: 503 });
+    if (!env.OPENROUTER_API_KEY) {
+      return NextResponse.json({ error: "OpenRouter image generation is not configured." }, { status: 503 });
+    }
+
+    const catalog = await getAiModelCatalog("image");
+    const availableModels = catalog.models.filter((model) => model.compatible);
+    const settingsResult = await loadCampaignAiSettings(context.supabase, input.data.campaignId, availableModels.map((model) => model.id));
+    if ("error" in settingsResult) return NextResponse.json({ error: settingsResult.error }, { status: 503 });
+
+    let selectedModel;
+    try {
+      selectedModel = resolveAiModel("image", input.data.model, env.OPENROUTER_IMAGE_MODEL, settingsResult.settings.enabledModelIds, availableModels);
+    } catch (error) {
+      if (error instanceof AiModelSelectionError) return NextResponse.json({ error: error.message }, { status: 400 });
+      throw error;
     }
 
     const { data: campaign, error: campaignError } = await context.supabase
@@ -53,26 +66,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Campaign was not found." }, { status: 404 });
     }
 
-    const windowStart = new Date(Date.now() - imageGenerationWindowMs).toISOString();
-    const { count, error: rateLimitError } = await context.supabase
-      .from("ai_generation_runs")
-      .select("id", { count: "exact", head: true })
-      .eq("campaign_id", input.data.campaignId)
-      .eq("requested_by", context.user.id)
-      .eq("kind", "image")
-      .gte("created_at", windowStart);
-
-    if (rateLimitError) {
-      return NextResponse.json({ error: "AI generation limits could not be checked." }, { status: 503 });
-    }
-
-    if ((count ?? 0) >= imageGenerationLimit) {
-      return NextResponse.json(
-        { error: "Image generation is temporarily rate-limited. Try again later." },
-        { status: 429, headers: { "Retry-After": String(Math.ceil(imageGenerationWindowMs / 1000)) } },
-      );
-    }
-
     const campaignStyle = [
       campaign.system,
       campaign.description,
@@ -81,38 +74,37 @@ export async function POST(request: Request) {
     ].filter(Boolean).join(". ");
     const prompt = buildArtPrompt(input.data.subject, campaignStyle, input.data.refinement, input.data.currentPrompt);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
-    const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
     let response;
 
     try {
-      response = await client.images.generate({
-        model: env.OPENAI_IMAGE_MODEL,
-        prompt,
-        size: "1024x1024",
-      });
+      response = await generateImage(prompt, selectedModel.id);
     } catch {
       await context.supabase.from("ai_generation_runs").insert({
         campaign_id: input.data.campaignId,
         requested_by: context.user.id,
         kind: "image",
         mode: input.data.mode,
-        model: env.OPENAI_IMAGE_MODEL,
+        model: selectedModel.id,
         prompt_hash: promptHash,
+        provider: "openrouter",
+        effective_model: selectedModel.id,
         status: "failed",
       });
       return NextResponse.json({ error: "Art generation is temporarily unavailable." }, { status: 503 });
     }
 
-    const image = response.data?.[0];
+    const image = response.image;
 
-    if (!image?.b64_json && !image?.url) {
+    if (!image.base64 && !image.url) {
       await context.supabase.from("ai_generation_runs").insert({
         campaign_id: input.data.campaignId,
         requested_by: context.user.id,
         kind: "image",
         mode: input.data.mode,
-        model: env.OPENAI_IMAGE_MODEL,
+        model: selectedModel.id,
         prompt_hash: promptHash,
+        provider: "openrouter",
+        effective_model: selectedModel.id,
         status: "failed",
       });
       return NextResponse.json({ error: "The AI provider returned no image data." }, { status: 502 });
@@ -125,8 +117,14 @@ export async function POST(request: Request) {
         requested_by: context.user.id,
         kind: "image",
         mode: input.data.mode,
-        model: env.OPENAI_IMAGE_MODEL,
+        model: response.model,
         prompt_hash: promptHash,
+        provider: "openrouter",
+        effective_model: response.model,
+        generation_id: response.generationId,
+        input_tokens: response.usage?.inputTokens,
+        output_tokens: response.usage?.outputTokens,
+        cost_usd: response.usage?.cost,
         status: "complete",
       })
       .select("id, created_at")
@@ -143,9 +141,9 @@ export async function POST(request: Request) {
       mode: input.data.mode,
       subject: input.data.subject,
       prompt,
-      image: { base64: image.b64_json ?? null, url: image.url ?? null },
-      provider: "openai",
-      model: env.OPENAI_IMAGE_MODEL,
+      image: { base64: image.base64, url: image.url, mediaType: image.mediaType },
+      provider: "openrouter",
+      model: response.model,
       createdAt,
     });
 
@@ -153,7 +151,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The AI response did not match the image draft format.", issues: draft.error.flatten() }, { status: 502 });
     }
 
-    return NextResponse.json({ draft: draft.data });
+    return NextResponse.json({ draft: draft.data, model: response.model });
   } catch {
     return NextResponse.json({ error: "Art generation is temporarily unavailable." }, { status: 503 });
   }

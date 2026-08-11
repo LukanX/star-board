@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
-import { createCampaignArtSignedUrl, campaignArtBucket, validateCampaignArtPath } from "@/lib/storage/campaign-art";
+import { createCampaignArtSignedUrl, campaignArtBucket, removeCampaignArtIfUnreferenced, validateCampaignArtPath } from "@/lib/storage/campaign-art";
 import { campaignArtKindSchema, campaignArtMaxBytes, campaignArtMimeTypes } from "@/lib/validation/art";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
@@ -115,11 +115,7 @@ export async function DELETE(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Campaign membership is required." }, { status: 403 });
     }
 
-    const { error } = await context.supabase.storage.from(campaignArtBucket).remove([path]);
-
-    if (error) {
-      return NextResponse.json({ error: "Unable to remove campaign art." }, { status: 400 });
-    }
+    await removeCampaignArtIfUnreferenced(context.supabase, campaignId, path);
 
     return new NextResponse(null, { status: 204 });
   } catch {
