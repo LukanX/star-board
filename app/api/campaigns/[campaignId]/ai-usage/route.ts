@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCampaignGM } from "@/lib/auth/permissions";
+import { getRollingSevenDaysStart } from "@/lib/time";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 
   try {
-    const periodStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const periodStart = getRollingSevenDaysStart().toISOString();
     const { data, error } = await context.supabase
       .from("ai_generation_runs")
       .select("input_tokens, output_tokens")

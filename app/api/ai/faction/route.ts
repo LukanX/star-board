@@ -9,6 +9,7 @@ import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
 import { factionDraftSchema, factionGenerationInputSchema } from "@/lib/validation/ai";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
+import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 
 export const runtime = "nodejs";
 
@@ -68,9 +69,12 @@ export async function POST(request: Request) {
     try {
       providerResult = await generateJson(prompt, factionDraftSchema, selectedModel.id);
       rawDraft = providerResult.data;
-    } catch {
+    } catch (error: unknown) {
+      logAiProviderFailure(error, { kind: "faction", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
       await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "faction", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: selectedModel.id, status: "failed" });
-      return NextResponse.json({ error: "Faction assistance is temporarily unavailable." }, { status: 503 });
+      const failure = getAiProviderFailure(error, "Faction assistance is temporarily unavailable.");
+      const headers = failure.retryAfter ? { "Retry-After": failure.retryAfter } : undefined;
+      return NextResponse.json({ error: failure.message, ...(failure.requestId ? { providerRequestId: failure.requestId } : {}) }, { status: failure.status, ...(headers ? { headers } : {}) });
     }
 
     const draft = factionDraftSchema.safeParse(rawDraft);

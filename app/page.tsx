@@ -4,10 +4,10 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import AuthPrompt from "@/components/auth/AuthPrompt";
 import SignOutButton from "@/components/auth/SignOutButton";
-import CampaignArtField, { CampaignArtEditorSlot, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
-import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
+import { CampaignArtEditorSlot, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
 import CampaignAiSettings from "@/components/archive/CampaignAiSettings";
 import CampaignNotesView, { type ApiCampaignNote, type CampaignNote } from "@/components/archive/CampaignNotesView";
+import { getRollingSevenDaysStart } from "@/lib/time";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -34,13 +34,13 @@ import {
   Plus,
   Radio,
   Send,
+  SlidersHorizontal,
   Sparkles,
   UserRound,
   UsersRound,
   Vote,
   X,
   Zap,
-  SlidersHorizontal,
 } from "lucide-react";
 
 type NavId = "overview" | "characters" | "npcs" | "factions" | "jobs" | "episodes" | "notes" | "members" | "settings";
@@ -77,9 +77,6 @@ type Mission = {
   artUrl?: string | null;
   artPrompt?: string | null;
   artProvider?: string | null;
-  hook?: string;
-  gmNotesMarkdown?: string;
-  artSubject?: string | null;
 };
 
 type ApiJob = {
@@ -88,12 +85,9 @@ type ApiJob = {
   summary: string;
   status: "draft" | "open" | "promoted" | "archived";
   player_notes_markdown: string;
-  hook?: string;
-  gm_notes_markdown?: string;
   giver_npc_id: string | null;
   giver_faction_id: string | null;
   art_path: string | null;
-  art_subject: string | null;
   art_url?: string | null;
   art_prompt: string | null;
   art_provider: string | null;
@@ -113,6 +107,7 @@ type ApiCharacter = {
   art_path: string | null;
   art_url?: string | null;
   art_prompt: string | null;
+  art_provider?: string | null;
 };
 
 type ApiNpc = {
@@ -124,7 +119,6 @@ type ApiNpc = {
   description: string;
   player_notes_markdown: string;
   gm_notes_markdown?: string;
-  art_subject: string | null;
   art_path: string | null;
   art_url?: string | null;
   art_prompt: string | null;
@@ -137,7 +131,6 @@ type ApiFaction = {
   name: string;
   description: string;
   status: string;
-  art_subject: string | null;
   art_path: string | null;
   art_url?: string | null;
   art_prompt: string | null;
@@ -193,6 +186,7 @@ type Character = {
   artPath?: string | null;
   artUrl?: string | null;
   artPrompt?: string | null;
+  artProvider?: string | null;
 };
 
 type CharacterDraft = {
@@ -204,10 +198,11 @@ type CharacterDraft = {
   artPath: string | null;
   artUrl: string | null;
   artPrompt: string | null;
+  artProvider: string | null;
 };
 function mapApiJob(job: ApiJob, index: number): Mission {
   const accent = (["cyan", "pink", "amber"] as const)[index % 3];
-  const image = job.art_url ?? (job.art_path?.startsWith("http") ? job.art_path : null);
+  const image = getAttachedArtUrl(job.art_url, job.art_path);
 
   return {
     id: job.id,
@@ -227,9 +222,6 @@ function mapApiJob(job: ApiJob, index: number): Mission {
     artUrl: job.art_url ?? null,
     artPrompt: job.art_prompt,
     artProvider: job.art_provider,
-    hook: job.hook ?? undefined,
-    gmNotesMarkdown: job.gm_notes_markdown ?? "",
-    artSubject: job.art_subject,
   };
 }
 
@@ -383,16 +375,6 @@ async function fetchCampaignMembers(campaignId: string) {
   return { role: result.role ?? "player", displayName: result.displayName ?? "Crew member", members: result.members ?? [] };
 }
 
-async function fetchCampaignAiUsage(campaignId: string) {
-  try {
-    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/ai-usage`);
-    const result = (await response.json()) as { totalTokens?: number };
-    return response.ok && typeof result.totalTokens === "number" ? result.totalTokens : null;
-  } catch {
-    return null;
-  }
-}
-
 type NavItem = { id: NavId; label: string; icon: LucideIcon; count?: string };
 
 const navItems: { label: string; items: NavItem[] }[] = [
@@ -414,12 +396,13 @@ function mapApiCharacter(character: ApiCharacter, index: number): Character {
     subtitle,
     detail,
     color: colors[index % colors.length],
-    image: character.art_url ?? (character.art_path?.startsWith("http") ? character.art_path : null),
+    image: getAttachedArtUrl(character.art_url, character.art_path),
     status: "ACTIVE",
     backstoryMarkdown: character.backstory_markdown,
     artPath: character.art_path,
     artUrl: character.art_url ?? null,
     artPrompt: character.art_prompt,
+    artProvider: character.art_provider ?? null,
   };
 }
 
@@ -453,10 +436,10 @@ type OverviewMetrics = {
 };
 
 function getOverviewMetrics(missions: Mission[], members: ApiCampaignMember[], notes: CampaignNote[], episodes: EpisodeRecord[]): OverviewMetrics {
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const notesThisWeek = notes.filter((note) => {
+  const rollingSevenDaysStart = getRollingSevenDaysStart().getTime();
+  const notesInLastSevenDays = notes.filter((note) => {
     const timestamp = Date.parse(note.updated_at || note.created_at);
-    return !Number.isNaN(timestamp) && timestamp >= weekAgo;
+    return !Number.isNaN(timestamp) && timestamp >= rollingSevenDaysStart;
   }).length;
 
   return {
@@ -467,28 +450,28 @@ function getOverviewMetrics(missions: Mission[], members: ApiCampaignMember[], n
     players: members.filter((member) => member.role === "player").length,
     gms: members.filter((member) => member.role === "gm").length,
     notes: notes.length,
-    notesThisWeek,
+    notesThisWeek: notesInLastSevenDays,
     draftSignals: missions.filter((mission) => mission.status === "draft").length,
     latestEpisodeTitle: episodes[0]?.title ?? null,
   };
 }
 
-const emptyCharacterDraft: CharacterDraft = { name: "", species: "", className: "", level: 1, backstoryMarkdown: "", artPath: null, artUrl: null, artPrompt: null };
+const emptyCharacterDraft: CharacterDraft = { name: "", species: "", className: "", level: 1, backstoryMarkdown: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
 
 function toCharacterDraft(character: Character): CharacterDraft {
-  return { name: character.name, species: character.species, className: character.className, level: Number(character.detail.match(/Level (\d+)/)?.[1] ?? 1), backstoryMarkdown: character.backstoryMarkdown, artPath: character.artPath ?? null, artUrl: character.artUrl ?? null, artPrompt: character.artPrompt ?? null };
+  return { name: character.name, species: character.species, className: character.className, level: Number(character.detail.match(/Level (\d+)/)?.[1] ?? 1), backstoryMarkdown: character.backstoryMarkdown, artPath: character.artPath ?? null, artUrl: character.artUrl ?? null, artPrompt: character.artPrompt ?? null, artProvider: character.artProvider ?? null };
 }
 
 function VisualAsset({ src, label, className = "" }: { src: string | null; label: string; className?: string }) {
   return <div aria-label={label} className={`visual-asset ${className} ${src ? "has-asset" : "no-asset"}`} role={src ? "img" : undefined} style={src ? { backgroundImage: `url(${src})` } : undefined} />;
 }
 
-function getAttachedArtUrl(artUrl: string | null | undefined, artPath: string | null | undefined) {
-  return artUrl ?? (artPath?.startsWith("http") ? artPath : null);
+function getAttachedArtUrl(signedUrl: string | null | undefined, path: string | null | undefined) {
+  return signedUrl ?? (path?.startsWith("http") ? path : null);
 }
 
-function RecordPortrait({ src, label, className = "" }: { src: string | null; label: string; className?: string }) {
-  return <div aria-label={label} className={`${className} ${src ? "has-portrait" : "no-portrait"}`} role={src ? "img" : undefined} style={src ? { backgroundImage: `url(${src})` } : undefined}>{src ? null : <UserRound size={19} />}</div>;
+function RecordPortrait({ src, label, className, fallback }: { src: string | null; label: string; className: string; fallback: React.ReactNode }) {
+  return <div aria-label={label} className={className} role={src ? "img" : undefined} style={src ? { backgroundImage: `url(${src})`, backgroundPosition: "center", backgroundSize: "cover" } : undefined}>{src ? null : fallback}</div>;
 }
 
 function StatusPill({ children, color = "cyan" }: { children: React.ReactNode; color?: string }) {
@@ -512,7 +495,6 @@ export default function Home() {
   const [noteRecords, setNoteRecords] = useState<CampaignNote[]>([]);
   const [episodeRecords, setEpisodeRecords] = useState<EpisodeRecord[]>([]);
   const [memberRecords, setMemberRecords] = useState<ApiCampaignMember[]>([]);
-  const [aiTokensThisWeek, setAiTokensThisWeek] = useState<number | null>(null);
   const [isGM, setIsGM] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [campaign, setCampaign] = useState<CampaignRecord | null>(null);
@@ -556,7 +538,7 @@ export default function Home() {
           return;
         }
 
-        const [jobsResult, charactersResult, npcsResult, factionsResult, notesResult, episodesResult, membersResult, aiUsageResult] = await Promise.all([
+        const [jobsResult, charactersResult, npcsResult, factionsResult, notesResult, episodesResult, membersResult] = await Promise.all([
           fetchCampaignJobs(requestedCampaignId),
           fetchCampaignCharacters(requestedCampaignId),
           fetchCampaignNpcs(requestedCampaignId),
@@ -564,7 +546,6 @@ export default function Home() {
           fetchCampaignNotes(requestedCampaignId),
           fetchCampaignEpisodes(requestedCampaignId),
           fetchCampaignMembers(requestedCampaignId),
-          membership.role === "gm" ? fetchCampaignAiUsage(requestedCampaignId) : Promise.resolve(null),
         ]);
 
         if (cancelled) return;
@@ -581,7 +562,6 @@ export default function Home() {
         setNoteRecords(notesResult.notes.map(mapApiNote));
         setEpisodeRecords(episodesResult.episodes.map(mapApiEpisode));
         setMemberRecords(membersResult.members);
-        setAiTokensThisWeek(aiUsageResult);
         setIsLoading(false);
       } catch (error: unknown) {
         if (cancelled) return;
@@ -644,7 +624,7 @@ export default function Home() {
   };
   const displayedNavItems = navItems.map((group) => ({
     ...group,
-    items: group.items.filter((item) => item.id !== "settings" || isGM).map((item) => ({ ...item, count: String(countByNavId[item.id] ?? 0).padStart(2, "0") })),
+    items: group.items.filter((item) => item.id !== "settings" || isGM).map((item) => ({ ...item, count: item.id === "settings" ? undefined : String(countByNavId[item.id] ?? 0).padStart(2, "0") })),
   }));
   const activeLabel = navItems.flatMap((group) => group.items).find((item) => item.id === activeView)?.label ?? "Overview";
 
@@ -663,56 +643,41 @@ export default function Home() {
 
       <div className="app-content">
         <header className="topbar"><div className="topbar-left"><button aria-label="Open navigation" className="mobile-menu icon-button" onClick={() => setMobileNavOpen(true)} title="Open navigation" type="button"><Menu size={20} /></button><div className="crumb-mark"><Command size={14} /></div><span className="crumb-muted">{campaign?.name}</span><ChevronRight size={14} className="muted-icon" /><span className="crumb-current">{activeLabel.toUpperCase()}</span></div><div className="topbar-right"><SignOutButton compact className="icon-button" /></div></header>
-        <div className="content-frame">{activeView === "overview" ? <OverviewView campaign={campaign!} missions={missions} characters={characters} npcs={npcRecords} factions={factionRecords} members={memberRecords} notes={noteRecords} episodes={episodeRecords} aiTokensThisWeek={aiTokensThisWeek} isGM={isGM} onVote={handleVote} onOpenView={selectView} /> : activeView === "jobs" ? <JobsView missions={missions} campaignId={campaignId} isGM={isGM} npcs={npcRecords} factions={factionRecords} onMissionsChange={setMissions} onNpcsChange={setNpcRecords} onFactionsChange={setFactionRecords} onVote={handleVote} onPromote={handlePromote} onAction={notify} /> : activeView === "characters" ? <CharactersView characters={characters} campaignId={campaignId} isGM={isGM} onCharactersChange={setCharacters} onAction={notify} /> : activeView === "npcs" ? <NpcsView npcs={npcRecords} campaignId={campaignId} isGM={isGM} onNpcsChange={setNpcRecords} onAction={notify} /> : activeView === "factions" ? <FactionsView factions={factionRecords} campaignId={campaignId} isGM={isGM} onFactionsChange={setFactionRecords} onAction={notify} /> : activeView === "episodes" ? <EpisodesView episodes={episodeRecords} campaignId={campaignId} /> : activeView === "notes" ? <CampaignNotesView notes={noteRecords} episodes={episodeRecords} campaignId={campaignId} isGM={isGM} onNotesChange={setNoteRecords} onAction={notify} /> : activeView === "settings" ? <CampaignSettingsView campaignId={campaignId} /> : <MembersView members={memberRecords} campaignId={campaignId} isGM={isGM} onMembersChange={setMemberRecords} onAction={notify} />}</div>
+        <div className="content-frame">{activeView === "overview" ? <OverviewView campaign={campaign!} missions={missions} characters={characters} npcs={npcRecords} factions={factionRecords} members={memberRecords} notes={noteRecords} episodes={episodeRecords} isGM={isGM} onVote={handleVote} onOpenView={selectView} /> : activeView === "jobs" ? <JobsView missions={missions} campaignId={campaignId} isGM={isGM} npcs={npcRecords} factions={factionRecords} onMissionsChange={setMissions} onVote={handleVote} onPromote={handlePromote} onAction={notify} /> : activeView === "characters" ? <CharactersView characters={characters} campaignId={campaignId} isGM={isGM} onCharactersChange={setCharacters} onAction={notify} /> : activeView === "npcs" ? <NpcsView npcs={npcRecords} campaignId={campaignId} isGM={isGM} onNpcsChange={setNpcRecords} onAction={notify} /> : activeView === "factions" ? <FactionsView factions={factionRecords} campaignId={campaignId} isGM={isGM} onFactionsChange={setFactionRecords} onAction={notify} /> : activeView === "episodes" ? <EpisodesView episodes={episodeRecords} campaignId={campaignId} /> : activeView === "notes" ? <CampaignNotesView notes={noteRecords} episodes={episodeRecords} campaignId={campaignId} isGM={isGM} onNotesChange={setNoteRecords} onAction={notify} /> : activeView === "settings" ? <CampaignSettingsView campaignId={campaignId} /> : <MembersView members={memberRecords} campaignId={campaignId} isGM={isGM} onMembersChange={setMemberRecords} onAction={notify} />}</div>
       </div>
       {toast ? <div className="toast"><span className="toast-icon"><Radio size={14} /></span><span>{toast}</span><button aria-label="Dismiss notification" onClick={() => setToast(null)} title="Dismiss notification" type="button"><X size={14} /></button></div> : null}
     </main>
   );
 }
 
-function CampaignSettingsView({ campaignId }: { campaignId: string | null }) {
-  return <><div className="page-intro"><div><p className="eyebrow eyebrow-bright"><span className="live-dot" /> GAME MASTER CONTROL</p><h1>Campaign settings</h1><p className="intro-copy">Shape which AI models are available when this campaign creates text drafts and visual art.</p></div></div><CampaignAiSettings campaignId={campaignId} /></>;
-}
-
-function OverviewView({ campaign, missions, characters, npcs, factions, members, notes, episodes, aiTokensThisWeek, isGM, onVote, onOpenView }: { campaign: CampaignRecord; missions: Mission[]; characters: Character[]; npcs: NpcRecord[]; factions: FactionRecord[]; members: ApiCampaignMember[]; notes: CampaignNote[]; episodes: EpisodeRecord[]; aiTokensThisWeek: number | null; isGM: boolean; onVote: (id: string) => void; onOpenView: (id: NavId) => void }) {
+function OverviewView({ campaign, missions, characters, npcs, factions, members, notes, episodes, isGM, onVote, onOpenView }: { campaign: CampaignRecord; missions: Mission[]; characters: Character[]; npcs: NpcRecord[]; factions: FactionRecord[]; members: ApiCampaignMember[]; notes: CampaignNote[]; episodes: EpisodeRecord[]; isGM: boolean; onVote: (id: string) => void; onOpenView: (id: NavId) => void }) {
   const metrics = getOverviewMetrics(missions, members, notes, episodes);
   const roster = members.map((member, index) => ({ ...member, initials: member.displayName.slice(0, 2).toUpperCase(), color: ["#f5b84b", "#ff5c9a", "#62e8ff", "#b992ff"][index % 4] }));
 
   return <><div className="page-intro overview-intro"><div><p className="eyebrow eyebrow-bright"><span className="live-dot" /> {campaign.system.toUpperCase()} {"//"} CAMPAIGN OVERVIEW</p><h1>{campaign.name}</h1><p className="intro-copy">{campaign.description || "No campaign brief recorded yet."}</p></div><div className="intro-actions"><div className="last-sync"><span>CAMPAIGN RECORDS</span><strong>LIVE</strong></div><button className="button button-primary" onClick={() => onOpenView("jobs")} type="button"><Plus size={16} /> {isGM ? "OPEN JOB BOARD" : "VIEW JOB BOARD"}</button></div></div>
     <div className="signal-strip"><div className="signal-strip-pattern" /><div className="signal-copy"><span className="micro-label">CAMPAIGN BRIEF</span><strong>{campaign.description || "No public campaign brief recorded yet."}</strong></div><div className="signal-stats"><span><strong>{String(metrics.openJobs).padStart(2, "0")}</strong> OPEN JOBS</span><span><strong>{String(metrics.activeVotes).padStart(2, "0")}</strong> VOTED JOBS</span><span><strong>{String(metrics.episodes).padStart(2, "0")}</strong> EPISODES</span></div><Zap size={18} className="signal-zap" /></div>
-    <div className="metric-grid"><MetricCard label="Crew roster" value={String(metrics.members).padStart(2, "0")} detail={`${metrics.players} players / ${metrics.gms} GM${metrics.gms === 1 ? "" : "s"}`} icon={UsersRound} accent="cyan" /><MetricCard label="Campaign notes" value={String(metrics.notes).padStart(2, "0")} detail={`${metrics.notesThisWeek} updated this week`} icon={FileText} accent="pink" /><MetricCard label="Episodes logged" value={String(metrics.episodes).padStart(2, "0")} detail={metrics.latestEpisodeTitle ?? "No episodes logged"} icon={FolderKanban} accent="amber" /><MetricCard label="GM signals" value={String(metrics.draftSignals).padStart(2, "0")} detail={`${metrics.draftSignals} drafts / ${metrics.openJobs} open`} icon={Bot} accent="purple" />{isGM ? <MetricCard label="OpenRouter tokens this week" value={formatTokenCount(aiTokensThisWeek)} detail="Input + output, last 7 days" help="Counts input and output tokens recorded for this campaign's OpenRouter AI runs over the last 7 days. It is not your account-wide OpenRouter balance." icon={Zap} accent="cyan" /> : null}</div>
+    <div className="metric-grid"><MetricCard label="Crew roster" value={String(metrics.members).padStart(2, "0")} detail={`${metrics.players} players / ${metrics.gms} GM${metrics.gms === 1 ? "" : "s"}`} icon={UsersRound} accent="cyan" /><MetricCard label="Campaign notes" value={String(metrics.notes).padStart(2, "0")} detail={`${metrics.notesThisWeek} updated in last 7 days`} icon={FileText} accent="pink" /><MetricCard label="Episodes logged" value={String(metrics.episodes).padStart(2, "0")} detail={metrics.latestEpisodeTitle ?? "No episodes logged"} icon={FolderKanban} accent="amber" /><MetricCard label="GM signals" value={String(metrics.draftSignals).padStart(2, "0")} detail={`${metrics.draftSignals} drafts / ${metrics.openJobs} open`} icon={Bot} accent="purple" /></div>
     <div className="dashboard-grid"><section className="panel panel-jobboard"><div className="panel-topline"><div><p className="eyebrow">MISSION CONTROL</p><h2>Job board</h2></div></div>{missions.length ? <div className="job-list">{missions.map((mission, index) => <MissionCard key={mission.id} mission={mission} isGM={isGM} index={index} onVote={onVote} compact />)}</div> : <div className="character-empty overview-empty"><BriefcaseBusiness size={22} /><h2>No jobs recorded yet.</h2><p>{isGM ? "Open the job board to create the campaign's first signal." : "The GM has not posted a job yet."}</p></div>}<button className="panel-footer-action" onClick={() => onOpenView("jobs")} type="button">VIEW ALL JOBS <ArrowUpRight size={14} /></button></section>
       <aside className="right-rail"><section className="panel crew-panel"><SectionHeading eyebrow="CREW MANIFEST" title="On the roster" action="Manage" onAction={() => onOpenView("members")} />{roster.length ? <div className="crew-list">{roster.map((member) => <div className="crew-row" key={member.userId}><div className="avatar" style={{ backgroundColor: member.color }}>{member.initials}</div><div className="crew-copy"><strong>{member.displayName}</strong><span>{member.role === "gm" ? "GAME MASTER" : "PLAYER"}</span></div></div>)}</div> : <div className="character-empty overview-empty"><UsersRound size={22} /><h2>No crew members yet.</h2><p>Campaign access has not been established.</p></div>}</section><section className="panel snapshot-panel"><div className="panel-topline"><div><p className="eyebrow">CAMPAIGN SNAPSHOT</p><h2>Record coverage</h2></div><Activity size={17} className="accent-icon-cyan" /></div><div className="snapshot-list"><button onClick={() => onOpenView("characters")} type="button"><UsersRound size={15} /> <span>Characters</span><strong>{characters.length}</strong></button><button onClick={() => onOpenView("npcs")} type="button"><UserRound size={15} /> <span>NPCs</span><strong>{npcs.length}</strong></button><button onClick={() => onOpenView("factions")} type="button"><Network size={15} /> <span>Factions</span><strong>{factions.length}</strong></button></div></section></aside></div></>;
 }
 
-function MetricCard({ label, value, detail, help, icon: Icon, accent }: { label: string; value: string; detail: string; help?: string; icon: LucideIcon; accent: string }) { return <div className={`metric-card metric-${accent}`}><div className="metric-head"><span>{label}</span><span className="metric-head-actions"><Icon size={16} />{help ? <button aria-label={help} className="metric-help" title={help} type="button">?</button> : null}</span></div><strong>{value}</strong><small>{detail}</small><div className="metric-bar"><span /></div></div>; }
-
-function formatTokenCount(tokens: number | null) {
-  return tokens === null ? "--" : tokens.toLocaleString();
-}
+function MetricCard({ label, value, detail, icon: Icon, accent }: { label: string; value: string; detail: string; icon: LucideIcon; accent: string }) { return <div className={`metric-card metric-${accent}`}><div className="metric-head"><span>{label}</span><Icon size={16} /></div><strong>{value}</strong><small>{detail}</small><div className="metric-bar"><span /></div></div>; }
 
 function MissionCard({ mission, isGM, index, onVote, onEdit, onPromote, compact = false }: { mission: Mission; isGM: boolean; index: number; onVote: (id: string) => void; onEdit?: () => void; onPromote?: (id: string) => void; compact?: boolean }) {
   return <article className={`mission-card mission-${mission.accent} ${compact ? "mission-compact" : ""}`}><VisualAsset src={mission.image} label={`${mission.title} artwork`} className="mission-art" /><div className="mission-art-overlay" /><div className="mission-index">0{index + 1}</div><div className="mission-content"><div className="mission-meta"><StatusPill color={mission.accent}>{mission.category}</StatusPill></div><h3>{mission.title}</h3><p>{mission.summary}</p><div className="mission-footer"><span className="giver"><span className="giver-glyph">{mission.giverType === "NPC" ? "N" : "F"}</span><span><small>{mission.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}</small><strong>{mission.giver}</strong></span></span></div></div><div className="mission-vote"><span><strong>{mission.votes.toString().padStart(2, "0")}</strong> votes</span><button className={`vote-button ${mission.voted ? "vote-active" : ""}`} onClick={() => onVote(mission.id)} type="button"><Vote size={15} /> {mission.voted ? "VOTED" : "VOTE"}</button>{isGM && onEdit ? <button className="mission-more icon-button" aria-label={`Edit ${mission.title}`} onClick={onEdit} title="Edit mission" type="button"><MoreHorizontal size={16} /></button> : null}{isGM && mission.status === "open" && onPromote ? <button className="mission-more mission-promote icon-button" aria-label={`Promote ${mission.title} to an episode`} onClick={() => onPromote(mission.id)} title="Promote to episode" type="button"><Sparkles size={16} /></button> : null}</div></article>;
 }
 
-type JobDraft = { title: string; summary: string; playerNotesMarkdown: string; gmNotesMarkdown: string; hook: string; giverType: "npc" | "faction"; giverId: string; status: "draft" | "open" | "archived"; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
-type SuggestedGiver = { type: "npc" | "faction"; name: string };
-const emptyJobDraft: JobDraft = { title: "", summary: "", playerNotesMarkdown: "", gmNotesMarkdown: "", hook: "", giverType: "npc", giverId: "", status: "draft", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
+type JobDraft = { title: string; summary: string; playerNotesMarkdown: string; giverType: "npc" | "faction"; giverId: string; status: "draft" | "open" | "archived"; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
+const emptyJobDraft: JobDraft = { title: "", summary: "", playerNotesMarkdown: "", giverType: "npc", giverId: "", status: "draft", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
 
-function JobsView({ missions, campaignId, isGM, npcs, factions, onMissionsChange, onNpcsChange, onFactionsChange, onVote, onPromote, onAction }: { missions: Mission[]; campaignId: string | null; isGM: boolean; npcs: NpcRecord[]; factions: FactionRecord[]; onMissionsChange: Dispatch<SetStateAction<Mission[]>>; onNpcsChange: Dispatch<SetStateAction<NpcRecord[]>>; onFactionsChange: Dispatch<SetStateAction<FactionRecord[]>>; onVote: (id: string) => void; onPromote: (id: string) => void; onAction: (message: string) => void }) {
+function JobsView({ missions, campaignId, isGM, npcs, factions, onMissionsChange, onVote, onPromote, onAction }: { missions: Mission[]; campaignId: string | null; isGM: boolean; npcs: NpcRecord[]; factions: FactionRecord[]; onMissionsChange: Dispatch<SetStateAction<Mission[]>>; onVote: (id: string) => void; onPromote: (id: string) => void; onAction: (message: string) => void }) {
   const [filter, setFilter] = useState<"open" | "archived" | "drafts">("open");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [draft, setDraft] = useState<JobDraft>(emptyJobDraft);
-  const [suggestedGiver, setSuggestedGiver] = useState<SuggestedGiver | null>(null);
-  const [nestedGiverKind, setNestedGiverKind] = useState<"npc" | "faction" | null>(null);
-  const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const jobAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/mission" entityLabel="job" mode={editingMission ? "refine" : "create"} requestFields={{ title: draft.title }} currentDraft={{ title: draft.title, summary: draft.summary, playerNotes: draft.playerNotesMarkdown, gmNotes: draft.gmNotesMarkdown, hook: draft.hook, thumbnailDescription: draft.artSubject }} fields={[{ key: "title", label: "Title", maxLength: 160 }, { key: "summary", label: "Summary", maxLength: 4000, multiline: true }, { key: "playerNotes", label: "Player context", maxLength: 20000, multiline: true }, { key: "gmNotes", label: "GM notes", maxLength: 20000, multiline: true }, { key: "hook", label: "Hook", maxLength: 1200, multiline: true }, { key: "thumbnailDescription", label: "Thumbnail description", maxLength: 1600, multiline: true }, { key: "suggestedGiverType", label: "Suggested giver type", maxLength: 20, readOnly: true }, { key: "suggestedGiverName", label: "Suggested giver", maxLength: 160, readOnly: true }]} onApply={(candidate) => { setDraft((current) => ({ ...current, title: candidate.title ?? current.title, summary: candidate.summary ?? current.summary, playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown, gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown, hook: candidate.hook ?? current.hook, artSubject: candidate.thumbnailDescription ?? current.artSubject })); setSuggestedGiver(candidate.suggestedGiverType === "npc" || candidate.suggestedGiverType === "faction" ? { type: candidate.suggestedGiverType, name: candidate.suggestedGiverName ?? "" } : null); }} /> : null;
-  const jobGiverTools = editorOpen ? <>{suggestedGiver ? <JobGiverRecommendation suggestion={suggestedGiver} npcs={npcs} factions={factions} onUseExisting={(type, id) => { setDraft((current) => ({ ...current, giverType: type, giverId: id })); setNestedGiverKind(null); }} onCreate={(type) => setNestedGiverKind(type)} /> : null}{nestedGiverKind ? <GiverCreator campaignId={campaignId} kind={nestedGiverKind} suggestedName={suggestedGiver?.name ?? ""} onCancel={() => setNestedGiverKind(null)} onSaved={(result) => { if (result.kind === "npc") { onNpcsChange((current) => [mapApiNpc(result.record, current.length), ...current]); } else { onFactionsChange((current) => [mapApiFaction(result.record, current.length), ...current]); } setDraft((current) => ({ ...current, giverType: result.kind, giverId: result.record.id })); setSuggestedGiver(null); setNestedGiverKind(null); onAction(`${result.record.name} is ready as the mission giver.`); }} /> : null}</> : null;
-  const jobAdditionalFields = editorOpen ? <><label>Hook<textarea maxLength={1200} value={draft.hook} onChange={(event) => setDraft((current) => ({ ...current, hook: event.target.value }))} /></label><label>GM notes <span className="field-lock"><LockKeyhole size={11} /> PRIVATE</span><textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, gmNotesMarkdown: event.target.value }))} /></label></> : null;
-  useCampaignArtEditor(editorOpen ? { campaignId, kind: "job", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onApproved: (asset) => setDraft((current) => ({ ...current, artPath: asset.path, artUrl: asset.signedUrl, artPrompt: asset.prompt, artProvider: asset.provider })) } : null);
+  useCampaignArtEditor(editorOpen ? { campaignId, kind: "job", value: draft.artPath, url: draft.artUrl, currentPrompt: draft.artPrompt, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
 
   const filteredMissions = missions.filter((mission) => filter === "drafts" ? mission.status === "draft" : mission.status === filter);
   const openEditor = (mission?: Mission) => {
@@ -721,10 +686,7 @@ function JobsView({ missions, campaignId, isGM, npcs, factions, onMissionsChange
       return;
     }
     setEditingMission(mission ?? null);
-    setSuggestedGiver(null);
-    setNestedGiverKind(null);
-    setAssistantOpen(false);
-    setDraft(mission ? { title: mission.title, summary: mission.summary, playerNotesMarkdown: mission.playerNotesMarkdown, gmNotesMarkdown: mission.gmNotesMarkdown ?? "", hook: mission.hook ?? "", giverType: mission.giverType.toLowerCase() as JobDraft["giverType"], giverId: mission.giverId, status: mission.status === "promoted" ? "open" : mission.status, artSubject: mission.artSubject ?? "", artPath: mission.artPath ?? null, artUrl: mission.artUrl ?? null, artPrompt: mission.artPrompt ?? null, artProvider: mission.artProvider ?? null } : emptyJobDraft);
+    setDraft(mission ? { title: mission.title, summary: mission.summary, playerNotesMarkdown: mission.playerNotesMarkdown, giverType: mission.giverType.toLowerCase() as JobDraft["giverType"], giverId: mission.giverId, status: mission.status === "promoted" ? "open" : mission.status, artPath: mission.artPath ?? null, artUrl: mission.artUrl ?? null, artPrompt: mission.artPrompt ?? null, artProvider: mission.artProvider ?? null } : emptyJobDraft);
     setError(null);
     setEditorOpen(true);
   };
@@ -772,55 +734,10 @@ function JobsView({ missions, campaignId, isGM, npcs, factions, onMissionsChange
   const filterCount = (status: "open" | "archived" | "draft") => missions.filter((mission) => mission.status === status).length.toString().padStart(2, "0");
 
   return <PageLayout eyebrow={`MISSION CONTROL // ${filterCount("open")} OPEN`} title="Job board" description="Potential missions, ranked by the crew. Choose the signal that pulls hardest." action={isGM ? "NEW MISSION" : undefined} onAction={() => openEditor()}>
-    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM MISSION EDITOR</p><h2>{editingMission ? `Edit ${editingMission.title}` : "New mission"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE JOB"}</button><button className="icon-button" aria-label="Close mission editor" onClick={() => setEditorOpen(false)} title="Close mission editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? jobAssistant : null}{jobGiverTools}<form className="character-form" onSubmit={saveJob}><div className="job-title-row"><label>Title<input required maxLength={160} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label></div><div className="job-assignment-row"><label>Status<select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as JobDraft["status"] }))}><option value="draft">DRAFT</option><option value="open">OPEN</option><option value="archived">ARCHIVED</option></select></label><label>Giver type<select value={draft.giverType} onChange={(event) => setDraft((current) => ({ ...current, giverType: event.target.value as JobDraft["giverType"], giverId: "" }))}><option value="npc">NPC</option><option value="faction">FACTION</option></select></label><label>Giver<select required value={draft.giverId} onChange={(event) => setDraft((current) => ({ ...current, giverId: event.target.value }))}><option value="">Select a giver</option>{(draft.giverType === "npc" ? npcs : factions).map((giver) => <option key={giver.id} value={giver.id}>{giver.name}</option>)}</select></label></div><label>Summary<textarea maxLength={4000} value={draft.summary} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} /></label><label>Player context<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label>{jobAdditionalFields}{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingMission ? "SAVE CHANGES" : "ADD MISSION"}</button>{editingMission && editingMission.status !== "promoted" ? <button className="button button-danger" disabled={isSaving} onClick={() => void deleteJob()} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
+    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM MISSION EDITOR</p><h2>{editingMission ? `Edit ${editingMission.title}` : "New mission"}</h2></div><button className="icon-button" aria-label="Close mission editor" onClick={() => setEditorOpen(false)} title="Close mission editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveJob}><div className="character-form-grid"><label>Title<input required maxLength={160} value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label><label>Status<select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as JobDraft["status"] }))}><option value="draft">DRAFT</option><option value="open">OPEN</option><option value="archived">ARCHIVED</option></select></label><label>Giver type<select value={draft.giverType} onChange={(event) => setDraft((current) => ({ ...current, giverType: event.target.value as JobDraft["giverType"], giverId: "" }))}><option value="npc">NPC</option><option value="faction">FACTION</option></select></label><label>Giver<select required value={draft.giverId} onChange={(event) => setDraft((current) => ({ ...current, giverId: event.target.value }))}><option value="">Select a giver</option>{(draft.giverType === "npc" ? npcs : factions).map((giver) => <option key={giver.id} value={giver.id}>{giver.name}</option>)}</select></label></div><label>Summary<textarea maxLength={4000} value={draft.summary} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} /></label><label>Player context<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingMission ? "SAVE CHANGES" : "ADD MISSION"}</button>{editingMission && editingMission.status !== "promoted" ? <button className="button button-danger" disabled={isSaving} onClick={() => void deleteJob()} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
     <div className="view-toolbar"><div className="filter-tabs"><button className={`filter-tab ${filter === "open" ? "filter-tab-active" : ""}`} onClick={() => setFilter("open")} type="button">OPEN <span>{filterCount("open")}</span></button><button className={`filter-tab ${filter === "archived" ? "filter-tab-active" : ""}`} onClick={() => setFilter("archived")} type="button">ARCHIVED <span>{filterCount("archived")}</span></button>{isGM ? <button className={`filter-tab ${filter === "drafts" ? "filter-tab-active" : ""}`} onClick={() => setFilter("drafts")} type="button">DRAFTS <span>{filterCount("draft")}</span></button> : null}</div></div>
     {filteredMissions.length ? <div className="jobs-grid">{filteredMissions.map((mission, index) => <MissionCard key={mission.id} mission={mission} isGM={isGM} index={index} onVote={onVote} onEdit={isGM ? () => openEditor(mission) : undefined} onPromote={isGM ? onPromote : undefined} />)}</div> : <div className="character-empty"><BriefcaseBusiness size={22} /><h2>No missions in this view.</h2><p>{filter === "drafts" ? "Draft the next signal when the GM is ready." : "The campaign board has no missions here yet."}</p></div>}
   </PageLayout>;
-}
-
-function JobGiverRecommendation({ suggestion, npcs, factions, onUseExisting, onCreate }: { suggestion: SuggestedGiver; npcs: NpcRecord[]; factions: FactionRecord[]; onUseExisting: (type: SuggestedGiver["type"], id: string) => void; onCreate: (type: SuggestedGiver["type"]) => void }) {
-  const records = suggestion.type === "npc" ? npcs : factions;
-  const existing = records.find((record) => record.name.trim().toLowerCase() === suggestion.name.trim().toLowerCase());
-  const label = suggestion.type === "npc" ? "NPC" : "FACTION";
-
-  return <section className="ai-giver-recommendation"><div><p className="eyebrow">AI RECOMMENDATION // MISSION GIVER</p><strong>{suggestion.name || `Unnamed ${label.toLowerCase()}`}</strong><span>{label} suggested for this job.</span></div><div className="ai-draft-actions">{existing ? <button className="button button-secondary" onClick={() => onUseExisting(suggestion.type, existing.id)} type="button">USE EXISTING {label}</button> : null}<button className="button button-ai" onClick={() => onCreate(suggestion.type)} type="button"><Sparkles size={14} /> GENERATE {label}</button></div></section>;
-}
-
-type GiverDraft = { name: string; species: string; role: string; description: string; playerNotesMarkdown: string; gmNotesMarkdown: string; status: string; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
-type GiverCreatorResult = { kind: "npc"; record: ApiNpc } | { kind: "faction"; record: ApiFaction };
-
-function GiverCreator({ campaignId, kind, suggestedName, onCancel, onSaved }: { campaignId: string | null; kind: "npc" | "faction"; suggestedName: string; onCancel: () => void; onSaved: (result: GiverCreatorResult) => void }) {
-  const [draft, setDraft] = useState<GiverDraft>(() => kind === "npc" ? { name: suggestedName, species: "", role: "", description: "", playerNotesMarkdown: "", gmNotesMarkdown: "", status: "active", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null } : { name: suggestedName, species: "", role: "", description: "", playerNotesMarkdown: "", gmNotesMarkdown: "", status: "active", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null });
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const isNpc = kind === "npc";
-  const entityLabel = isNpc ? "NPC" : "faction";
-  const assistant = <AiDraftAssistant campaignId={campaignId} endpoint={isNpc ? "/api/ai/npc" : "/api/ai/faction"} entityLabel={entityLabel} mode="create" requestFields={isNpc ? { name: draft.name, species: draft.species, role: draft.role } : { name: draft.name, status: draft.status }} currentDraft={isNpc ? { name: draft.name, species: draft.species, role: draft.role, shortDescription: draft.description, playerNotes: draft.playerNotesMarkdown, gmNotes: draft.gmNotesMarkdown, visualPrompt: draft.artSubject } : { name: draft.name, status: draft.status, description: draft.description, visualPrompt: draft.artSubject }} fields={isNpc ? [{ key: "name", label: "Name", maxLength: 160 }, { key: "species", label: "Species", maxLength: 120 }, { key: "role", label: "Role", maxLength: 160 }, { key: "shortDescription", label: "Description", maxLength: 4000, multiline: true }, { key: "playerNotes", label: "Player notes", maxLength: 20000, multiline: true }, { key: "gmNotes", label: "GM notes", maxLength: 20000, multiline: true }, { key: "visualPrompt", label: "Portrait description", maxLength: 1600, multiline: true }] : [{ key: "name", label: "Name", maxLength: 160 }, { key: "status", label: "Status", maxLength: 80 }, { key: "description", label: "Public description", maxLength: 4000, multiline: true }, { key: "visualPrompt", label: "Emblem or scene description", maxLength: 1600, multiline: true }]} onApply={(candidate) => setDraft((current) => ({ ...current, name: candidate.name ?? current.name, species: candidate.species ?? current.species, role: candidate.role ?? current.role, description: candidate.shortDescription ?? candidate.description ?? current.description, playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown, gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown, status: candidate.status ?? current.status, artSubject: candidate.visualPrompt ?? current.artSubject }))} />;
-
-  const save = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!campaignId) {
-      setError("Select a campaign before creating a giver.");
-      return;
-    }
-
-    setIsSaving(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/${isNpc ? "npcs" : "factions"}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(isNpc ? draft : { name: draft.name, description: draft.description, status: draft.status, artSubject: draft.artSubject, artPath: draft.artPath, artUrl: draft.artUrl, artPrompt: draft.artPrompt, artProvider: draft.artProvider }) });
-      const result = (await response.json()) as { error?: string; npc?: ApiNpc; faction?: ApiFaction };
-      if (!response.ok || (isNpc ? !result.npc : !result.faction)) throw new Error(result.error ?? `${entityLabel} could not be saved.`);
-      if (isNpc) onSaved({ kind: "npc", record: result.npc! });
-      else onSaved({ kind: "faction", record: result.faction! });
-    } catch (saveError: unknown) {
-      setError(saveError instanceof Error ? saveError.message : `${entityLabel} could not be saved.`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return <section className="giver-creator"><div className="editor-heading"><div><p className="eyebrow">NEW {isNpc ? "NPC" : "FACTION"} - MISSION GIVER</p><h3>{draft.name || `Create a ${entityLabel}`}</h3></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : `GENERATE ${isNpc ? "NPC" : "FACTION"}`}</button><button className="icon-button" aria-label={`Close ${entityLabel} creator`} onClick={onCancel} title={`Close ${entityLabel} creator`} type="button"><X size={16} /></button></div></div>{assistantOpen ? assistant : null}<CampaignArtField campaignId={campaignId} kind={kind} value={draft.artPath} url={draft.artUrl} subject={draft.artSubject} currentPrompt={draft.artPrompt} onSubjectChange={(subject) => setDraft((current) => ({ ...current, artSubject: subject }))} onChange={(path) => setDraft((current) => ({ ...current, artPath: path }))} onUrlChange={(url) => setDraft((current) => ({ ...current, artUrl: url }))} onApproved={(asset) => setDraft((current) => ({ ...current, artPath: asset.path, artUrl: asset.signedUrl, artPrompt: asset.prompt, artProvider: asset.provider }))} /><form className="character-form" onSubmit={save}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>{isNpc ? <><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Role<input maxLength={160} value={draft.role} onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value }))} /></label></> : <label>Status<input required maxLength={80} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))} /></label>}</div><label>{isNpc ? "Description" : "Public description"}<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label>{isNpc ? <><label>Player notes<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label><label>GM notes <span className="field-lock"><LockKeyhole size={11} /> PRIVATE</span><textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, gmNotesMarkdown: event.target.value }))} /></label></> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : `SAVE ${isNpc ? "NPC" : "FACTION"}`}</button><button className="text-action" disabled={isSaving} onClick={onCancel} type="button">CANCEL</button></div></form></section>;
 }
 
 function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAction }: { characters: Character[]; campaignId: string | null; isGM: boolean; onCharactersChange: Dispatch<SetStateAction<Character[]>>; onAction: (message: string) => void }) {
@@ -829,7 +746,7 @@ function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAc
   const [draft, setDraft] = useState<CharacterDraft>(emptyCharacterDraft);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useCampaignArtEditor(editorOpen ? { campaignId, kind: "character", value: draft.artPath, url: draft.artUrl, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })) } : null);
+  useCampaignArtEditor(editorOpen ? { campaignId, kind: "character", value: draft.artPath, url: draft.artUrl, currentPrompt: draft.artPrompt, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
   const featuredCharacter = characters[0] ?? null;
 
   const openEditor = (character?: Character) => {
@@ -919,31 +836,27 @@ type NpcDraft = {
   description: string;
   playerNotesMarkdown: string;
   gmNotesMarkdown: string;
-  artSubject: string;
   artPath: string | null;
   artUrl: string | null;
   artPrompt: string | null;
   artProvider: string | null;
 };
 
-const emptyNpcDraft: NpcDraft = { name: "", species: "", role: "", description: "", playerNotesMarkdown: "", gmNotesMarkdown: "", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
+const emptyNpcDraft: NpcDraft = { name: "", species: "", role: "", description: "", playerNotesMarkdown: "", gmNotesMarkdown: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
 
 function NpcsView({ npcs: npcRecords, campaignId, isGM, onNpcsChange, onAction }: { npcs: NpcRecord[]; campaignId: string | null; isGM: boolean; onNpcsChange: Dispatch<SetStateAction<NpcRecord[]>>; onAction: (message: string) => void }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingNpc, setEditingNpc] = useState<NpcRecord | null>(null);
   const [selectedNpc, setSelectedNpc] = useState<NpcRecord | null>(null);
   const [draft, setDraft] = useState<NpcDraft>(emptyNpcDraft);
-  const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const npcAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/npc" entityLabel="NPC" mode={editingNpc ? "refine" : "create"} requestFields={{ name: draft.name, species: draft.species, role: draft.role }} currentDraft={{ name: draft.name, species: draft.species, role: draft.role, shortDescription: draft.description, playerNotes: draft.playerNotesMarkdown, gmNotes: draft.gmNotesMarkdown, visualPrompt: draft.artSubject }} fields={[{ key: "name", label: "Name", maxLength: 160 }, { key: "species", label: "Species", maxLength: 120 }, { key: "role", label: "Role", maxLength: 160 }, { key: "shortDescription", label: "Description", maxLength: 4000, multiline: true }, { key: "playerNotes", label: "Player notes", maxLength: 20000, multiline: true }, { key: "gmNotes", label: "GM notes", maxLength: 20000, multiline: true }, { key: "visualPrompt", label: "Portrait description", maxLength: 1600, multiline: true }]} onApply={(candidate) => { setDraft((current) => ({ ...current, name: candidate.name ?? current.name, species: candidate.species ?? current.species, role: candidate.role ?? current.role, description: candidate.shortDescription ?? current.description, playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown, gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown, artSubject: candidate.visualPrompt ?? current.artSubject })); }} /> : null;
-  useCampaignArtEditor(editorOpen ? { campaignId, kind: "npc", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onApproved: (asset) => setDraft((current) => ({ ...current, artPath: asset.path, artUrl: asset.signedUrl, artPrompt: asset.prompt, artProvider: asset.provider })) } : null);
+  useCampaignArtEditor(editorOpen ? { campaignId, kind: "npc", value: draft.artPath, url: draft.artUrl, currentPrompt: draft.artPrompt, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
 
   const openEditor = (npc?: NpcRecord) => {
     setEditingNpc(npc ?? null);
     setSelectedNpc(npc ?? null);
-    setDraft(npc ? { name: npc.name, species: npc.species, role: npc.role, description: npc.description, playerNotesMarkdown: npc.player_notes_markdown, gmNotesMarkdown: npc.gm_notes_markdown ?? "", artSubject: npc.art_subject ?? "", artPath: npc.art_path ?? null, artUrl: npc.art_url ?? null, artPrompt: npc.art_prompt, artProvider: npc.art_provider ?? null } : emptyNpcDraft);
-    setAssistantOpen(false);
+    setDraft(npc ? { name: npc.name, species: npc.species, role: npc.role, description: npc.description, playerNotesMarkdown: npc.player_notes_markdown, gmNotesMarkdown: npc.gm_notes_markdown ?? "", artPath: npc.art_path ?? null, artUrl: npc.art_url ?? null, artPrompt: npc.art_prompt, artProvider: npc.art_provider ?? null } : emptyNpcDraft);
     setError(null);
     setEditorOpen(true);
   };
@@ -1000,37 +913,34 @@ function NpcsView({ npcs: npcRecords, campaignId, isGM, onNpcsChange, onAction }
   };
 
   return <PageLayout eyebrow="ARCHIVE // CONTACTS" title="NPCs" description="People worth knowing, watching, or avoiding. Their private context stays behind the GM lock." action={isGM ? "ADD NPC" : undefined} onAction={() => openEditor()}>
-    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM CONTACT RECORD</p><h2>{editingNpc ? `Edit ${editingNpc.name}` : "Add an NPC"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE NPC"}</button><button className="icon-button" aria-label="Close NPC editor" onClick={() => setEditorOpen(false)} title="Close NPC editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? npcAssistant : null}<form className="character-form" onSubmit={saveNpc}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Role<input maxLength={160} value={draft.role} onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value }))} /></label></div><label>Description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label><label>Player notes<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label><label>GM notes <span className="field-lock"><LockKeyhole size={11} /> PRIVATE</span><textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, gmNotesMarkdown: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingNpc ? "SAVE CHANGES" : "ADD CONTACT"}</button>{editingNpc ? <button className="button button-danger" disabled={isSaving} onClick={deleteNpc} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
-    {npcRecords.length ? <div className="record-list">{npcRecords.map((npc) => <article aria-label={`Open public file for ${npc.name}`} className="record-row npc-record-row" key={npc.id} onClick={() => setSelectedNpc(npc)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedNpc(npc); } }} role="button" tabIndex={0}><RecordPortrait src={getAttachedArtUrl(npc.art_url, npc.art_path)} label={`${npc.name} portrait`} className={`record-icon record-icon-${npc.color} record-portrait`} /><div className="record-main"><div className="record-title-row"><h3>{npc.name}</h3><StatusPill color={npc.color}>{npc.role || "CONTACT"}</StatusPill></div><p>{npc.description || npc.species || "No public profile recorded."}</p><span className="record-meta"><Map size={13} /> {npc.species || "Unclassified contact"}</span></div><div className="record-visibility"><span><BookOpen size={14} /> PLAYER NOTES</span>{isGM ? <span className="private-note"><LockKeyhole size={13} /> GM NOTES</span> : null}</div>{isGM ? <div className="record-row-actions"><button className="icon-button" aria-label={`Edit ${npc.name}`} onClick={(event) => { event.stopPropagation(); openEditor(npc); }} title={`Edit ${npc.name}`} type="button"><Pencil size={15} /></button></div> : null}</article>)}</div> : <div className="character-empty"><UserRound size={22} /><h2>No NPCs recorded yet.</h2><p>{isGM ? "Add the first contact to this campaign archive." : "The GM has not recorded any contacts yet."}</p></div>}
-    {selectedNpc && !editorOpen ? <section className="record-detail npc-record-detail"><div className="npc-detail-preview">{getAttachedArtUrl(selectedNpc.art_url, selectedNpc.art_path) ? <RecordPortrait src={getAttachedArtUrl(selectedNpc.art_url, selectedNpc.art_path)} label={`${selectedNpc.name} portrait`} className="npc-detail-portrait record-portrait" /> : null}<div className="npc-detail-copy"><div><p className="eyebrow">PUBLIC CONTACT FILE</p><h2>{selectedNpc.name}</h2><p className="record-detail-meta">{selectedNpc.species || "Unclassified"}{" // "}{selectedNpc.role || "Contact"}</p></div><p>{selectedNpc.description || "No public description recorded yet."}</p></div><div className="npc-detail-notes markdown-preview"><div className="preview-toolbar"><BookOpen size={14} /> PLAYER NOTES</div><p>{selectedNpc.player_notes_markdown || "No player notes recorded yet."}</p></div></div></section> : null}
+    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM CONTACT RECORD</p><h2>{editingNpc ? `Edit ${editingNpc.name}` : "Add an NPC"}</h2></div><button className="icon-button" aria-label="Close NPC editor" onClick={() => setEditorOpen(false)} title="Close NPC editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveNpc}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Role<input maxLength={160} value={draft.role} onChange={(event) => setDraft((current) => ({ ...current, role: event.target.value }))} /></label></div><label>Description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label><label>Player notes<textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, playerNotesMarkdown: event.target.value }))} /></label><label>GM notes <span className="field-lock"><LockKeyhole size={11} /> PRIVATE</span><textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => setDraft((current) => ({ ...current, gmNotesMarkdown: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingNpc ? "SAVE CHANGES" : "ADD CONTACT"}</button>{editingNpc ? <button className="button button-danger" disabled={isSaving} onClick={deleteNpc} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
+    {npcRecords.length ? <div className="record-list">{npcRecords.map((npc) => <article aria-label={`Open public file for ${npc.name}`} className="record-row npc-record-row" key={npc.id} onClick={() => setSelectedNpc(npc)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedNpc(npc); } }} role="button" tabIndex={0}><RecordPortrait src={getAttachedArtUrl(npc.art_url, npc.art_path)} label={`${npc.name} portrait`} className={`record-icon record-icon-${npc.color} record-portrait`} fallback={<UserRound size={19} />} /><div className="record-main"><div className="record-title-row"><h3>{npc.name}</h3><StatusPill color={npc.color}>{npc.role || "CONTACT"}</StatusPill></div><p>{npc.description || npc.species || "No public profile recorded."}</p><span className="record-meta"><Map size={13} /> {npc.species || "Unclassified contact"}</span></div><div className="record-visibility"><span><BookOpen size={14} /> PLAYER NOTES</span>{isGM ? <span className="private-note"><LockKeyhole size={13} /> GM NOTES</span> : null}</div>{isGM ? <div className="record-row-actions"><button className="icon-button" aria-label={`Edit ${npc.name}`} onClick={(event) => { event.stopPropagation(); openEditor(npc); }} title={`Edit ${npc.name}`} type="button"><Pencil size={15} /></button></div> : null}</article>)}</div> : <div className="character-empty"><UserRound size={22} /><h2>No NPCs recorded yet.</h2><p>{isGM ? "Add the first contact to this campaign archive." : "The GM has not recorded any contacts yet."}</p></div>}
+    {selectedNpc && !editorOpen ? <section className="record-detail npc-record-detail"><div className="npc-detail-preview"><RecordPortrait src={getAttachedArtUrl(selectedNpc.art_url, selectedNpc.art_path)} label={`${selectedNpc.name} portrait`} className="npc-detail-portrait record-portrait" fallback={<UserRound size={19} />} /><div className="npc-detail-copy"><div><p className="eyebrow">PUBLIC CONTACT FILE</p><h2>{selectedNpc.name}</h2><p className="record-detail-meta">{selectedNpc.species || "Unclassified"}{" // "}{selectedNpc.role || "Contact"}</p></div><p>{selectedNpc.description || "No public description recorded yet."}</p></div><div className="npc-detail-notes markdown-preview"><div className="preview-toolbar"><BookOpen size={14} /> PLAYER NOTES</div><p>{selectedNpc.player_notes_markdown || "No player notes recorded yet."}</p></div></div></section> : null}
   </PageLayout>;
 }
 
-type FactionDraft = { name: string; description: string; status: string; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
-const emptyFactionDraft: FactionDraft = { name: "", description: "", status: "active", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
+type FactionDraft = { name: string; description: string; status: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
+const emptyFactionDraft: FactionDraft = { name: "", description: "", status: "active", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
 
 function FactionsView({ factions: factionRecords, campaignId, isGM, onFactionsChange, onAction }: { factions: FactionRecord[]; campaignId: string | null; isGM: boolean; onFactionsChange: Dispatch<SetStateAction<FactionRecord[]>>; onAction: (message: string) => void }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingFaction, setEditingFaction] = useState<FactionRecord | null>(null);
   const [selectedFaction, setSelectedFaction] = useState<FactionRecord | null>(null);
   const [draft, setDraft] = useState<FactionDraft>(emptyFactionDraft);
-  const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useCampaignArtEditor(editorOpen ? { campaignId, kind: "faction", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onApproved: (asset) => setDraft((current) => ({ ...current, artPath: asset.path, artUrl: asset.signedUrl, artPrompt: asset.prompt, artProvider: asset.provider })) } : null);
+  useCampaignArtEditor(editorOpen ? { campaignId, kind: "faction", value: draft.artPath, url: draft.artUrl, currentPrompt: draft.artPrompt, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
 
   const openEditor = (faction?: FactionRecord) => {
+    if (!isGM) {
+      onAction("Only a GM can edit factions.");
+      return;
+    }
     setEditingFaction(faction ?? null);
     setSelectedFaction(faction ?? null);
-    setDraft(faction ? { name: faction.name, description: faction.description, status: faction.status, artSubject: faction.art_subject ?? "", artPath: faction.art_path ?? null, artUrl: faction.art_url ?? null, artPrompt: faction.art_prompt, artProvider: faction.art_provider ?? null } : emptyFactionDraft);
-    setAssistantOpen(false);
+    setDraft(faction ? { name: faction.name, description: faction.description, status: faction.status, artPath: faction.art_path ?? null, artUrl: faction.art_url ?? null, artPrompt: faction.art_prompt, artProvider: faction.art_provider ?? null } : emptyFactionDraft);
     setError(null);
     setEditorOpen(true);
-  };
-
-  const applyFactionCandidate = (candidate: Record<string, string>) => {
-    setDraft((current) => ({ ...current, name: candidate.name ?? current.name, status: candidate.status ?? current.status, description: candidate.description ?? current.description, artSubject: candidate.visualPrompt ?? current.artSubject }));
-    setAssistantOpen(false);
   };
 
   const saveFaction = async (event: FormEvent<HTMLFormElement>) => {
@@ -1080,10 +990,14 @@ function FactionsView({ factions: factionRecords, campaignId, isGM, onFactionsCh
   };
 
   return <PageLayout eyebrow="ARCHIVE // POWER MAP" title="Factions" description="The groups shaping this campaign. Use them as mission givers and campaign context." action={isGM ? "ADD FACTION" : undefined} onAction={() => openEditor()}>
-    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM FACTION RECORD</p><h2>{editingFaction ? `Edit ${editingFaction.name}` : "Add a faction"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE FACTION"}</button><button className="icon-button" aria-label="Close faction editor" onClick={() => setEditorOpen(false)} title="Close faction editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/faction" entityLabel="faction" mode={editingFaction ? "refine" : "create"} requestFields={{ name: draft.name, status: draft.status }} currentDraft={{ name: draft.name, status: draft.status, description: draft.description, visualPrompt: draft.artSubject }} fields={[{ key: "name", label: "Name", maxLength: 160 }, { key: "status", label: "Status", maxLength: 80 }, { key: "description", label: "Public description", maxLength: 4000, multiline: true }, { key: "visualPrompt", label: "Emblem or scene description", maxLength: 1600, multiline: true }]} onApply={applyFactionCandidate} /> : null}<form className="character-form" onSubmit={saveFaction}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Status<input required maxLength={80} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))} /></label></div><label>Public description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label><label>Emblem or scene description<textarea maxLength={1600} placeholder="Describe the visual identity the GM wants to review." value={draft.artSubject} onChange={(event) => setDraft((current) => ({ ...current, artSubject: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingFaction ? "SAVE CHANGES" : "ADD FACTION"}</button>{editingFaction ? <button className="button button-danger" disabled={isSaving} onClick={deleteFaction} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
-    {factionRecords.length ? <div className="faction-grid">{factionRecords.map((faction) => <article aria-label={`Open public file for ${faction.name}`} className={`faction-card faction-${faction.color}`} key={faction.id} onClick={() => setSelectedFaction(faction)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedFaction(faction); } }} role="button" tabIndex={0}><div className="faction-top"><div className="faction-emblem"><Network size={20} /></div><StatusPill color={faction.color}>{faction.status.toUpperCase()}</StatusPill></div><h3>{faction.name}</h3><p>{faction.description || "No public description recorded."}</p><div className="faction-footer"><span><strong>CAMPAIGN</strong><small>MISSION CONTEXT</small></span>{isGM ? <button className="icon-button" aria-label={`Edit ${faction.name}`} onClick={(event) => { event.stopPropagation(); openEditor(faction); }} title={`Edit ${faction.name}`} type="button"><Pencil size={15} /></button> : null}</div></article>)}</div> : <div className="character-empty"><Network size={22} /><h2>No factions recorded yet.</h2><p>{isGM ? "Add the first faction to establish campaign context." : "The GM has not recorded any factions yet."}</p></div>}
-    {selectedFaction && !editorOpen ? <section className="record-detail"><div><p className="eyebrow">PUBLIC FACTION FILE</p><h2>{selectedFaction.name}</h2><p className="record-detail-meta">{selectedFaction.status.toUpperCase()}</p></div><p>{selectedFaction.description || "No public description recorded yet."}</p></section> : null}
+    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM FACTION RECORD</p><h2>{editingFaction ? `Edit ${editingFaction.name}` : "Add a faction"}</h2></div><button className="icon-button" aria-label="Close faction editor" onClick={() => setEditorOpen(false)} title="Close faction editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveFaction}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Status<input required maxLength={80} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))} /></label></div><label>Public description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingFaction ? "SAVE CHANGES" : "ADD FACTION"}</button>{editingFaction ? <button className="button button-danger" disabled={isSaving} onClick={deleteFaction} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
+    {factionRecords.length ? <div className="faction-grid">{factionRecords.map((faction) => <article aria-label={`Open public file for ${faction.name}`} className={`faction-card faction-${faction.color}`} key={faction.id} onClick={() => setSelectedFaction(faction)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedFaction(faction); } }} role="button" tabIndex={0}><div className="faction-top"><div className="faction-emblem"><Network size={20} /></div><StatusPill color={faction.color}>{faction.status.toUpperCase()}</StatusPill></div><h3>{faction.name}</h3><p>{faction.description || "No public description recorded."}</p><div className="faction-footer"><span><strong>CAMPAIGN</strong><small>MISSION CONTEXT</small></span>{isGM ? <button className="icon-button" aria-label={`Edit ${faction.name}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openEditor(faction); }} title={`Edit ${faction.name}`} type="button"><Pencil size={15} /></button> : <button className="icon-button" aria-label={`Open ${faction.name}`} onClick={(event) => { event.stopPropagation(); setSelectedFaction(faction); }} title={`Open ${faction.name}`} type="button"><ArrowUpRight size={16} /></button>}</div></article>)}</div> : <div className="character-empty"><Network size={22} /><h2>No factions recorded yet.</h2><p>{isGM ? "Add the first faction to establish campaign context." : "The GM has not recorded any factions yet."}</p></div>}
+    {selectedFaction && !editorOpen ? <section className="record-detail"><div className="section-heading"><div><p className="eyebrow">PUBLIC FACTION FILE</p><h2>{selectedFaction.name}</h2><p className="record-detail-meta">{selectedFaction.status.toUpperCase()}</p></div>{isGM ? <button className="button button-secondary" onClick={() => openEditor(selectedFaction)} type="button"><Pencil size={14} /> EDIT FACTION</button> : null}</div><p>{selectedFaction.description || "No public description recorded yet."}</p></section> : null}
   </PageLayout>;
+}
+
+function CampaignSettingsView({ campaignId }: { campaignId: string | null }) {
+  return <><div className="page-intro"><div><p className="eyebrow eyebrow-bright"><span className="live-dot" /> GAME MASTER CONTROL</p><h1>Campaign settings</h1><p className="intro-copy">Shape which AI models are available when this campaign creates text drafts and visual art.</p></div></div><CampaignAiSettings campaignId={campaignId} /></>;
 }
 
 function EpisodesView({ episodes: episodeRecords, campaignId }: { episodes: EpisodeRecord[]; campaignId: string | null }) {

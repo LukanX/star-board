@@ -19,7 +19,7 @@ vi.mock("openai", () => ({
 }));
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 
-import { generateImage, generateJson } from "@/lib/ai/client";
+import { AiProviderError, generateImage, generateJson } from "@/lib/ai/client";
 
 describe("OpenRouter AI client", () => {
   beforeEach(() => {
@@ -51,5 +51,39 @@ describe("OpenRouter AI client", () => {
     expect(mocks.fetch).toHaveBeenCalledWith("https://openrouter.ai/api/v1/images", expect.objectContaining({ method: "POST" }));
     expect(request).toEqual({ model: "openai/gpt-image-1", prompt: "a station broker", size: "1024x1024", output_format: "png" });
     expect(result).toMatchObject({ generationId: "image-run", model: "openai/gpt-image-1", image: { base64: "aW1hZ2U=", mediaType: "image/webp" }, usage: { inputTokens: 4, outputTokens: 8, cost: 0.02 } });
+  });
+
+  it("preserves image provider status and retry metadata", async () => {
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ error: { message: "Provider rate limit exceeded" } }), { status: 429, headers: { "x-request-id": "image-request-1", "retry-after": "12" } }));
+
+    const failure = generateImage("a station broker", "openai/gpt-image-1");
+
+    await expect(failure).rejects.toBeInstanceOf(AiProviderError);
+    await expect(failure).rejects.toMatchObject({ status: 429, requestId: "image-request-1", retryAfter: "12", message: expect.stringContaining("Provider rate limit exceeded") });
+  });
+
+  it("keeps bounded provider bodies and generation IDs for diagnostics", async () => {
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.fetch.mockResolvedValue(new Response("upstream gateway failure", { status: 502, headers: { "x-openrouter-request-id": "image-request-2" } }));
+
+    const failure = generateImage("a station broker", "openai/gpt-image-1");
+
+    await expect(failure).rejects.toMatchObject({
+      status: 502,
+      requestId: "image-request-2",
+      providerBody: "upstream gateway failure",
+      generationId: null,
+    });
+  });
+
+  it("preserves text provider status and retry metadata", async () => {
+    mocks.create.mockRejectedValue({ status: 429, request_id: "text-request-1", headers: new Headers({ "retry-after": "9" }), error: { message: "Too many requests", request_id: "text-request-body", prompt: "do not log this" }, id: "text-generation-1" });
+
+    const failure = generateJson("mission prompt", z.object({ title: z.string() }), "google/gemini-2.5-flash");
+
+    await expect(failure).rejects.toBeInstanceOf(AiProviderError);
+    await expect(failure).rejects.toMatchObject({ status: 429, requestId: "text-request-1", retryAfter: "9", generationId: "text-generation-1", providerBody: expect.stringContaining("Too many requests"), message: expect.stringContaining("Too many requests") });
+    await expect(failure).rejects.not.toMatchObject({ providerBody: expect.stringContaining("do not log this") });
   });
 });

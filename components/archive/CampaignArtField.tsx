@@ -16,6 +16,8 @@ export type CampaignArtEditorTarget = {
   onSubjectChange?: (subject: string) => void;
   onChange: (path: string | null) => void;
   onUrlChange: (url: string | null) => void;
+  onPromptChange?: (prompt: string | null) => void;
+  onProviderChange?: (provider: string | null) => void;
   onApproved?: (asset: { path: string; signedUrl: string; prompt: string; provider: string }) => void;
 };
 
@@ -50,7 +52,7 @@ export function CampaignArtEditorSlot() {
   return target ? <CampaignArtField key={target.kind} {...target} /> : null;
 }
 
-export default function CampaignArtField({ campaignId, kind, value, url, subject, currentPrompt, onSubjectChange, onChange, onUrlChange, onApproved }: CampaignArtEditorTarget) {
+export default function CampaignArtField({ campaignId, kind, value, url, subject, currentPrompt, onSubjectChange, onChange, onUrlChange, onPromptChange, onProviderChange, onApproved }: CampaignArtEditorTarget) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadedPathsRef = useRef(new Set<string>());
   const persistedPathRef = useRef<string | null>(value && !value.startsWith("http") ? value : null);
@@ -58,6 +60,10 @@ export default function CampaignArtField({ campaignId, kind, value, url, subject
   const [artStudioOpen, setArtStudioOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    persistedPathRef.current = value && !value.startsWith("http") ? value : null;
+  }, [value]);
 
   useEffect(() => () => {
     if (!campaignId) return;
@@ -103,6 +109,8 @@ export default function CampaignArtField({ campaignId, kind, value, url, subject
 
       onChange(result.asset.path);
       onUrlChange(result.asset.signedUrl);
+      onPromptChange?.(null);
+      onProviderChange?.(null);
       uploadedPathsRef.current.add(result.asset.path);
       setPreviewUrl(result.asset.signedUrl);
     } catch (uploadError: unknown) {
@@ -116,9 +124,11 @@ export default function CampaignArtField({ campaignId, kind, value, url, subject
   const clear = () => {
     onChange(null);
     onUrlChange(null);
+    onPromptChange?.(null);
+    onProviderChange?.(null);
     setPreviewUrl(null);
     setError(null);
   };
 
-  return <div className="campaign-art-stack"><div className="campaign-art-field"><div aria-label="Campaign art preview" className="campaign-art-preview" role="img" style={previewUrl ? { backgroundImage: `url(${previewUrl})` } : undefined}>{previewUrl ? null : <ImagePlus size={22} />}</div><div className="campaign-art-copy"><p className="eyebrow">CAMPAIGN ART</p><strong>{previewUrl ? "ART ASSET READY" : "NO ART ASSET"}</strong><span>JPEG, PNG, WebP, or GIF - 5 MB maximum</span><div className="campaign-art-actions"><input ref={inputRef} accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); }} type="file" /><button className="button button-secondary" disabled={isUploading} onClick={() => inputRef.current?.click()} type="button">{isUploading ? <><LoaderCircle className="spin" size={14} /> UPLOADING...</> : <><ImagePlus size={14} /> {previewUrl ? "REPLACE ART" : "UPLOAD ART"}</>}</button><button aria-expanded={artStudioOpen} className={`button ${artStudioOpen ? "button-secondary" : "button-ai"}`} onClick={() => setArtStudioOpen((current) => !current)} type="button"><Sparkles size={14} /> {artStudioOpen ? "HIDE GENERATOR" : "GENERATE ART"}</button>{previewUrl ? <button aria-label="Remove campaign art" className="icon-button" disabled={isUploading} onClick={clear} title="Remove campaign art" type="button"><X size={16} /></button> : null}</div>{error ? <span className="form-error" role="alert">{error}</span> : null}</div></div>{campaignId && artStudioOpen ? <div className="campaign-art-generator"><AiArtStudio campaignId={campaignId} kind={kind} subject={subject} currentPrompt={currentPrompt} onSubjectChange={onSubjectChange} onApproved={(asset) => { onChange(asset.path); onUrlChange(asset.signedUrl); uploadedPathsRef.current.add(asset.path); onApproved?.(asset); setPreviewUrl(asset.signedUrl); setError(null); }} /></div> : null}</div>;
+  return <div className="campaign-art-stack"><div className="campaign-art-field"><div aria-label="Campaign art preview" className="campaign-art-preview" role="img" style={previewUrl ? { backgroundImage: `url(${previewUrl})` } : undefined}>{previewUrl ? null : <ImagePlus size={22} />}</div><div className="campaign-art-copy"><p className="eyebrow">CAMPAIGN ART</p><strong>{previewUrl ? "ART ASSET READY" : "NO ART ASSET"}</strong><span>JPEG, PNG, WebP, or GIF - 5 MB maximum</span><div className="campaign-art-actions"><input ref={inputRef} accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); }} type="file" /><button className="button button-secondary" disabled={isUploading} onClick={() => inputRef.current?.click()} type="button">{isUploading ? <><LoaderCircle className="spin" size={14} /> UPLOADING...</> : <><ImagePlus size={14} /> {previewUrl ? "REPLACE ART" : "UPLOAD ART"}</>}</button><button aria-expanded={artStudioOpen} className={`button ${artStudioOpen ? "button-secondary" : "button-ai"}`} onClick={() => setArtStudioOpen((current) => !current)} type="button"><Sparkles size={14} /> {artStudioOpen ? "HIDE GENERATOR" : "GENERATE ART"}</button>{previewUrl ? <button aria-label="Remove campaign art" className="icon-button" disabled={isUploading} onClick={clear} title="Remove campaign art" type="button"><X size={16} /></button> : null}</div>{error ? <span className="form-error" role="alert">{error}</span> : null}</div></div>{campaignId && artStudioOpen ? <div className="campaign-art-generator"><AiArtStudio campaignId={campaignId} kind={kind} subject={subject} currentPrompt={currentPrompt} onSubjectChange={onSubjectChange} onApproved={(asset) => { onChange(asset.path); onUrlChange(asset.signedUrl); onPromptChange?.(asset.prompt); onProviderChange?.(asset.provider); uploadedPathsRef.current.add(asset.path); onApproved?.(asset); setPreviewUrl(asset.signedUrl); setError(null); }} /></div> : null}</div>;
 }

@@ -51,7 +51,7 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0007_campaign_ai_settings.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0008_character_art_provider.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
 
@@ -74,11 +74,9 @@ Set `OPENROUTER_API_KEY` in the server environment to enable the GM-only routes:
 - `POST /api/ai/faction`
 - `POST /api/ai/image`
 
-The defaults are configured with `OPENROUTER_TEXT_MODEL` and `OPENROUTER_IMAGE_MODEL`. `OPENROUTER_SITE_URL` and `OPENROUTER_APP_NAME` are optional attribution headers. GMs can choose a compatible model per generation from the live OpenRouter catalog returned by `GET /api/ai/models`; arbitrary browser-supplied model IDs are rejected server-side. The catalog supports text/image capability filtering and popularity or price sorting, while discovery failures use the last verified catalog when available.
+Text and image models can be changed with `OPENROUTER_TEXT_MODEL` and `OPENROUTER_IMAGE_MODEL`. `OPENROUTER_SITE_URL` and `OPENROUTER_APP_NAME` are optional attribution headers. GMs can choose compatible models from the live OpenRouter catalog, and campaign settings enforce the saved model allowlist for every generation request.
 
-Campaign-level model access is managed from the GM-only **Campaign settings** view in the dashboard. New campaigns, and campaigns without a saved AI settings row, start with no models selected. GMs can add compatible text and image models from the searchable, sortable catalog, remove them from the selected lists, and save the campaign allowlist. At least one structured-text model and one image model must be selected before saving. The server enforces the same allowlist for every generation request.
-
-Text choices are limited to models advertising structured outputs and not advertising image output. Image choices are limited to models advertising image output, and drafts are normalized with their returned media type. Mission, NPC, and faction responses are schema-validated and require GM review before applying them to an editor. Jobs can retain a suggested NPC or faction giver and create that giver inline without losing the unfinished job draft. Image drafts are reviewed and approved before the selected asset path is saved to a campaign record. The prototype does not impose generation-count limits; OpenRouter or the selected provider may still enforce its own limits. Successful or failed generations retain provider, model, usage, cost when supplied, and a prompt hash in `ai_generation_runs`; raw prompts and generated image data are not stored there. Keep the API key server-only.
+Mission, NPC, faction, and image responses are schema-validated. Image drafts are reviewed and approved before the selected asset is saved to a campaign record; generated approvals persist the originating prompt and provider, while manual uploads clear stale generation provenance. Provider failures preserve their HTTP status and safe request ID in the response, while bounded diagnostics are written to server logs without storing raw prompts or generated image data. AI usage is tracked by token and provider metadata, but generation-count quotas are not enforced. Keep the API key server-only.
 
 ## Validation
 
