@@ -3,6 +3,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z, type ZodType } from "zod";
 import { getServerEnv } from "@/lib/env";
 import { AiProviderError, extractProviderGenerationId, extractProviderMessage, normalizeProviderError, serializeProviderBody } from "@/lib/ai/errors";
+import { defaultImageAspectRatio, defaultImageSize, type ImageAspectRatio, type ImageSize } from "@/lib/ai/image-options";
 
 export { AiProviderError } from "@/lib/ai/errors";
 
@@ -97,7 +98,12 @@ export type ImageGenerationResult = {
   };
 };
 
-export async function generateImage(prompt: string, requestedModel: string): Promise<ImageGenerationResult> {
+export type ImageGenerationOptions = {
+  aspectRatio?: ImageAspectRatio;
+  size?: ImageSize;
+};
+
+export async function generateImage(prompt: string, requestedModel: string, options: ImageGenerationOptions = {}): Promise<ImageGenerationResult> {
   const env = getServerEnv();
 
   if (!env.OPENROUTER_API_KEY) {
@@ -114,7 +120,13 @@ export async function generateImage(prompt: string, requestedModel: string): Pro
   const response = await fetch(`${openRouterBaseUrl}/images`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ model: requestedModel, prompt, size: "1024x1024", output_format: "png" }),
+    body: JSON.stringify({
+      model: requestedModel,
+      prompt,
+      aspect_ratio: options.aspectRatio ?? defaultImageAspectRatio,
+      size: options.size ?? defaultImageSize,
+      output_format: "png",
+    }),
   });
 
   if (!response.ok) {

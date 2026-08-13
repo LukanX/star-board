@@ -46,11 +46,21 @@ describe("OpenRouter AI client", () => {
     mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ id: "image-run", model: "openai/gpt-image-1", data: [{ b64_json: "aW1hZ2U=", media_type: "image/webp" }], usage: { prompt_tokens: 4, completion_tokens: 8, cost: 0.02 } }), { status: 200, headers: { "Content-Type": "application/json" } }));
 
     const result = await generateImage("a station broker", "openai/gpt-image-1");
-    const request = JSON.parse(mocks.fetch.mock.calls[0][1].body as string) as { model: string; prompt: string; size: string; output_format: string };
+    const request = JSON.parse(mocks.fetch.mock.calls[0][1].body as string) as { model: string; prompt: string; aspect_ratio: string; size: string; output_format: string };
 
     expect(mocks.fetch).toHaveBeenCalledWith("https://openrouter.ai/api/v1/images", expect.objectContaining({ method: "POST" }));
-    expect(request).toEqual({ model: "openai/gpt-image-1", prompt: "a station broker", size: "1024x1024", output_format: "png" });
+    expect(request).toEqual({ model: "openai/gpt-image-1", prompt: "a station broker", aspect_ratio: "1:1", size: "1024x1024", output_format: "png" });
     expect(result).toMatchObject({ generationId: "image-run", model: "openai/gpt-image-1", image: { base64: "aW1hZ2U=", mediaType: "image/webp" }, usage: { inputTokens: 4, outputTokens: 8, cost: 0.02 } });
+  });
+
+  it("forwards a requested aspect ratio and pixel size", async () => {
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ model: "openai/gpt-image-1", data: [{ b64_json: "aW1hZ2U=", media_type: "image/png" }] }), { status: 200 }));
+
+    await generateImage("a wide station", "openai/gpt-image-1", { aspectRatio: "16:9", size: "2048x1152" });
+    const request = JSON.parse(mocks.fetch.mock.calls[0][1].body as string) as { aspect_ratio: string; size: string };
+
+    expect(request).toMatchObject({ aspect_ratio: "16:9", size: "2048x1152" });
   });
 
   it("preserves image provider status and retry metadata", async () => {

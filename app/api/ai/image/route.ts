@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     let response;
 
     try {
-      response = await generateImage(prompt, selectedModel.id);
+      response = await generateImage(prompt, selectedModel.id, { aspectRatio: input.data.aspectRatio, size: input.data.size });
     } catch (error: unknown) {
       logAiProviderFailure(error, { kind: "image", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
       await context.supabase.from("ai_generation_runs").insert({
@@ -144,6 +144,8 @@ export async function POST(request: Request) {
       targetKind: input.data.targetKind,
       mode: input.data.mode,
       subject: input.data.subject,
+      aspectRatio: input.data.aspectRatio,
+      size: input.data.size,
       prompt,
       image: { base64: image.base64, url: image.url, mediaType: image.mediaType },
       provider: "openrouter",

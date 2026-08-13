@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { validateCampaignPlace } from "@/lib/places";
 import { createFactionSchema } from "@/lib/validation/faction";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 
 export const runtime = "nodejs";
 
-const factionColumns = "id, author_id, name, description, status, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const factionColumns = "id, author_id, name, description, status, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId } = await params;
@@ -71,6 +72,16 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
     }
 
+    const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);
+
+    if (placeResult.unavailable) {
+      return NextResponse.json({ error: "Unable to validate faction place." }, { status: 503 });
+    }
+
+    if (!placeResult.valid) {
+      return NextResponse.json({ error: "Faction place must belong to this campaign." }, { status: 400 });
+    }
+
     const { data, error } = await context.supabase
       .from("factions")
       .insert({
@@ -79,6 +90,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         name: input.data.name,
         description: input.data.description,
         status: input.data.status,
+        place_id: input.data.placeId ?? null,
         art_subject: input.data.artSubject ?? null,
         art_path: input.data.artPath ?? null,
         art_prompt: input.data.artPrompt ?? null,

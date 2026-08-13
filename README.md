@@ -21,7 +21,7 @@ Star Board is a persistent Starfinder 2e campaign operations console for GMs and
 
 6. Open `http://localhost:3000`. Unauthenticated visitors see sign-in and account-creation actions; authenticated users without a selected campaign are sent to `/campaigns`.
 
-The cockpit reads campaign records from Supabase. It does not seed demo jobs, characters, NPCs, factions, notes, episodes, or members in the browser. Empty collections render empty states, and selecting a campaign from `/campaigns` opens it at `/?campaignId=...`. The authenticated shell includes sign-out controls in both the cockpit and campaign selector.
+The cockpit reads campaign records from Supabase. It does not seed demo jobs, characters, NPCs, factions, Places, notes, episodes, or members in the browser. Empty collections render empty states, and selecting a campaign from `/campaigns` opens it at `/?campaignId=...`. The authenticated shell includes sign-out controls in both the cockpit and campaign selector.
 
 ## Supabase setup
 
@@ -51,11 +51,11 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0008_character_art_provider.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0011_fix_place_cycle_validation.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
 
-The migration creates campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, and a private `campaign-art` storage bucket. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
+The migrations create campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, a private `campaign-art` storage bucket, and the genre-neutral Places archive. Places form an arbitrary-depth tree through `parent_place_id`; sibling names are unique within a campaign, cycles are rejected in PostgreSQL, deleting a parent promotes children to roots, and deleting a Place clears primary-place links on NPCs, factions, jobs, and episodes. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
 
 Accounts are open to anyone. Local Auth is configured for email/password signup with email confirmation disabled, so a successful signup immediately creates a session without SMTP setup. A new account can create a campaign and is automatically made its GM; a campaign join link is only required to enter an existing campaign as a player. Display names are stored per campaign membership, so one account can use a different name in each campaign.
 
@@ -72,11 +72,12 @@ Set `OPENROUTER_API_KEY` in the server environment to enable the GM-only routes:
 - `POST /api/ai/mission`
 - `POST /api/ai/npc`
 - `POST /api/ai/faction`
+- `POST /api/ai/place`
 - `POST /api/ai/image`
 
 Text and image models can be changed with `OPENROUTER_TEXT_MODEL` and `OPENROUTER_IMAGE_MODEL`. `OPENROUTER_SITE_URL` and `OPENROUTER_APP_NAME` are optional attribution headers. GMs can choose compatible models from the live OpenRouter catalog, and campaign settings enforce the saved model allowlist for every generation request.
 
-Mission, NPC, faction, and image responses are schema-validated. Image drafts are reviewed and approved before the selected asset is saved to a campaign record; generated approvals persist the originating prompt and provider, while manual uploads clear stale generation provenance. Provider failures preserve their HTTP status and safe request ID in the response, while bounded diagnostics are written to server logs without storing raw prompts or generated image data. AI usage is tracked by token and provider metadata, but generation-count quotas are not enforced. Keep the API key server-only.
+Mission, NPC, faction, Place, and image responses are schema-validated. Place generation receives the selected parent hierarchy, but all AI output remains review-before-save. Image drafts are reviewed and approved before the selected asset is saved to a campaign record; generated approvals persist the originating prompt and provider, while manual uploads clear stale generation provenance. Provider failures preserve their HTTP status and safe request ID in the response, while bounded diagnostics are written to server logs without storing raw prompts or generated image data. AI usage is tracked by token and provider metadata, but generation-count quotas are not enforced. Keep the API key server-only.
 
 ## Validation
 
@@ -98,4 +99,4 @@ The suite creates or signs into two local test accounts, creates a temporary cam
 
 ## Product direction
 
-The interface uses a synthwave starship-terminal visual language. Persistence covers job-board voting, campaign notes, characters/NPCs/factions, episode promotion, image uploads, and review-before-save AI image drafts.
+The interface uses a synthwave starship-terminal visual language. Persistence covers job-board voting, campaign notes, characters/NPCs/factions, the arbitrary-depth Places archive, one primary Place link on NPCs/factions/jobs/episodes, episode promotion, image uploads, and review-before-save AI text and image drafts.

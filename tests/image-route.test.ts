@@ -105,13 +105,17 @@ describe("POST /api/ai/image", () => {
       targetKind: "npc",
       subject: "A masked station broker",
       model: "openai/gpt-image-1",
+      aspectRatio: "16:9",
+      size: "2048x1152",
     }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mocks.generateImage).toHaveBeenCalledWith(expect.stringContaining("masked station broker"), "openai/gpt-image-1");
+    expect(mocks.generateImage).toHaveBeenCalledWith(expect.stringContaining("masked station broker"), "openai/gpt-image-1", { aspectRatio: "16:9", size: "2048x1152" });
     expect(payload.draft).toMatchObject({
       generationRunId: "00000000-0000-4000-8000-000000000003",
+      aspectRatio: "16:9",
+      size: "2048x1152",
       image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" },
       createdAt: "2026-08-03T12:34:56.000Z",
     });

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls, removeCampaignArtIfUnreferenced } from "@/lib/storage/campaign-art";
+import { validateCampaignPlace } from "@/lib/places";
 import { updateFactionSchema } from "@/lib/validation/faction";
 
 type RouteContext = { params: Promise<{ campaignId: string; factionId: string }> };
 
 export const runtime = "nodejs";
 
-const factionColumns = "id, author_id, name, description, status, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const factionColumns = "id, author_id, name, description, status, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId, factionId } = await params;
@@ -76,6 +77,16 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
     }
 
+    const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);
+
+    if (placeResult.unavailable) {
+      return NextResponse.json({ error: "Unable to validate faction place." }, { status: 503 });
+    }
+
+    if (!placeResult.valid) {
+      return NextResponse.json({ error: "Faction place must belong to this campaign." }, { status: 400 });
+    }
+
     const { data: previousFaction, error: previousFactionError } = await context.supabase
       .from("factions")
       .select("art_path")
@@ -91,6 +102,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       ...(input.data.name === undefined ? {} : { name: input.data.name }),
       ...(input.data.description === undefined ? {} : { description: input.data.description }),
       ...(input.data.status === undefined ? {} : { status: input.data.status }),
+      ...(input.data.placeId === undefined ? {} : { place_id: input.data.placeId }),
       ...(input.data.artSubject === undefined ? {} : { art_subject: input.data.artSubject }),
       ...(input.data.artPath === undefined ? {} : { art_path: input.data.artPath }),
       ...(input.data.artPrompt === undefined ? {} : { art_prompt: input.data.artPrompt }),

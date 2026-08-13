@@ -150,6 +150,99 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(unchanged.data?.description).toContain("local RLS integration suite");
   });
 
+  it("enforces Places visibility, hierarchy rules, and link cleanup", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    const root = await gmClient.from("places").insert({
+      campaign_id: campaignId,
+      author_id: gmUser?.id,
+      name: "RLS Root Place",
+      kind: "planet",
+      description: "A visible root.",
+    }).select("id, parent_place_id").single();
+    expect(root.error).toBeNull();
+    expect(root.data?.parent_place_id).toBeNull();
+
+    const child = await gmClient.from("places").insert({
+      campaign_id: campaignId,
+      author_id: gmUser?.id,
+      parent_place_id: root.data?.id,
+      name: "RLS Child Place",
+      kind: "city",
+    }).select("id, parent_place_id").single();
+    expect(child.error).toBeNull();
+
+    const grandchild = await gmClient.from("places").insert({
+      campaign_id: campaignId,
+      author_id: gmUser?.id,
+      parent_place_id: child.data?.id,
+      name: "RLS Grandchild Place",
+      kind: "room",
+    }).select("id, parent_place_id").single();
+    expect(grandchild.error).toBeNull();
+
+    const duplicateRoot = await gmClient.from("places").insert({
+      campaign_id: campaignId,
+      author_id: gmUser?.id,
+      name: "rls root place",
+      kind: "moon",
+    });
+    expect(duplicateRoot.error).not.toBeNull();
+
+    const selfParent = await gmClient.from("places")
+      .update({ parent_place_id: root.data?.id })
+      .eq("id", root.data?.id)
+      .select("id");
+    expect(selfParent.error).not.toBeNull();
+
+    const indirectCycle = await gmClient.from("places")
+      .update({ parent_place_id: grandchild.data?.id })
+      .eq("id", root.data?.id)
+      .select("id");
+    expect(indirectCycle.error).not.toBeNull();
+
+    const privateNotes = await gmClient.from("place_gm_notes").insert({
+      place_id: root.data?.id,
+      body_markdown: "GM-only route beneath the root.",
+      updated_by: gmUser?.id,
+    });
+    expect(privateNotes.error).toBeNull();
+
+    const playerPlaces = await playerClient.from("places").select("id, name").eq("campaign_id", campaignId);
+    expect(playerPlaces.error).toBeNull();
+    expect(playerPlaces.data?.some((place) => place.id === root.data?.id)).toBe(true);
+
+    const playerPrivateNotes = await playerClient.from("place_gm_notes").select("place_id").eq("place_id", root.data?.id);
+    expect(playerPrivateNotes.error).toBeNull();
+    expect(playerPrivateNotes.data).toEqual([]);
+
+    const blockedPlayerInsert = await playerClient.from("places").insert({
+      campaign_id: campaignId,
+      author_id: playerId,
+      name: "Player Place Should Be Blocked",
+    });
+    expect(blockedPlayerInsert.error).not.toBeNull();
+
+    const npc = await gmClient.from("npcs").insert({
+      campaign_id: campaignId,
+      author_id: gmUser?.id,
+      name: "RLS Linked Contact",
+      place_id: root.data?.id,
+    }).select("id, place_id").single();
+    expect(npc.error).toBeNull();
+    expect(npc.data?.place_id).toBe(root.data?.id);
+
+    const deletedRoot = await gmClient.from("places").delete().eq("id", root.data?.id).select("id").single();
+    expect(deletedRoot.error).toBeNull();
+
+    const survivingChild = await gmClient.from("places").select("parent_place_id").eq("id", child.data?.id).single();
+    expect(survivingChild.error).toBeNull();
+    expect(survivingChild.data?.parent_place_id).toBeNull();
+
+    const unlinkedNpc = await gmClient.from("npcs").select("place_id").eq("id", npc.data?.id).single();
+    expect(unlinkedNpc.error).toBeNull();
+    expect(unlinkedNpc.data?.place_id).toBeNull();
+  });
+
   it("enforces authenticated campaign-art ownership in Storage", async () => {
     const gmUser = (await gmClient.auth.getUser()).data.user;
     const blockedPath = `${campaignId}/${gmUser?.id}/player-upload-should-be-blocked.png`;

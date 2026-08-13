@@ -73,7 +73,7 @@ describe("job action routes", () => {
   });
 
   it("returns the newly created episode after campaign-scoped promotion", async () => {
-    const episode = { id: episodeId, title: "Relay", status: "planned", source_job_id: jobId };
+    const episode = { id: episodeId, title: "Relay", status: "planned", source_job_id: jobId, place_id: "00000000-0000-4000-8000-000000000004" };
     const episodeQuery = createQuery(episode);
     const rpc = vi.fn().mockResolvedValue({ data: episodeId, error: null });
     const supabase = { rpc, from: vi.fn().mockReturnValue(episodeQuery) };

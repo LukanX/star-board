@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import AiArtStudio from "@/components/archive/AiArtStudio";
 import { ImagePlus, LoaderCircle, Sparkles, X } from "lucide-react";
 
-type ArtKind = "character" | "npc" | "faction" | "job";
+type ArtKind = "character" | "npc" | "faction" | "job" | "place";
 
 export type CampaignArtEditorTarget = {
   campaignId: string | null;

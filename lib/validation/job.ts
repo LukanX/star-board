@@ -13,4 +13,5 @@ export const createJobSchema = z.object({
   artPath: z.string().trim().max(500).nullable().optional(),
   artPrompt: z.string().trim().max(4000).nullable().optional(),
   artProvider: z.string().trim().max(80).nullable().optional(),
+  placeId: z.string().uuid().nullable().optional(),
 });

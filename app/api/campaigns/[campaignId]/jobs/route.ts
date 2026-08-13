@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls, removeCampaignArtIfUnreferenced } from "@/lib/storage/campaign-art";
+import { validateCampaignPlace } from "@/lib/places";
 import { createJobSchema } from "@/lib/validation/job";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
@@ -26,7 +27,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const [jobsResult, votesResult, npcsResult, factionsResult] = await Promise.all([
       context.supabase
         .from("jobs")
-        .select("id, title, summary, player_notes_markdown, giver_npc_id, giver_faction_id, status, hook, art_subject, art_path, art_prompt, art_provider, created_at, updated_at")
+        .select("id, title, summary, player_notes_markdown, giver_npc_id, giver_faction_id, place_id, status, hook, art_subject, art_path, art_prompt, art_provider, created_at, updated_at")
         .eq("campaign_id", campaignId)
         .order("created_at", { ascending: false }),
       context.supabase.from("job_votes").select("job_id, user_id").eq("campaign_id", campaignId),
@@ -105,12 +106,23 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
     }
 
+    const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);
+
+    if (placeResult.unavailable) {
+      return NextResponse.json({ error: "Unable to validate job place." }, { status: 503 });
+    }
+
+    if (!placeResult.valid) {
+      return NextResponse.json({ error: "Job place must belong to this campaign." }, { status: 400 });
+    }
+
     const payload = {
       campaign_id: campaignId,
       author_id: context.user.id,
       title: input.data.title,
       summary: input.data.summary,
       player_notes_markdown: input.data.playerNotesMarkdown,
+      place_id: input.data.placeId ?? null,
       hook: input.data.hook,
       art_subject: input.data.artSubject ?? null,
       status: input.data.status,
@@ -176,6 +188,16 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
     }
 
+    const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);
+
+    if (placeResult.unavailable) {
+      return NextResponse.json({ error: "Unable to validate job place." }, { status: 503 });
+    }
+
+    if (!placeResult.valid) {
+      return NextResponse.json({ error: "Job place must belong to this campaign." }, { status: 400 });
+    }
+
     const { data: previousJob, error: previousJobError } = await context.supabase
       .from("jobs")
       .select("art_path")
@@ -193,6 +215,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         title: input.data.title,
         summary: input.data.summary,
         player_notes_markdown: input.data.playerNotesMarkdown,
+        ...(input.data.placeId === undefined ? {} : { place_id: input.data.placeId }),
         hook: input.data.hook,
         art_subject: input.data.artSubject ?? null,
         status: input.data.status,

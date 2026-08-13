@@ -8,6 +8,7 @@ const factionFields = {
   artPath: z.string().trim().max(500).nullable().optional(),
   artPrompt: z.string().trim().max(4000).nullable().optional(),
   artProvider: z.string().trim().max(80).nullable().optional(),
+  placeId: z.string().uuid().nullable().optional(),
 };
 
 export const createFactionSchema = z.object(factionFields);
@@ -20,4 +21,5 @@ export const updateFactionSchema = z.object({
   artPath: factionFields.artPath,
   artPrompt: factionFields.artPrompt,
   artProvider: factionFields.artProvider,
+  placeId: factionFields.placeId,
 });
