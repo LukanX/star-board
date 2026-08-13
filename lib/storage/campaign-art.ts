@@ -3,7 +3,7 @@ import { campaignArtPathSchema } from "@/lib/validation/art";
 
 export const campaignArtBucket = "campaign-art";
 
-const artReferenceTables = ["characters", "npcs", "factions", "jobs"] as const;
+const artReferenceTables = ["characters", "npcs", "factions", "jobs", "places"] as const;
 
 export function isExternalArtPath(path: string | null | undefined) {
   return Boolean(path?.startsWith("http://") || path?.startsWith("https://"));

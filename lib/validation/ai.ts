@@ -32,6 +32,15 @@ const factionCurrentDraftSchema = z.object({
   visualPrompt: z.string().max(1600).optional(),
 }).partial().optional();
 
+const placeCurrentDraftSchema = z.object({
+  name: z.string().max(160).optional(),
+  kind: z.string().max(80).optional(),
+  description: z.string().max(4000).optional(),
+  playerNotes: z.string().max(20000).optional(),
+  gmNotes: z.string().max(20000).optional(),
+  visualPrompt: z.string().max(1600).optional(),
+}).partial().optional();
+
 export const missionGenerationInputSchema = campaignContextSchema.extend({
   mode: z.enum(["create", "refine"]),
   model: z.string().trim().min(1).max(160).optional(),
@@ -58,6 +67,16 @@ export const factionGenerationInputSchema = campaignContextSchema.extend({
   status: z.string().trim().max(80).optional(),
   focus: z.string().trim().max(600).optional(),
   currentDraft: factionCurrentDraftSchema,
+});
+
+export const placeGenerationInputSchema = campaignContextSchema.extend({
+  mode: z.enum(["create", "refine"]),
+  model: z.string().trim().min(1).max(160).optional(),
+  parentPlaceId: z.string().uuid().nullable().optional(),
+  name: z.string().trim().max(160).optional(),
+  kind: z.string().trim().max(80).optional(),
+  focus: z.string().trim().max(600).optional(),
+  currentDraft: placeCurrentDraftSchema,
 });
 
 export const missionDraftSchema = z.object({
@@ -89,6 +108,16 @@ export const factionDraftSchema = z.object({
   visualPrompt: z.string().trim().max(1600),
 });
 
+export const placeDraftSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  kind: z.string().trim().min(1).max(80),
+  description: z.string().trim().min(1).max(4000),
+  playerNotes: z.string().trim().max(2400),
+  gmNotes: z.string().trim().max(2400),
+  visualPrompt: z.string().trim().max(1600),
+});
+
 export type MissionGenerationInput = z.infer<typeof missionGenerationInputSchema>;
 export type NpcGenerationInput = z.infer<typeof npcGenerationInputSchema>;
 export type FactionGenerationInput = z.infer<typeof factionGenerationInputSchema>;
+export type PlaceGenerationInput = z.infer<typeof placeGenerationInputSchema>;

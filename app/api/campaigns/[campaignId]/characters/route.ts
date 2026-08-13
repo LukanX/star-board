@@ -7,7 +7,7 @@ type RouteContext = { params: Promise<{ campaignId: string }> };
 
 export const runtime = "nodejs";
 
-const characterColumns = "id, owner_id, name, species, class_name, level, backstory_markdown, art_path, art_prompt, created_at, updated_at";
+const characterColumns = "id, owner_id, name, species, class_name, level, backstory_markdown, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId } = await params;
@@ -83,6 +83,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         backstory_markdown: input.data.backstoryMarkdown,
         art_path: input.data.artPath ?? null,
         art_prompt: input.data.artPrompt ?? null,
+        art_provider: input.data.artProvider ?? null,
         updated_by: context.user.id,
       })
       .select(characterColumns)

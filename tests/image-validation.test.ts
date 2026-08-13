@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildArtPrompt } from "@/lib/ai/prompts";
+import { campaignArtKindSchema } from "@/lib/validation/art";
 import { imageDraftSchema, imageGenerationInputSchema, imagePromptMaxLength } from "@/lib/validation/image";
 
 const validDraft = {
@@ -7,6 +8,8 @@ const validDraft = {
   targetKind: "npc" as const,
   mode: "create" as const,
   subject: "A masked station broker",
+  aspectRatio: "1:1" as const,
+  size: "1024x1024" as const,
   prompt: "A masked station broker in a crowded orbital bazaar.",
   image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" },
   provider: "openrouter" as const,
@@ -48,6 +51,45 @@ describe("image generation schemas", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts dependent dimensions for a non-square aspect ratio", () => {
+    const result = imageGenerationInputSchema.safeParse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      mode: "create",
+      targetKind: "place",
+      subject: "A storm-lit orbital harbor",
+      aspectRatio: "16:9",
+      size: "2048x1152",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a size that does not belong to the selected aspect ratio", () => {
+    const result = imageGenerationInputSchema.safeParse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      mode: "create",
+      targetKind: "place",
+      subject: "A storm-lit orbital harbor",
+      aspectRatio: "3:4",
+      size: "2048x1152",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.flatten().fieldErrors.size).toContain("Size 2048x1152 does not match aspect ratio 3:4.");
+  });
+
+  it("accepts Places as an image generation target", () => {
+    const input = imageGenerationInputSchema.safeParse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      mode: "create",
+      targetKind: "place",
+      subject: "A storm-lit orbital harbor",
+    });
+
+    expect(input.success).toBe(true);
+    expect(imageDraftSchema.safeParse({ ...validDraft, targetKind: "place" }).success).toBe(true);
+  });
+
   it("accepts a full previously generated prompt for refinement", () => {
     const result = imageGenerationInputSchema.safeParse({
       campaignId: "00000000-0000-4000-8000-000000000001",
@@ -71,5 +113,9 @@ describe("image generation schemas", () => {
     expect(prompt.length).toBeLessThanOrEqual(imagePromptMaxLength);
     expect(prompt).toContain("Make the overcoat white");
     expect(prompt).toContain("Subject: A pilot with a cracked visor");
+  });
+
+  it("accepts Places as a campaign artwork target", () => {
+    expect(campaignArtKindSchema.parse("place")).toBe("place");
   });
 });

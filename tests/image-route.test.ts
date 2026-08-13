@@ -15,6 +15,7 @@ vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loa
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
 
 import { POST } from "@/app/api/ai/image/route";
+import { AiProviderError } from "@/lib/ai/errors";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -104,13 +105,17 @@ describe("POST /api/ai/image", () => {
       targetKind: "npc",
       subject: "A masked station broker",
       model: "openai/gpt-image-1",
+      aspectRatio: "16:9",
+      size: "2048x1152",
     }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mocks.generateImage).toHaveBeenCalledWith(expect.stringContaining("masked station broker"), "openai/gpt-image-1");
+    expect(mocks.generateImage).toHaveBeenCalledWith(expect.stringContaining("masked station broker"), "openai/gpt-image-1", { aspectRatio: "16:9", size: "2048x1152" });
     expect(payload.draft).toMatchObject({
       generationRunId: "00000000-0000-4000-8000-000000000003",
+      aspectRatio: "16:9",
+      size: "2048x1152",
       image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" },
       createdAt: "2026-08-03T12:34:56.000Z",
     });
@@ -120,5 +125,25 @@ describe("POST /api/ai/image", () => {
       kind: "image",
       status: "complete",
     }));
+  });
+
+  it("surfaces provider rate limits instead of masking them as an application failure", async () => {
+    const providerLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.generateImage.mockRejectedValue(new AiProviderError("OpenRouter image generation failed. Provider rate limit exceeded", { status: 429, requestId: "image-request-1", retryAfter: "12", providerBody: "{\"error\":\"rate limit\"}", generationId: "image-generation-1" }));
+
+    const response = await POST(createRequest({ campaignId, mode: "refine", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("12");
+    expect(payload).toMatchObject({ error: expect.stringContaining("Provider rate limit exceeded"), providerRequestId: "image-request-1" });
+    expect(payload).not.toHaveProperty("providerBody");
+    expect(payload).not.toHaveProperty("generationId");
+    expect(JSON.parse(providerLog.mock.calls[0][0] as string)).toMatchObject({ event: "ai_provider_failure", kind: "image", status: 429, requestId: "image-request-1", generationId: "image-generation-1", providerBody: "{\"error\":\"rate limit\"}" });
   });
 });

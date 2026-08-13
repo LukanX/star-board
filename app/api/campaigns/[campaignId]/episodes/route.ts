@@ -24,7 +24,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const [episodesResult, notesResult] = await Promise.all([
       context.supabase
         .from("episodes")
-        .select("id, campaign_id, source_job_id, created_by, title, summary, player_context_markdown, status, started_at, completed_at, created_at, updated_at")
+        .select("id, campaign_id, source_job_id, place_id, created_by, title, summary, player_context_markdown, status, started_at, completed_at, created_at, updated_at")
         .eq("campaign_id", campaignId)
         .order("created_at", { ascending: false }),
       context.supabase

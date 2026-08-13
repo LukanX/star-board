@@ -9,6 +9,7 @@ import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { missionDraftSchema, missionGenerationInputSchema } from "@/lib/validation/ai";
+import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 
 export const runtime = "nodejs";
 
@@ -67,9 +68,12 @@ export async function POST(request: Request) {
     try {
       providerResult = await generateJson(prompt, missionDraftSchema, selectedModel.id);
       rawDraft = providerResult.data;
-    } catch {
+    } catch (error: unknown) {
+      logAiProviderFailure(error, { kind: "mission", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
       await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "mission", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: selectedModel.id, status: "failed" });
-      return NextResponse.json({ error: "Job assistance is temporarily unavailable." }, { status: 503 });
+      const failure = getAiProviderFailure(error, "Job assistance is temporarily unavailable.");
+      const headers = failure.retryAfter ? { "Retry-After": failure.retryAfter } : undefined;
+      return NextResponse.json({ error: failure.message, ...(failure.requestId ? { providerRequestId: failure.requestId } : {}) }, { status: failure.status, ...(headers ? { headers } : {}) });
     }
 
     const draft = missionDraftSchema.safeParse(rawDraft);

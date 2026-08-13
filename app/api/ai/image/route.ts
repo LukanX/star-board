@@ -8,6 +8,7 @@ import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { imageDraftSchema, imageGenerationInputSchema } from "@/lib/validation/image";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
+import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 
 export const runtime = "nodejs";
 
@@ -77,8 +78,9 @@ export async function POST(request: Request) {
     let response;
 
     try {
-      response = await generateImage(prompt, selectedModel.id);
-    } catch {
+      response = await generateImage(prompt, selectedModel.id, { aspectRatio: input.data.aspectRatio, size: input.data.size });
+    } catch (error: unknown) {
+      logAiProviderFailure(error, { kind: "image", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
       await context.supabase.from("ai_generation_runs").insert({
         campaign_id: input.data.campaignId,
         requested_by: context.user.id,
@@ -90,7 +92,9 @@ export async function POST(request: Request) {
         effective_model: selectedModel.id,
         status: "failed",
       });
-      return NextResponse.json({ error: "Art generation is temporarily unavailable." }, { status: 503 });
+      const failure = getAiProviderFailure(error, "Art generation is temporarily unavailable.");
+      const headers = failure.retryAfter ? { "Retry-After": failure.retryAfter } : undefined;
+      return NextResponse.json({ error: failure.message, ...(failure.requestId ? { providerRequestId: failure.requestId } : {}) }, { status: failure.status, ...(headers ? { headers } : {}) });
     }
 
     const image = response.image;
@@ -140,6 +144,8 @@ export async function POST(request: Request) {
       targetKind: input.data.targetKind,
       mode: input.data.mode,
       subject: input.data.subject,
+      aspectRatio: input.data.aspectRatio,
+      size: input.data.size,
       prompt,
       image: { base64: image.base64, url: image.url, mediaType: image.mediaType },
       provider: "openrouter",

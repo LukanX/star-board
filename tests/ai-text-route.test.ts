@@ -31,6 +31,7 @@ vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModel
 import { POST as generateFaction } from "@/app/api/ai/faction/route";
 import { POST as generateMission } from "@/app/api/ai/mission/route";
 import { POST as generateNpc } from "@/app/api/ai/npc/route";
+import { AiProviderError } from "@/lib/ai/errors";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -122,6 +123,21 @@ describe("structured AI assistance routes", () => {
     expect(response.status).toBe(400);
     expect(mocks.generateJson).not.toHaveBeenCalled();
     expect(mocks.recordAiGeneration).not.toHaveBeenCalled();
+  });
+
+  it("surfaces provider rate limits instead of masking them as an application failure", async () => {
+    const providerLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.generateJson.mockRejectedValue(new AiProviderError("OpenRouter text generation failed. Too many requests", { status: 429, requestId: "text-request-1", retryAfter: "9", providerBody: "{\"error\":\"rate limit\"}", generationId: "text-generation-1" }));
+
+    const response = await generateMission(request({ ...baseInput, title: "The Relay" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("9");
+    expect(payload).toMatchObject({ error: expect.stringContaining("Too many requests"), providerRequestId: "text-request-1" });
+    expect(payload).not.toHaveProperty("providerBody");
+    expect(payload).not.toHaveProperty("generationId");
+    expect(JSON.parse(providerLog.mock.calls[0][0] as string)).toMatchObject({ event: "ai_provider_failure", kind: "mission", status: 429, requestId: "text-request-1", generationId: "text-generation-1", providerBody: "{\"error\":\"rate limit\"}" });
   });
 
 });

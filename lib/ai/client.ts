@@ -2,6 +2,10 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z, type ZodType } from "zod";
 import { getServerEnv } from "@/lib/env";
+import { AiProviderError, extractProviderGenerationId, extractProviderMessage, normalizeProviderError, serializeProviderBody } from "@/lib/ai/errors";
+import { defaultImageAspectRatio, defaultImageSize, type ImageAspectRatio, type ImageSize } from "@/lib/ai/image-options";
+
+export { AiProviderError } from "@/lib/ai/errors";
 
 const openRouterBaseUrl = "https://openrouter.ai/api/v1";
 
@@ -35,11 +39,17 @@ export type JsonGenerationResult = {
 
 export async function generateJson(prompt: string, schema?: ZodType, requestedModel?: string): Promise<JsonGenerationResult> {
   const { client, model } = getOpenRouterClient();
-  const completion = await client.chat.completions.create({
-    model: requestedModel ?? model,
-    messages: [{ role: "user", content: prompt }],
-    response_format: schema ? zodResponseFormat(schema, "star_board_draft") : { type: "json_object" },
-  });
+  let completion;
+
+  try {
+    completion = await client.chat.completions.create({
+      model: requestedModel ?? model,
+      messages: [{ role: "user", content: prompt }],
+      response_format: schema ? zodResponseFormat(schema, "star_board_draft") : { type: "json_object" },
+    });
+  } catch (error: unknown) {
+    throw normalizeProviderError(error, "OpenRouter text generation failed.");
+  }
 
   const content = completion.choices[0]?.message.content;
 
@@ -88,7 +98,12 @@ export type ImageGenerationResult = {
   };
 };
 
-export async function generateImage(prompt: string, requestedModel: string): Promise<ImageGenerationResult> {
+export type ImageGenerationOptions = {
+  aspectRatio?: ImageAspectRatio;
+  size?: ImageSize;
+};
+
+export async function generateImage(prompt: string, requestedModel: string, options: ImageGenerationOptions = {}): Promise<ImageGenerationResult> {
   const env = getServerEnv();
 
   if (!env.OPENROUTER_API_KEY) {
@@ -105,10 +120,37 @@ export async function generateImage(prompt: string, requestedModel: string): Pro
   const response = await fetch(`${openRouterBaseUrl}/images`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ model: requestedModel, prompt, size: "1024x1024", output_format: "png" }),
+    body: JSON.stringify({
+      model: requestedModel,
+      prompt,
+      aspect_ratio: options.aspectRatio ?? defaultImageAspectRatio,
+      size: options.size ?? defaultImageSize,
+      output_format: "png",
+    }),
   });
 
-  if (!response.ok) throw new Error("OpenRouter image generation failed.");
+  if (!response.ok) {
+    let providerMessage: string | null = null;
+    let providerBody: string | null = null;
+    let providerPayload: unknown = null;
+    try {
+      providerPayload = await response.clone().json();
+      providerMessage = extractProviderMessage(providerPayload);
+      providerBody = serializeProviderBody(providerPayload);
+    } catch {
+      const body = await response.clone().text();
+      providerMessage = extractProviderMessage(body);
+      providerBody = serializeProviderBody(body);
+    }
+
+    throw new AiProviderError(providerMessage ? `OpenRouter image generation failed. ${providerMessage}` : "OpenRouter image generation failed.", {
+      status: response.status,
+      requestId: response.headers.get("x-request-id") ?? response.headers.get("x-openrouter-request-id"),
+      retryAfter: response.headers.get("retry-after"),
+      providerBody,
+      generationId: extractProviderGenerationId(providerPayload),
+    });
+  }
 
   const payload = imageGenerationResponseSchema.safeParse(await response.json());
 

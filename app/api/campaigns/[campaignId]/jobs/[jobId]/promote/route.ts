@@ -26,7 +26,7 @@ export async function POST(_request: Request, { params }: RouteContext) {
 
     const { data: episode, error: episodeError } = await context.supabase
       .from("episodes")
-      .select("id, title, status, source_job_id")
+      .select("id, title, status, source_job_id, place_id")
       .eq("id", data)
       .eq("campaign_id", campaignId)
       .single();

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
 
 import { GET } from "@/app/api/campaigns/[campaignId]/ai-usage/route";
+import { rollingSevenDaysMs } from "@/lib/time";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 
@@ -27,7 +28,7 @@ describe("GET /api/campaigns/[campaignId]/ai-usage", () => {
     expect(payload.error).toBe("GM access is required to view AI usage.");
   });
 
-  it("sums input and output tokens from the last seven days", async () => {
+  it("sums input and output tokens from the rolling last seven days", async () => {
     const query = {
       select: vi.fn(),
       eq: vi.fn(),
@@ -47,6 +48,9 @@ describe("GET /api/campaigns/[campaignId]/ai-usage", () => {
     expect(supabase.from).toHaveBeenCalledWith("ai_generation_runs");
     expect(query.eq).toHaveBeenCalledWith("campaign_id", campaignId);
     expect(query.gte).toHaveBeenCalledWith("created_at", expect.any(String));
+    const periodStart = new Date(query.gte.mock.calls[0][1] as string).getTime();
+    expect(Date.now() - periodStart).toBeGreaterThanOrEqual(rollingSevenDaysMs - 1000);
+    expect(Date.now() - periodStart).toBeLessThan(rollingSevenDaysMs + 1000);
   });
 
   it("returns a service error when usage cannot be read", async () => {

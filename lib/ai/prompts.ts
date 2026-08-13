@@ -1,4 +1,4 @@
-import type { FactionGenerationInput, MissionGenerationInput, NpcGenerationInput } from "@/lib/validation/ai";
+import type { FactionGenerationInput, MissionGenerationInput, NpcGenerationInput, PlaceGenerationInput } from "@/lib/validation/ai";
 import type { CampaignAiContext } from "@/lib/ai/assistance";
 import { imagePromptMaxLength } from "@/lib/validation/image";
 
@@ -63,6 +63,26 @@ export function buildFactionPrompt(input: FactionGenerationInput, context?: Camp
     "Write a distinct organization with a clear public identity, operating status, pressure point, and relationship to the campaign. Keep the description suitable for players.",
     "visualPrompt must be a concise, subject-specific description of an emblem, banner, headquarters, or representative faction scene for later image generation. Do not include provider names, image dimensions, logos, or text.",
     "Fields: name, status, description, visualPrompt.",
+  ].filter(Boolean).join("\n");
+}
+
+export function buildPlacePrompt(input: PlaceGenerationInput, context?: CampaignAiContext, hierarchy: Array<{ name: string; kind: string }> = []) {
+  return [
+    "You are a campaign writer for a tabletop campaign manager.",
+    "Return only valid JSON matching the requested place draft fields.",
+    ...campaignLines(context),
+    `Campaign setting: ${input.setting ?? "A richly imagined campaign world shaped by the GM."}`,
+    `Campaign style notes: ${input.styleNotes ?? "Distinctive, playable, sensory, and useful at the table."}`,
+    `Mode: ${input.mode}`,
+    hierarchy.length ? `Place hierarchy: ${hierarchy.map((place) => `${place.name} (${place.kind})`).join(" > ")}` : "This place is a top-level location in the campaign.",
+    input.name ? `Existing name: ${input.name}` : "",
+    input.kind ? `Existing kind label: ${input.kind}` : "",
+    input.focus ? `GM focus: ${input.focus}` : "",
+    input.currentDraft ? `Current editor draft: ${JSON.stringify(input.currentDraft)}` : "",
+    "The kind field is a campaign-specific label, not a fixed genre category. Write one distinct place that fits its parent context without inventing a whole automatic subtree.",
+    "Write player notes without spoilers and put secrets, threats, and future reveals in gmNotes.",
+    "visualPrompt must be a concise, subject-specific description for later image generation. Do not include provider names, image dimensions, logos, or text.",
+    "Fields: name, kind, description, playerNotes, gmNotes, visualPrompt.",
   ].filter(Boolean).join("\n");
 }
 

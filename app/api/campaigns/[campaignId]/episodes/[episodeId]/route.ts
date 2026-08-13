@@ -23,7 +23,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const { data: episode, error: episodeError } = await context.supabase
       .from("episodes")
-      .select("id, campaign_id, source_job_id, created_by, title, summary, player_context_markdown, status, started_at, completed_at, created_at, updated_at")
+      .select("id, campaign_id, source_job_id, place_id, created_by, title, summary, player_context_markdown, status, started_at, completed_at, created_at, updated_at")
       .eq("campaign_id", campaignId)
       .eq("id", episodeId)
       .maybeSingle();
