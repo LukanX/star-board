@@ -8,6 +8,7 @@ import { defaultImageAspectRatio, defaultImageSize, type ImageAspectRatio, type 
 export { AiProviderError } from "@/lib/ai/errors";
 
 const openRouterBaseUrl = "https://openrouter.ai/api/v1";
+const defaultImageGenerationTimeoutMs = 2 * 60 * 1000;
 
 export function getOpenRouterClient() {
   const env = getServerEnv();
@@ -101,6 +102,7 @@ export type ImageGenerationResult = {
 export type ImageGenerationOptions = {
   aspectRatio?: ImageAspectRatio;
   size?: ImageSize;
+  timeoutMs?: number;
 };
 
 export async function generateImage(prompt: string, requestedModel: string, options: ImageGenerationOptions = {}): Promise<ImageGenerationResult> {
@@ -117,17 +119,28 @@ export async function generateImage(prompt: string, requestedModel: string, opti
   if (env.OPENROUTER_SITE_URL) headers["HTTP-Referer"] = env.OPENROUTER_SITE_URL;
   if (env.OPENROUTER_APP_NAME) headers["X-Title"] = env.OPENROUTER_APP_NAME;
 
-  const response = await fetch(`${openRouterBaseUrl}/images`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: requestedModel,
-      prompt,
-      aspect_ratio: options.aspectRatio ?? defaultImageAspectRatio,
-      size: options.size ?? defaultImageSize,
-      output_format: "png",
-    }),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${openRouterBaseUrl}/images`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: requestedModel,
+        prompt,
+        aspect_ratio: options.aspectRatio ?? defaultImageAspectRatio,
+        size: options.size ?? defaultImageSize,
+        output_format: "png",
+      }),
+      signal: AbortSignal.timeout(options.timeoutMs ?? defaultImageGenerationTimeoutMs),
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+      throw new AiProviderError("OpenRouter image generation timed out. Try again, or use background generation for long-running requests.", { status: 504 });
+    }
+
+    throw error;
+  }
 
   if (!response.ok) {
     let providerMessage: string | null = null;

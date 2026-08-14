@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   requireCampaignGM: vi.fn(),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  dispatchImageBackgroundJob: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
@@ -13,6 +14,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/ai/client", () => ({ generateImage: mocks.generateImage }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
+vi.mock("@/lib/ai/image-jobs", () => ({ dispatchImageBackgroundJob: mocks.dispatchImageBackgroundJob }));
 
 import { POST } from "@/app/api/ai/image/route";
 import { AiProviderError } from "@/lib/ai/errors";
@@ -127,6 +129,23 @@ describe("POST /api/ai/image", () => {
     }));
   });
 
+  it("queues image generation for the Netlify background worker", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+
+    const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(202);
+    expect(payload.job).toMatchObject({ generationRunId: "00000000-0000-4000-8000-000000000003", status: "pending", targetKind: "npc", mode: "create", subject: "A masked station broker" });
+    expect(payload.prompt).toEqual(expect.any(String));
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith(expect.stringContaining("/api/ai/image"), expect.objectContaining({ generationRunId: payload.job.generationRunId, model: "openai/gpt-image-1" }), "worker-secret");
+  });
+
   it("surfaces provider rate limits instead of masking them as an application failure", async () => {
     const providerLog = vi.spyOn(console, "error").mockImplementation(() => {});
     const supabase = createSupabaseMock();
@@ -145,5 +164,20 @@ describe("POST /api/ai/image", () => {
     expect(payload).not.toHaveProperty("providerBody");
     expect(payload).not.toHaveProperty("generationId");
     expect(JSON.parse(providerLog.mock.calls[0][0] as string)).toMatchObject({ event: "ai_provider_failure", kind: "image", status: 429, requestId: "image-request-1", generationId: "image-generation-1", providerBody: "{\"error\":\"rate limit\"}" });
+  });
+
+  it("surfaces provider timeouts with a retryable response", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.generateImage.mockRejectedValue(new AiProviderError("OpenRouter image generation timed out. Try again, or use background generation for long-running requests.", { status: 504 }));
+
+    const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(504);
+    expect(payload.error).toContain("timed out");
   });
 });

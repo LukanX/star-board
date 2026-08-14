@@ -20,11 +20,13 @@ const publicEnvSchema = z
   });
 
 const serverEnvSchema = publicEnvSchema.extend({
+  SUPABASE_SECRET_KEY: z.string().min(1).optional(),
   OPENROUTER_API_KEY: z.string().min(1).optional(),
   OPENROUTER_SITE_URL: z.string().url().optional(),
   OPENROUTER_APP_NAME: z.string().min(1).optional(),
   OPENROUTER_TEXT_MODEL: z.string().min(1).default("openai/gpt-4o-mini"),
   OPENROUTER_IMAGE_MODEL: z.string().min(1).default("openai/gpt-image-1"),
+  NETLIFY_IMAGE_GENERATION: z.enum(["sync", "background"]).default("sync"),
 });
 
 function parseEnvironment<T extends z.ZodType>(schema: T, values: Record<string, string | undefined>): z.output<T> {
@@ -51,10 +53,12 @@ export function getServerEnv() {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     OPENROUTER_SITE_URL: process.env.OPENROUTER_SITE_URL,
     OPENROUTER_APP_NAME: process.env.OPENROUTER_APP_NAME,
     OPENROUTER_TEXT_MODEL: process.env.OPENROUTER_TEXT_MODEL,
     OPENROUTER_IMAGE_MODEL: process.env.OPENROUTER_IMAGE_MODEL,
+    NETLIFY_IMAGE_GENERATION: process.env.NETLIFY_IMAGE_GENERATION,
   });
 }

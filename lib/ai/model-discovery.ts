@@ -4,6 +4,7 @@ import { fallbackAiModels, type AiCapability } from "@/lib/ai/model-catalog";
 
 const openRouterBaseUrl = "https://openrouter.ai/api/v1";
 const modelDiscoveryCacheMs = 5 * 60 * 1000;
+const modelDiscoveryTimeoutMs = 3000;
 
 export const aiModelSorts = ["most-popular", "pricing-low-to-high", "pricing-high-to-low"] as const;
 export type AiModelSort = (typeof aiModelSorts)[number];
@@ -100,7 +101,7 @@ async function fetchDiscovery(capability: AiCapability, sort: AiModelSort) {
   if (env.OPENROUTER_SITE_URL) headers["HTTP-Referer"] = env.OPENROUTER_SITE_URL;
   if (env.OPENROUTER_APP_NAME) headers["X-Title"] = env.OPENROUTER_APP_NAME;
 
-  const response = await fetch(endpoint, { headers });
+  const response = await fetch(endpoint, { headers, signal: AbortSignal.timeout(modelDiscoveryTimeoutMs) });
   if (!response.ok) throw new Error("OpenRouter model discovery failed.");
 
   const payload = providerModelsResponseSchema.safeParse(await response.json());
