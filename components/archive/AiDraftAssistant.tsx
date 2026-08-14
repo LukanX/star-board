@@ -12,13 +12,23 @@ export type AiDraftField = {
   readOnly?: boolean;
 };
 
+export type AiDraftSelectField = {
+  key: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+};
+
 type AiDraftAssistantProps = {
   campaignId: string | null;
   endpoint: string;
   entityLabel: string;
   mode: "create" | "refine";
   fields: AiDraftField[];
-  requestFields?: Record<string, string>;
+  contextFields?: AiDraftSelectField[];
+  requestFields?: Record<string, string | null | undefined>;
   currentDraft?: Record<string, string>;
   onApply: (candidate: Record<string, string>) => void;
 };
@@ -27,7 +37,7 @@ export default function AiDraftAssistant(props: AiDraftAssistantProps) {
   return <AiDraftAssistantContent key={`${props.campaignId ?? "none"}:${props.endpoint}`} {...props} />;
 }
 
-function AiDraftAssistantContent({ campaignId, endpoint, entityLabel, mode, fields, requestFields, currentDraft, onApply }: AiDraftAssistantProps) {
+function AiDraftAssistantContent({ campaignId, endpoint, entityLabel, mode, fields, contextFields, requestFields, currentDraft, onApply }: AiDraftAssistantProps) {
   const [focus, setFocus] = useState("");
   const [candidate, setCandidate] = useState<Record<string, string> | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
@@ -78,5 +88,5 @@ function AiDraftAssistantContent({ campaignId, endpoint, entityLabel, mode, fiel
     }
   };
 
-  return <section className="ai-draft-assistant"><div className="ai-draft-heading"><div><p className="eyebrow">GM TOOL // {entityLabel.toUpperCase()} DRAFT</p><h3>Build a starting point</h3></div><Sparkles size={17} /></div><p className="ai-draft-copy">Review every field before applying this candidate to the editor. Nothing is saved until the record form is submitted.</p><AiModelPicker campaignId={campaignId} capability="structured-text" value={selectedModel} onChange={setSelectedModel} /><label>GM direction<textarea maxLength={600} placeholder={`What should this ${entityLabel.toLowerCase()} emphasize?`} value={focus} onChange={(event) => setFocus(event.target.value)} /></label>{candidate ? <div className="ai-draft-fields">{fields.map((field) => <label key={field.key}>{field.label}{field.multiline ? <textarea readOnly={field.readOnly} maxLength={field.maxLength} value={candidate[field.key] ?? ""} onChange={(event) => setCandidate((current) => current ? { ...current, [field.key]: event.target.value } : current)} /> : <input readOnly={field.readOnly} maxLength={field.maxLength} value={candidate[field.key] ?? ""} onChange={(event) => setCandidate((current) => current ? { ...current, [field.key]: event.target.value } : current)} />}</label>)}</div> : <div className="ai-draft-empty"><Sparkles size={17} /><span>NO CANDIDATE UNDER REVIEW</span></div>}{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="ai-draft-actions"><button className="button button-ai" disabled={isGenerating} onClick={() => void generate()} type="button">{isGenerating ? <><LoaderCircle className="spin" size={14} /> GENERATING...</> : <><Sparkles size={14} /> {candidate ? "REGENERATE CANDIDATE" : "GENERATE CANDIDATE"}</>}</button>{candidate ? <button className="button button-secondary" disabled={isGenerating} onClick={() => onApply(candidate)} type="button">APPLY TO EDITOR</button> : null}</div>{lastModel ? <p className="ai-draft-meta">{lastModel.toUpperCase()} / REVIEW DRAFT</p> : null}</section>;
+  return <section className="ai-draft-assistant"><div className="ai-draft-heading"><div><p className="eyebrow">GM TOOL // {entityLabel.toUpperCase()} DRAFT</p><h3>Build a starting point</h3></div><Sparkles size={17} /></div><p className="ai-draft-copy">Review every field before applying this candidate to the editor. Nothing is saved until the record form is submitted.</p>{contextFields?.length ? <div className="ai-draft-context"><p className="ai-draft-context-label">CAMPAIGN CONTEXT</p><div className="ai-draft-context-grid">{contextFields.map((field) => <label key={field.key}>{field.label}<select aria-label={field.label} value={field.value} onChange={(event) => field.onChange(event.target.value)}>{field.placeholder ? <option value="">{field.placeholder}</option> : null}{field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>)}</div></div> : null}<AiModelPicker campaignId={campaignId} capability="structured-text" value={selectedModel} onChange={setSelectedModel} /><label>GM direction<textarea maxLength={600} placeholder={`What should this ${entityLabel.toLowerCase()} emphasize?`} value={focus} onChange={(event) => setFocus(event.target.value)} /></label>{candidate ? <div className="ai-draft-fields">{fields.map((field) => <label key={field.key}>{field.label}{field.multiline ? <textarea readOnly={field.readOnly} maxLength={field.maxLength} value={candidate[field.key] ?? ""} onChange={(event) => setCandidate((current) => current ? { ...current, [field.key]: event.target.value } : current)} /> : <input readOnly={field.readOnly} maxLength={field.maxLength} value={candidate[field.key] ?? ""} onChange={(event) => setCandidate((current) => current ? { ...current, [field.key]: event.target.value } : current)} />}</label>)}</div> : <div className="ai-draft-empty"><Sparkles size={17} /><span>NO CANDIDATE UNDER REVIEW</span></div>}{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="ai-draft-actions"><button className="button button-ai" disabled={isGenerating} onClick={() => void generate()} type="button">{isGenerating ? <><LoaderCircle className="spin" size={14} /> GENERATING...</> : <><Sparkles size={14} /> {candidate ? "REGENERATE CANDIDATE" : "GENERATE CANDIDATE"}</>}</button>{candidate ? <button className="button button-secondary" disabled={isGenerating} onClick={() => onApply(candidate)} type="button">APPLY TO EDITOR</button> : null}</div>{lastModel ? <p className="ai-draft-meta">{lastModel.toUpperCase()} / REVIEW DRAFT</p> : null}</section>;
 }

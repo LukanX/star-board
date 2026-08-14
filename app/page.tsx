@@ -5,7 +5,7 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import AuthPrompt from "@/components/auth/AuthPrompt";
 import SignOutButton from "@/components/auth/SignOutButton";
 import { CampaignArtEditorSlot, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
-import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
+import AiDraftAssistant, { type AiDraftSelectField } from "@/components/archive/AiDraftAssistant";
 import CampaignAiSettings from "@/components/archive/CampaignAiSettings";
 import CampaignNotesView, { type ApiCampaignNote, type CampaignNote } from "@/components/archive/CampaignNotesView";
 import PlacesView, { type ApiPlace } from "@/components/archive/PlacesView";
@@ -616,7 +616,12 @@ export default function Home() {
   const handleVote = (id: string) => {
     const chosen = missions.find((mission) => mission.id === id);
     if (!chosen) return;
+    if (chosen.status !== "open") {
+      notify("Only open jobs can be voted on.");
+      return;
+    }
     const wasVoted = chosen.voted;
+    const previousMissions = missions;
     setMissions((current) => current.map((mission) => {
       if (mission.id === id) return { ...mission, voted: !wasVoted, votes: wasVoted ? mission.votes - 1 : mission.votes + 1 };
       if (!wasVoted && mission.voted) return { ...mission, voted: false, votes: mission.votes - 1 };
@@ -626,13 +631,19 @@ export default function Home() {
       const selectedCampaignId = campaignIdRef.current;
       const method = wasVoted ? "DELETE" : "POST";
       void fetch(`/api/campaigns/${encodeURIComponent(selectedCampaignId)}/jobs/${encodeURIComponent(id)}/vote`, { method }).then(async (response) => {
-        if (!response.ok) throw new Error("Vote could not be synchronized.");
+        if (!response.ok) {
+          const result = (await response.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(result?.error ?? "Vote could not be synchronized.");
+        }
         const result = await fetchCampaignJobs(selectedCampaignId);
         setMissions(result.jobs.map(mapApiJob));
         setIsGM(result.role === "gm");
-      }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Vote could not be synchronized."));
+        notify(wasVoted ? `Vote removed from ${chosen.title}` : `Vote locked on ${chosen.title}`);
+      }).catch((error: unknown) => {
+        setMissions(previousMissions);
+        notify(error instanceof Error ? error.message : "Vote could not be synchronized.");
+      });
     }
-    notify(wasVoted ? `Vote removed from ${chosen.title}` : `Vote locked on ${chosen.title}`);
   };
   const handlePromote = async (jobId: string) => {
     const selectedCampaignId = campaignIdRef.current;
@@ -705,7 +716,7 @@ function OverviewView({ campaign, missions, characters, npcs, factions, places, 
 function MetricCard({ label, value, detail, icon: Icon, accent }: { label: string; value: string; detail: string; icon: LucideIcon; accent: string }) { return <div className={`metric-card metric-${accent}`}><div className="metric-head"><span>{label}</span><Icon size={16} /></div><strong>{value}</strong><small>{detail}</small><div className="metric-bar"><span /></div></div>; }
 
 function MissionCard({ mission, isGM, index, onVote, onEdit, onPromote, compact = false }: { mission: Mission; isGM: boolean; index: number; onVote: (id: string) => void; onEdit?: () => void; onPromote?: (id: string) => void; compact?: boolean }) {
-  return <article className={`mission-card mission-${mission.accent} ${compact ? "mission-compact" : ""}`}><VisualAsset src={mission.image} label={`${mission.title} artwork`} className="mission-art" /><div className="mission-art-overlay" /><div className="mission-index">0{index + 1}</div><div className="mission-content"><div className="mission-meta"><StatusPill color={mission.accent}>{mission.category}</StatusPill></div><h3>{mission.title}</h3><p>{mission.summary}</p><div className="mission-footer"><span className="giver"><span className="giver-glyph">{mission.giverType === "NPC" ? "N" : "F"}</span><span><small>{mission.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}</small><strong>{mission.giver}</strong></span></span></div></div><div className="mission-vote"><span><strong>{mission.votes.toString().padStart(2, "0")}</strong> votes</span><button className={`vote-button ${mission.voted ? "vote-active" : ""}`} onClick={() => onVote(mission.id)} type="button"><Vote size={15} /> {mission.voted ? "VOTED" : "VOTE"}</button>{isGM && onEdit ? <button className="mission-more icon-button" aria-label={`Edit ${mission.title}`} onClick={onEdit} title="Edit mission" type="button"><MoreHorizontal size={16} /></button> : null}{isGM && mission.status === "open" && onPromote ? <button className="mission-more mission-promote icon-button" aria-label={`Promote ${mission.title} to an episode`} onClick={() => onPromote(mission.id)} title="Promote to episode" type="button"><Sparkles size={16} /></button> : null}</div></article>;
+  return <article className={`mission-card mission-${mission.accent} ${compact ? "mission-compact" : ""}`}><VisualAsset src={mission.image} label={`${mission.title} artwork`} className="mission-art" /><div className="mission-art-overlay" /><div className="mission-index">0{index + 1}</div><div className="mission-content"><div className="mission-meta"><StatusPill color={mission.accent}>{mission.category}</StatusPill></div><h3>{mission.title}</h3><p>{mission.summary}</p><div className="mission-footer"><span className="giver"><span className="giver-glyph">{mission.giverType === "NPC" ? "N" : "F"}</span><span><small>{mission.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}</small><strong>{mission.giver}</strong></span></span></div></div><div className="mission-vote"><span><strong>{mission.votes.toString().padStart(2, "0")}</strong> votes</span>{mission.status === "open" ? <button className={`vote-button ${mission.voted ? "vote-active" : ""}`} onClick={() => onVote(mission.id)} type="button"><Vote size={15} /> {mission.voted ? "VOTED" : "VOTE"}</button> : null}{isGM && onEdit ? <button className="mission-more icon-button" aria-label={`Edit ${mission.title}`} onClick={onEdit} title="Edit mission" type="button"><MoreHorizontal size={16} /></button> : null}{isGM && mission.status === "open" && onPromote ? <button className="mission-more mission-promote icon-button" aria-label={`Promote ${mission.title} to an episode`} onClick={() => onPromote(mission.id)} title="Promote to episode" type="button"><Sparkles size={16} /></button> : null}</div></article>;
 }
 
 type JobDraft = { title: string; summary: string; playerNotesMarkdown: string; gmNotesMarkdown: string; hook: string; giverType: "npc" | "faction"; giverId: string; placeId: string | null; status: "draft" | "open" | "archived"; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
@@ -719,7 +730,14 @@ function JobsView({ missions, campaignId, isGM, npcs, factions, places, onMissio
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const jobAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/mission" entityLabel="job" mode={editingMission ? "refine" : "create"} requestFields={{ title: draft.title }} currentDraft={{ title: draft.title, summary: draft.summary, playerNotes: draft.playerNotesMarkdown, gmNotes: draft.gmNotesMarkdown, hook: draft.hook, thumbnailDescription: draft.artSubject }} fields={[{ key: "title", label: "Title", maxLength: 160 }, { key: "summary", label: "Summary", maxLength: 4000, multiline: true }, { key: "playerNotes", label: "Player context", maxLength: 20000, multiline: true }, { key: "gmNotes", label: "GM notes", maxLength: 20000, multiline: true }, { key: "hook", label: "Hook", maxLength: 1200, multiline: true }, { key: "thumbnailDescription", label: "Thumbnail description", maxLength: 1600, multiline: true }, { key: "suggestedGiverType", label: "Suggested giver type", maxLength: 20, readOnly: true }, { key: "suggestedGiverName", label: "Suggested giver", maxLength: 160, readOnly: true }]} onApply={(candidate) => setDraft((current) => ({ ...current, title: candidate.title ?? current.title, summary: candidate.summary ?? current.summary, playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown, gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown, hook: candidate.hook ?? current.hook, artSubject: candidate.thumbnailDescription ?? current.artSubject }))} /> : null;
+  const giverOptions = (draft.giverType === "npc" ? npcs : factions).map((giver) => ({ value: giver.id, label: giver.name }));
+  const placeOptions = flattenPlaceTree(places).map(({ place, depth }) => ({ value: place.id, label: `${"  ".repeat(depth)}${depth ? "|- " : ""}${place.name} [${place.kind}]` }));
+  const jobContextFields: AiDraftSelectField[] = [
+    { key: "giver-type", label: "GIVER TYPE", value: draft.giverType, options: [{ value: "npc", label: "NPC" }, { value: "faction", label: "FACTION" }], onChange: (value) => setDraft((current) => ({ ...current, giverType: value as JobDraft["giverType"], giverId: "" })) },
+    { key: "giver", label: draft.giverType === "npc" ? "NPC" : "FACTION", value: draft.giverId, placeholder: draft.giverType === "npc" ? "SELECT NPC" : "SELECT FACTION", options: giverOptions, onChange: (value) => setDraft((current) => ({ ...current, giverId: value })) },
+    { key: "location", label: "LOCATION", value: draft.placeId ?? "", placeholder: "NO PRIMARY LOCATION", options: placeOptions, onChange: (value) => setDraft((current) => ({ ...current, placeId: value || null })) },
+  ];
+  const jobAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/mission" entityLabel="job" mode={editingMission ? "refine" : "create"} contextFields={jobContextFields} requestFields={{ title: draft.title, ...(draft.giverId ? { giverType: draft.giverType, giverId: draft.giverId } : {}), ...(draft.placeId ? { placeId: draft.placeId } : {}) }} currentDraft={{ title: draft.title, summary: draft.summary, playerNotes: draft.playerNotesMarkdown, gmNotes: draft.gmNotesMarkdown, hook: draft.hook, thumbnailDescription: draft.artSubject }} fields={[{ key: "title", label: "Title", maxLength: 160 }, { key: "summary", label: "Summary", maxLength: 4000, multiline: true }, { key: "playerNotes", label: "Player context", maxLength: 20000, multiline: true }, { key: "gmNotes", label: "GM notes", maxLength: 20000, multiline: true }, { key: "hook", label: "Hook", maxLength: 1200, multiline: true }, { key: "thumbnailDescription", label: "Thumbnail description", maxLength: 1600, multiline: true }, { key: "suggestedGiverType", label: "Suggested giver type", maxLength: 20, readOnly: true }, { key: "suggestedGiverName", label: "Suggested giver", maxLength: 160, readOnly: true }]} onApply={(candidate) => setDraft((current) => ({ ...current, title: candidate.title ?? current.title, summary: candidate.summary ?? current.summary, playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown, gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown, hook: candidate.hook ?? current.hook, artSubject: candidate.thumbnailDescription ?? current.artSubject }))} /> : null;
   useCampaignArtEditor(editorOpen ? { campaignId, kind: "job", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
 
   const filteredMissions = missions.filter((mission) => filter === "drafts" ? mission.status === "draft" : mission.status === filter);

@@ -21,7 +21,7 @@ export async function POST(_request: Request, { params }: RouteContext) {
     });
 
     if (error) {
-      return NextResponse.json({ error: "Only players can vote on an open job in this campaign." }, { status: 400 });
+      return NextResponse.json({ error: "Only campaign members can vote on an open job." }, { status: 400 });
     }
 
     return NextResponse.json({ vote: data });

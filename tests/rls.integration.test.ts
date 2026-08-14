@@ -150,6 +150,33 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(unchanged.data?.description).toContain("local RLS integration suite");
   });
 
+  it("allows both GMs and players to vote on open jobs", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    const npc = await gmClient.from("npcs").insert({
+      campaign_id: campaignId,
+      author_id: gmUser?.id,
+      name: "Vote Test Contact",
+    }).select("id").single();
+    expect(npc.error).toBeNull();
+
+    const job = await gmClient.from("jobs").insert({
+      campaign_id: campaignId,
+      author_id: gmUser?.id,
+      title: "Vote Test Job",
+      giver_npc_id: npc.data?.id,
+      status: "open",
+    }).select("id").single();
+    expect(job.error).toBeNull();
+
+    const gmVote = await gmClient.rpc("cast_job_vote", { target_campaign_id: campaignId, target_job_id: job.data?.id });
+    expect(gmVote.error).toBeNull();
+    expect(gmVote.data?.user_id).toBe(gmUser?.id);
+
+    const playerVote = await playerClient.rpc("cast_job_vote", { target_campaign_id: campaignId, target_job_id: job.data?.id });
+    expect(playerVote.error).toBeNull();
+    expect(playerVote.data?.user_id).toBe(playerId);
+  });
+
   it("enforces Places visibility, hierarchy rules, and link cleanup", async () => {
     const gmUser = (await gmClient.auth.getUser()).data.user;
     const root = await gmClient.from("places").insert({

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
-import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, loadMissionAiReferences, recordAiGeneration } from "@/lib/ai/assistance";
 import { generateJson } from "@/lib/ai/client";
 import { buildMissionPrompt } from "@/lib/ai/prompts";
 import { requireCampaignGM } from "@/lib/auth/permissions";
@@ -60,7 +60,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: aiContext.error }, { status: aiContext.notFound ? 404 : 503 });
     }
 
-    const prompt = buildMissionPrompt(input.data, aiContext.campaign);
+    const missionReferences = await loadMissionAiReferences(context.supabase, input.data.campaignId, input.data);
+
+    if ("error" in missionReferences) {
+      return NextResponse.json({ error: missionReferences.error }, { status: "notFound" in missionReferences ? 400 : 503 });
+    }
+
+    const prompt = buildMissionPrompt(input.data, aiContext.campaign, missionReferences.references);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let rawDraft: unknown;
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
