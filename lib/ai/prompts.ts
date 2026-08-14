@@ -1,5 +1,5 @@
 import type { FactionGenerationInput, MissionGenerationInput, NpcGenerationInput, PlaceGenerationInput } from "@/lib/validation/ai";
-import type { CampaignAiContext } from "@/lib/ai/assistance";
+import type { CampaignAiContext, MissionAiReferences } from "@/lib/ai/assistance";
 import { imagePromptMaxLength } from "@/lib/validation/image";
 
 export const ART_STYLE_PREFIX =
@@ -13,11 +13,42 @@ function campaignLines(context?: CampaignAiContext) {
   ] : [];
 }
 
-export function buildMissionPrompt(input: MissionGenerationInput, context?: CampaignAiContext) {
+function missionReferenceLines(references?: MissionAiReferences) {
+  if (!references) return [];
+
+  const lines: string[] = [];
+
+  if (references.giver) {
+    lines.push(`Selected mission giver: ${references.giver.type} named ${references.giver.name}`);
+    if (references.giver.type === "NPC") {
+      lines.push(`Giver species: ${references.giver.species}`);
+      lines.push(`Giver role: ${references.giver.role}`);
+      lines.push(`Giver description: ${references.giver.description}`);
+      lines.push(`Giver player notes: ${references.giver.playerNotes}`);
+      lines.push(`Giver GM notes: ${references.giver.gmNotes}`);
+    } else {
+      lines.push(`Giver status: ${references.giver.status}`);
+      lines.push(`Giver description: ${references.giver.description}`);
+    }
+  }
+
+  if (references.location) {
+    lines.push(`Selected mission location: ${references.location.name} (${references.location.kind})`);
+    lines.push(`Location hierarchy: ${references.location.hierarchy.map((place) => `${place.name} (${place.kind})`).join(" > ")}`);
+    lines.push(`Location description: ${references.location.description}`);
+    lines.push(`Location player notes: ${references.location.playerNotes}`);
+    lines.push(`Location GM notes: ${references.location.gmNotes}`);
+  }
+
+  return lines;
+}
+
+export function buildMissionPrompt(input: MissionGenerationInput, context?: CampaignAiContext, references?: MissionAiReferences) {
   return [
     "You are a campaign writer for a Starfinder 2e campaign manager.",
     "Return only valid JSON matching the requested mission draft fields.",
     ...campaignLines(context),
+    ...missionReferenceLines(references),
     `Campaign setting: ${input.setting ?? "A frontier crew navigating the Drift."}`,
     `Campaign style notes: ${input.styleNotes ?? "Tense, strange, character-forward science fantasy."}`,
     `Mode: ${input.mode}`,
@@ -25,7 +56,8 @@ export function buildMissionPrompt(input: MissionGenerationInput, context?: Camp
     input.giver ? `Possible mission giver: ${input.giver}` : "",
     input.focus ? `GM focus: ${input.focus}` : "",
     input.currentDraft ? `Current editor draft: ${JSON.stringify(input.currentDraft)}` : "",
-    "Write a playable hook with a clear complication. Keep player notes spoiler-light and put secrets in gmNotes.",
+    "Use the selected mission giver and location as authoritative campaign context. Keep player notes spoiler-light and put secrets in gmNotes.",
+    "Write a playable hook with a clear complication.",
     "thumbnailDescription must describe one compelling, readable scene for a job-board thumbnail. Keep it subject-specific; do not include provider names, image dimensions, logos, or text.",
     "Fields: title, summary, playerNotes, gmNotes, hook, suggestedGiverType, suggestedGiverName, thumbnailDescription.",
   ].filter(Boolean).join("\n");

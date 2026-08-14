@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   buildFactionPrompt: vi.fn(() => "faction-prompt"),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  loadMissionAiReferences: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/client", () => ({ generateJson: mocks.generateJson }));
@@ -18,6 +19,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
 vi.mock("@/lib/ai/assistance", () => ({
   loadCampaignAiContext: mocks.loadCampaignAiContext,
+  loadMissionAiReferences: mocks.loadMissionAiReferences,
   recordAiGeneration: mocks.recordAiGeneration,
 }));
 vi.mock("@/lib/ai/prompts", () => ({
@@ -58,6 +60,7 @@ describe("structured AI assistance routes", () => {
       { id: "google/gemini-2.5-flash", capability: "structured-text", compatible: true },
       { id: "openai/gpt-4o", capability: "structured-text", compatible: true },
     ] });
+    mocks.loadMissionAiReferences.mockResolvedValue({ references: {} });
     mocks.recordAiGeneration.mockResolvedValue({ error: null });
   });
 
@@ -102,6 +105,35 @@ describe("structured AI assistance routes", () => {
     expect(payload.draft).toEqual(draft);
     expect(mocks.generateJson).toHaveBeenCalledWith("mission-prompt", expect.anything(), "openai/gpt-4o-mini");
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "mission", status: "complete", model: "openai/gpt-4o-mini", provider: "openrouter", effectiveModel: "openrouter/fallback", generationId: "text-run-2", inputTokens: 12, outputTokens: 34, costUsd: 0.001 }));
+  });
+
+  it("passes selected giver and location context into the mission prompt", async () => {
+    const giverId = "00000000-0000-4000-8000-000000000003";
+    const placeId = "00000000-0000-4000-8000-000000000004";
+    const references = {
+      giver: { type: "NPC" as const, name: "Relay Keeper Venn", species: "Android", role: "Station keeper", description: "A careful custodian of the orbital relay.", playerNotes: "Venn needs outside help.", gmNotes: "Venn is covering up a sabotage.", },
+      location: { name: "The Relay", kind: "station", hierarchy: [{ name: "Asterion", kind: "planet" }, { name: "The Relay", kind: "station" }], description: "A damaged orbital relay.", playerNotes: "The relay is visible from the trade lane.", gmNotes: "The distress signal is being replayed.", },
+    };
+    const draft = { title: "The Relay", summary: "A damaged relay is broadcasting a distress signal.", playerNotes: "Find the relay and decide who gets rescued first.", gmNotes: "The signal is being replayed by a hidden saboteur.", hook: "The distress call uses a crew member's voice.", suggestedGiverType: "npc", suggestedGiverName: "Relay Keeper Venn", thumbnailDescription: "A damaged orbital relay sparking above a blue gas giant." };
+    mocks.loadMissionAiReferences.mockResolvedValue({ references });
+    mocks.generateJson.mockResolvedValue({ data: draft, model: "openrouter/fallback", generationId: "text-run-context" });
+
+    const response = await generateMission(request({ ...baseInput, giverType: "npc", giverId, placeId }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.loadMissionAiReferences).toHaveBeenCalledWith(expect.anything(), campaignId, expect.objectContaining({ giverType: "npc", giverId, placeId }));
+    expect(mocks.buildMissionPrompt).toHaveBeenCalledWith(expect.objectContaining({ giverType: "npc", giverId, placeId }), expect.objectContaining({ system: "Starfinder 2e" }), references);
+  });
+
+  it("rejects a missing selected mission reference before calling the provider", async () => {
+    mocks.loadMissionAiReferences.mockResolvedValue({ error: "Selected mission location was not found in this campaign.", notFound: true });
+
+    const response = await generateMission(request({ ...baseInput, giverType: "npc", giverId: "00000000-0000-4000-8000-000000000003", placeId: "00000000-0000-4000-8000-000000000004" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe("Selected mission location was not found in this campaign.");
+    expect(mocks.generateJson).not.toHaveBeenCalled();
   });
 
   it("accepts a compatible model supplied by the live OpenRouter catalog", async () => {

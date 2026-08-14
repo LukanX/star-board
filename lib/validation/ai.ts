@@ -45,9 +45,20 @@ export const missionGenerationInputSchema = campaignContextSchema.extend({
   mode: z.enum(["create", "refine"]),
   model: z.string().trim().min(1).max(160).optional(),
   title: z.string().trim().max(160).optional(),
+  giverType: z.enum(["npc", "faction"]).optional(),
+  giverId: z.string().uuid().optional(),
+  placeId: z.string().uuid().nullable().optional(),
   giver: z.string().trim().max(160).optional(),
   focus: z.string().trim().max(600).optional(),
   currentDraft: missionCurrentDraftSchema,
+}).superRefine((input, context) => {
+  if (input.giverType && !input.giverId) {
+    context.addIssue({ code: "custom", path: ["giverId"], message: "A giver ID is required when a giver type is selected." });
+  }
+
+  if (input.giverId && !input.giverType) {
+    context.addIssue({ code: "custom", path: ["giverType"], message: "A giver type is required when a giver ID is selected." });
+  }
 });
 
 export const npcGenerationInputSchema = campaignContextSchema.extend({

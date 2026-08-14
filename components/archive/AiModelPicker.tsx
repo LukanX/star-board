@@ -35,20 +35,8 @@ type CatalogState = {
   status: CatalogStatus;
 };
 
-type AiModelSort = "most-popular" | "pricing-low-to-high" | "pricing-high-to-low";
-
-const sortOptions: Array<{ value: AiModelSort; label: string }> = [
-  { value: "most-popular", label: "MOST POPULAR" },
-  { value: "pricing-low-to-high", label: "PRICE: LOW TO HIGH" },
-  { value: "pricing-high-to-low", label: "PRICE: HIGH TO LOW" },
-];
-
 export default function AiModelPicker({ campaignId, capability, value, onChange }: AiModelPickerProps) {
-  const [sort, setSort] = useState<AiModelSort>("most-popular");
-  const [search, setSearch] = useState("");
-  const showFilters = capability === "structured-text";
-  const effectiveSort = showFilters ? sort : "most-popular";
-  const catalogKey = `${campaignId ?? "none"}:${capability}:${effectiveSort}`;
+  const catalogKey = `${campaignId ?? "none"}:${capability}`;
   const [catalog, setCatalog] = useState<CatalogState>({ key: "", models: [], defaultModel: null, status: "loading" });
   const selectedValueRef = useRef(value);
 
@@ -65,7 +53,7 @@ export default function AiModelPicker({ campaignId, capability, value, onChange 
       };
     }
 
-    void fetch(`/api/ai/models?campaignId=${encodeURIComponent(campaignId)}&capability=${encodeURIComponent(capability)}&sort=${encodeURIComponent(effectiveSort)}`).then(async (response) => {
+    void fetch(`/api/ai/models?campaignId=${encodeURIComponent(campaignId)}&capability=${encodeURIComponent(capability)}&sort=most-popular`).then(async (response) => {
       const result = (await response.json()) as { defaultModel?: string; status?: "live" | "stale" | "unavailable"; models?: AiModel[] };
       if (!response.ok || !result.models) throw new Error("AI model catalog unavailable.");
       if (cancelled) return;
@@ -84,28 +72,19 @@ export default function AiModelPicker({ campaignId, capability, value, onChange 
     return () => {
       cancelled = true;
     };
-  }, [campaignId, capability, catalogKey, effectiveSort, onChange]);
+  }, [campaignId, capability, catalogKey, onChange]);
 
   const hasCurrentCatalog = Boolean(campaignId) && catalog.key === catalogKey;
   const visibleModels = hasCurrentCatalog ? catalog.models : [];
   const visibleStatus = campaignId ? (hasCurrentCatalog ? catalog.status : "loading") : "unavailable";
   const selectedModel = value ?? (hasCurrentCatalog ? catalog.defaultModel : null) ?? "";
   const selectedEntry = visibleModels.find((model) => model.id === selectedModel);
-  const normalizedSearch = showFilters ? search.trim().toLowerCase() : "";
-  const matchingModels = normalizedSearch
-    ? visibleModels.filter((model) => `${model.label} ${model.id} ${model.providerName ?? ""}`.toLowerCase().includes(normalizedSearch))
-    : visibleModels;
-  const optionModels = selectedEntry && !matchingModels.some((model) => model.id === selectedEntry.id) ? [selectedEntry, ...matchingModels] : matchingModels;
 
   return <div className="ai-model-picker">
     <span className="ai-model-picker-label">{capability === "image" ? "IMAGE MODEL" : "TEXT MODEL"}</span>
-    {showFilters ? <div className="ai-model-picker-controls">
-      <label>FIND MODEL<input aria-label="Find AI model" placeholder="NAME OR PROVIDER" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-      <label>SORT<select aria-label="Sort AI models" value={sort} onChange={(event) => setSort(event.target.value as AiModelSort)}>{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-    </div> : null}
     <select className="ai-model-picker-select" aria-label={`${capability === "image" ? "Image" : "Text"} generation model`} disabled={!visibleModels.length} value={selectedEntry ? selectedModel : ""} onChange={(event) => onChange(event.target.value)}>
-      <option value="" disabled>{visibleStatus === "loading" ? "LOADING CATALOG..." : matchingModels.length ? "SELECT A MODEL" : "NO MODELS MATCH FILTER"}</option>
-      {optionModels.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+      <option value="" disabled>{visibleStatus === "loading" ? "LOADING CATALOG..." : "SELECT A MODEL"}</option>
+      {visibleModels.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
     </select>
     <span className="ai-model-picker-meta">{selectedEntry ? formatAiModelPricing(selectedEntry.capability, selectedEntry.pricing) : visibleStatus === "stale" ? "Using the last verified catalog." : visibleStatus === "unavailable" ? "Live model verification is unavailable." : ""}</span>
   </div>;

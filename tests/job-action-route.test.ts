@@ -61,7 +61,7 @@ describe("job action routes", () => {
     expect(rpc).toHaveBeenNthCalledWith(2, "clear_job_vote", { target_campaign_id: campaignId });
   });
 
-  it("maps a failed vote RPC to the player/open-job error", async () => {
+  it("maps a failed vote RPC to the member/open-job error", async () => {
     const supabase = { rpc: vi.fn().mockResolvedValue({ data: null, error: new Error("not allowed") }) };
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: "user-id" } });
 
@@ -69,7 +69,7 @@ describe("job action routes", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(400);
-    expect(payload.error).toBe("Only players can vote on an open job in this campaign.");
+    expect(payload.error).toBe("Only campaign members can vote on an open job.");
   });
 
   it("returns the newly created episode after campaign-scoped promotion", async () => {
