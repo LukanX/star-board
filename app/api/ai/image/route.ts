@@ -9,8 +9,13 @@ import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { imageDraftSchema, imageGenerationInputSchema } from "@/lib/validation/image";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
+import { dispatchImageBackgroundJob } from "@/lib/ai/image-jobs";
 
 export const runtime = "nodejs";
+
+function shouldUseBackgroundImageGeneration(env: ReturnType<typeof getServerEnv>) {
+  return env.NETLIFY_IMAGE_GENERATION === "background" || (process.env.NETLIFY === "true" && process.env.NETLIFY_IMAGE_GENERATION !== "sync");
+}
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -75,6 +80,67 @@ export async function POST(request: Request) {
     ].filter(Boolean).join(". ");
     const prompt = buildArtPrompt(input.data.subject, campaignStyle, input.data.refinement, input.data.currentPrompt);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
+
+    if (shouldUseBackgroundImageGeneration(env)) {
+      if (!env.SUPABASE_SECRET_KEY) {
+        return NextResponse.json({ error: "Async image generation is not configured. Add SUPABASE_SECRET_KEY to the Netlify environment." }, { status: 503 });
+      }
+
+      const { data: generationRun, error: generationRunError } = await context.supabase
+        .from("ai_generation_runs")
+        .insert({
+          campaign_id: input.data.campaignId,
+          requested_by: context.user.id,
+          kind: "image",
+          mode: input.data.mode,
+          model: selectedModel.id,
+          prompt_hash: promptHash,
+          provider: "openrouter",
+          effective_model: selectedModel.id,
+          target_kind: input.data.targetKind,
+          aspect_ratio: input.data.aspectRatio,
+          size: input.data.size,
+          status: "pending",
+        })
+        .select("id, created_at")
+        .single();
+
+      if (generationRunError || !generationRun) {
+        return NextResponse.json({ error: "Image generation could not be queued." }, { status: 503 });
+      }
+
+      const job = {
+        generationRunId: generationRun.id,
+        prompt,
+        model: selectedModel.id,
+        aspectRatio: input.data.aspectRatio,
+        size: input.data.size,
+      };
+
+      try {
+        await dispatchImageBackgroundJob(request.url, job, env.SUPABASE_SECRET_KEY);
+      } catch {
+        await context.supabase.from("ai_generation_runs").update({ status: "failed", error_message: "The image background worker could not be reached." }).eq("id", generationRun.id);
+        return NextResponse.json({ error: "Image generation could not be started. Check the Netlify background function deployment." }, { status: 503 });
+      }
+
+      return NextResponse.json({
+        job: {
+          generationRunId: generationRun.id,
+          status: "pending",
+          targetKind: input.data.targetKind,
+          mode: input.data.mode,
+          subject: input.data.subject,
+          aspectRatio: input.data.aspectRatio,
+          size: input.data.size,
+          prompt,
+          createdAt: new Date(generationRun.created_at).toISOString(),
+          model: selectedModel.id,
+        },
+        prompt,
+      }, { status: 202 });
+    }
+
     let response;
 
     try {

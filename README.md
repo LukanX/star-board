@@ -51,9 +51,20 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0011_fix_place_cycle_validation.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0012_async_image_generation.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
+
+### Netlify image generation
+
+Netlify standard functions can time out while OpenRouter is rendering an image. The image route automatically queues generation on Netlify's background function and the art studio polls for the review draft. The background function is `generate-image-background` and can run for up to 15 minutes.
+
+Set these server-only values in the Netlify site environment:
+
+- `SUPABASE_SECRET_KEY`: the Supabase secret key. Never expose this as a `NEXT_PUBLIC_` variable.
+- `OPENROUTER_API_KEY`: the OpenRouter key used by the background worker.
+
+Netlify provides `NETLIFY=true`, so no mode variable is required. Set `NETLIFY_IMAGE_GENERATION=sync` only when intentionally testing the old synchronous path; set it to `background` to force the queue mode in another deployment environment. Apply migration `0012_async_image_generation.sql` before using the deployed art studio.
 
 The migrations create campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, a private `campaign-art` storage bucket, and the genre-neutral Places archive. Places form an arbitrary-depth tree through `parent_place_id`; sibling names are unique within a campaign, cycles are rejected in PostgreSQL, deleting a parent promotes children to roots, and deleting a Place clears primary-place links on NPCs, factions, jobs, and episodes. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
 

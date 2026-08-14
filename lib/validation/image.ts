@@ -20,6 +20,20 @@ export const imageGenerationInputSchema = z.object({
   }
 });
 
+export const imageBackgroundJobSchema = z.object({
+  generationRunId: z.string().uuid(),
+  prompt: z.string().trim().min(1).max(imagePromptMaxLength),
+  model: z.string().trim().min(1).max(160),
+  aspectRatio: z.enum(imageAspectRatioValues),
+  size: z.enum(imageSizeValues),
+}).superRefine(({ aspectRatio, size }, context) => {
+  if (!imageSizeOptions[aspectRatio].some((option) => option.value === size)) {
+    context.addIssue({ code: "custom", path: ["size"], message: `Size ${size} does not match aspect ratio ${aspectRatio}.` });
+  }
+});
+
+export type ImageBackgroundJob = z.infer<typeof imageBackgroundJobSchema>;
+
 export const imageDraftSchema = z.object({
   generationRunId: z.string().uuid(),
   targetKind: z.enum(["character", "npc", "faction", "job", "place"]),

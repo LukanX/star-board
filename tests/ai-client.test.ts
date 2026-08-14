@@ -73,6 +73,15 @@ describe("OpenRouter AI client", () => {
     await expect(failure).rejects.toMatchObject({ status: 429, requestId: "image-request-1", retryAfter: "12", message: expect.stringContaining("Provider rate limit exceeded") });
   });
 
+  it("returns an actionable timeout error when image generation takes too long", async () => {
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.fetch.mockRejectedValue(Object.assign(new Error("The operation timed out"), { name: "TimeoutError" }));
+
+    const failure = generateImage("a station broker", "openai/gpt-image-1");
+
+    await expect(failure).rejects.toMatchObject({ status: 504, message: expect.stringContaining("timed out") });
+  });
+
   it("keeps bounded provider bodies and generation IDs for diagnostics", async () => {
     mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.fetch.mockResolvedValue(new Response("upstream gateway failure", { status: 502, headers: { "x-openrouter-request-id": "image-request-2" } }));

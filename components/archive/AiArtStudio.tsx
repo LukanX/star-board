@@ -19,6 +19,20 @@ type ImageDraft = {
   model: string;
   image: { base64: string | null; url: string | null; mediaType: "image/png" | "image/jpeg" | "image/webp" };
   createdAt: string;
+  temporaryPath?: string;
+};
+
+type ImageBackgroundJob = {
+  generationRunId: string;
+  status: "pending" | "running";
+  targetKind: ArtKind;
+  mode: "create" | "refine";
+  subject: string;
+  aspectRatio: ImageAspectRatio;
+  size: ImageSize;
+  prompt: string;
+  model: string;
+  createdAt: string;
 };
 
 type ImageAsset = {
@@ -50,6 +64,61 @@ function formatImageValidationIssues(issues: ImageValidationIssues | undefined) 
     ...(issues.formErrors ?? []),
     ...Object.entries(issues.fieldErrors ?? {}).flatMap(([path, messages]) => messages.map((message) => `${path}: ${message}`)),
   ].join("; ") || undefined;
+}
+
+function wait(milliseconds: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+async function waitForImageBackgroundJob(job: ImageBackgroundJob): Promise<ImageDraft> {
+  for (let attempt = 0; attempt < 360; attempt += 1) {
+    await wait(attempt === 0 ? 750 : 2500);
+
+    const response = await fetch(`/api/ai/image/${encodeURIComponent(job.generationRunId)}`);
+    const result = (await response.json()) as {
+      error?: string;
+      job?: {
+        status: "pending" | "running" | "complete" | "failed";
+        model?: string;
+        createdAt?: string;
+        temporaryPath?: string;
+        image?: ImageDraft["image"];
+      };
+    };
+
+    if (!response.ok) {
+      if (response.status >= 500) continue;
+      throw new Error(result.error ?? "The image generation job could not be read.");
+    }
+
+    if (result.job?.status === "failed") {
+      throw new Error(result.error ?? "The image draft could not be generated.");
+    }
+
+    if (result.job?.status === "complete" && result.job.image?.url && result.job.createdAt) {
+      return {
+        generationRunId: job.generationRunId,
+        targetKind: job.targetKind,
+        mode: job.mode,
+        subject: job.subject,
+        aspectRatio: job.aspectRatio,
+        size: job.size,
+        prompt: job.prompt,
+        provider: "openrouter",
+        model: result.job.model ?? job.model,
+        image: result.job.image,
+        createdAt: result.job.createdAt,
+        temporaryPath: result.job.temporaryPath,
+      };
+    }
+  }
+
+  throw new Error("Image generation is taking longer than expected. Check the art studio again shortly.");
+}
+
+async function removeTemporaryArt(campaignId: string, path: string | undefined) {
+  if (!path) return;
+  await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/art?path=${encodeURIComponent(path)}`, { method: "DELETE" });
 }
 
 export default function AiArtStudio(props: AiArtStudioProps) {
@@ -117,7 +186,14 @@ function AiArtStudioContent({ campaignId, kind, subject, currentPrompt, onSubjec
           currentPrompt: draft?.prompt ?? currentPrompt ?? undefined,
         }),
       });
-      const result = (await response.json()) as { error?: string; details?: string; issues?: ImageValidationIssues; draft?: ImageDraft };
+      const result = (await response.json()) as { error?: string; details?: string; issues?: ImageValidationIssues; draft?: ImageDraft; job?: ImageBackgroundJob };
+
+      if (response.status === 202 && result.job) {
+        const nextDraft = await waitForImageBackgroundJob(result.job);
+        if (draft?.temporaryPath) void removeTemporaryArt(campaignId, draft.temporaryPath);
+        setDraft(nextDraft);
+        return;
+      }
 
       if (!response.ok || !result.draft) {
         const issueDetails = formatImageValidationIssues(result.issues);
@@ -149,6 +225,7 @@ function AiArtStudioContent({ campaignId, kind, subject, currentPrompt, onSubjec
         throw new Error(result.error ?? "The approved art could not be attached.");
       }
 
+      await removeTemporaryArt(campaignId, draft.temporaryPath);
       onApproved({ ...result.asset, prompt: draft.prompt, provider: draft.provider });
     } catch (approvalError: unknown) {
       setError(approvalError instanceof Error ? approvalError.message : "The approved art could not be attached.");
