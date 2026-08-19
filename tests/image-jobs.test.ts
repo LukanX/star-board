@@ -6,7 +6,7 @@ const job = {
   prompt: "A masked station broker",
   model: "openai/gpt-image-1",
   aspectRatio: "16:9" as const,
-  size: "2048x1152" as const,
+  size: "3840x2160" as const,
 };
 
 describe("image background jobs", () => {

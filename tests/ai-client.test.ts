@@ -57,10 +57,10 @@ describe("OpenRouter AI client", () => {
     mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ model: "openai/gpt-image-1", data: [{ b64_json: "aW1hZ2U=", media_type: "image/png" }] }), { status: 200 }));
 
-    await generateImage("a wide station", "openai/gpt-image-1", { aspectRatio: "16:9", size: "2048x1152" });
+    await generateImage("a wide station", "openai/gpt-image-1", { aspectRatio: "16:9", size: "3840x2160" });
     const request = JSON.parse(mocks.fetch.mock.calls[0][1].body as string) as { aspect_ratio: string; size: string };
 
-    expect(request).toMatchObject({ aspect_ratio: "16:9", size: "2048x1152" });
+    expect(request).toMatchObject({ aspect_ratio: "16:9", size: "3840x2160" });
   });
 
   it("preserves image provider status and retry metadata", async () => {

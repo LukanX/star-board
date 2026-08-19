@@ -15,6 +15,28 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Star Board // Campaign Operations",
   description: "A campaign command center for Starfinder 2e crews.",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      {
+        url: "/favicon-16x16.png",
+        type: "image/png",
+        sizes: "16x16",
+      },
+      {
+        url: "/favicon-32x32.png",
+        type: "image/png",
+        sizes: "32x32",
+      },
+    ],
+    apple: [
+      {
+        url: "/apple-touch-icon.png",
+        type: "image/png",
+        sizes: "180x180",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
