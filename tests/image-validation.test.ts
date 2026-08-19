@@ -58,7 +58,7 @@ describe("image generation schemas", () => {
       targetKind: "place",
       subject: "A storm-lit orbital harbor",
       aspectRatio: "16:9",
-      size: "2048x1152",
+      size: "3840x2160",
     });
 
     expect(result.success).toBe(true);
@@ -71,11 +71,11 @@ describe("image generation schemas", () => {
       targetKind: "place",
       subject: "A storm-lit orbital harbor",
       aspectRatio: "3:4",
-      size: "2048x1152",
+      size: "3840x2160",
     });
 
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.flatten().fieldErrors.size).toContain("Size 2048x1152 does not match aspect ratio 3:4.");
+    if (!result.success) expect(result.error.flatten().fieldErrors.size).toContain("Size 3840x2160 does not match aspect ratio 3:4.");
   });
 
   it("accepts Places as an image generation target", () => {

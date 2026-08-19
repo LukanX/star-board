@@ -73,7 +73,7 @@ describe("GET /api/ai/image/[generationRunId]", () => {
       mode: "refine",
       target_kind: "npc",
       aspect_ratio: "16:9",
-      size: "2048x1152",
+      size: "3840x2160",
       model: "openai/gpt-image-1",
       effective_model: "openai/gpt-image-1",
       image_path: imagePath,
