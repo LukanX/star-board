@@ -252,3 +252,13 @@ h1, h2, h3, p { margin-top: 0; } h1 { margin-bottom: 10px; color: var(--ink); fo
 .place-tree-copy strong, .place-search-result strong { overflow-wrap: anywhere; }
 @media (max-width: 760px) { .places-toolbar { padding: 14px; }.place-detail-panel { order: -1; }.places-tree-panel { order: 1; }.ai-draft-assistant { padding: 12px; }.ai-draft-context-grid { grid-template-columns: 1fr; } }
 @media (max-width: 420px) { .editor-heading-actions { width: 100%; justify-content: flex-start; }.editor-heading-actions .button { flex: 1 1 auto; }.ai-draft-actions .button { width: 100%; }.places-toolbar { padding: 12px; } }
+
+.faction-emblem { width: 64px; height: 64px; flex: 0 0 64px; display: grid; place-items: center; overflow: hidden; border: 1px solid currentColor; background-color: #0a1118; background-position: center; background-repeat: no-repeat; color: currentColor; }
+.faction-emblem.has-art { background-size: contain; }
+.faction-emblem.no-art { background-image: repeating-linear-gradient(135deg, rgba(98,232,255,.08) 0 1px, transparent 1px 9px); }
+.faction-emblem.no-art svg { opacity: .75; }
+.place-art { overflow: hidden; background-color: #0a1118; background-position: center; background-repeat: no-repeat; background-size: cover; color: var(--cyan); }
+.place-art.no-art { display: grid; place-items: center; background-image: repeating-linear-gradient(135deg, rgba(98,232,255,.08) 0 1px, transparent 1px 9px); }
+.place-tree-art { width: 38px; height: 38px; flex: 0 0 38px; border: 1px solid rgba(98,232,255,.22); }
+.place-detail-art { width: 100%; min-height: 150px; aspect-ratio: 16 / 7; border: 1px solid rgba(98,232,255,.24); }
+@media (max-width: 420px) { .place-tree-art { width: 34px; height: 34px; flex-basis: 34px; }.place-detail-art { min-height: 120px; } }

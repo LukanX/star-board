@@ -6,6 +6,8 @@ const characterFieldSchema = z.object({
   className: z.string().trim().max(160),
   level: z.number().int().min(1).max(20),
   backstoryMarkdown: z.string().max(20000),
+  physicalDescription: z.string().max(4000),
+  artSubject: z.string().trim().max(1600).nullable().optional(),
   artPath: z.string().trim().max(500).nullable().optional(),
   artPrompt: z.string().trim().max(4000).nullable().optional(),
   artProvider: z.string().trim().max(80).nullable().optional(),
@@ -16,6 +18,7 @@ export const characterFieldsSchema = characterFieldSchema.extend({
   className: z.string().trim().max(160).default(""),
   level: z.number().int().min(1).max(20).default(1),
   backstoryMarkdown: z.string().max(20000).default(""),
+  physicalDescription: z.string().max(4000).default(""),
 });
 
 export const createCharacterSchema = characterFieldsSchema;

@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       campaign.art_style_suffix,
       input.data.campaignStyle,
     ].filter(Boolean).join(". ");
-    const prompt = buildArtPrompt(input.data.subject, campaignStyle, input.data.refinement, input.data.currentPrompt);
+    const prompt = buildArtPrompt(input.data.subject, campaignStyle, input.data.refinement, input.data.currentPrompt, input.data.targetKind);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundImageGeneration(env)) {

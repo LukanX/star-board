@@ -40,7 +40,7 @@ type MissionAiReferenceInput = {
 };
 
 type GenerationStatus = "complete" | "failed";
-type GenerationKind = "mission" | "npc" | "faction" | "place" | "image";
+type GenerationKind = "mission" | "npc" | "faction" | "place" | "character" | "image";
 
 export async function loadCampaignAiContext(supabase: SupabaseClient, campaignId: string) {
   const { data: campaign, error: campaignError } = await supabase
