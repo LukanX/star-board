@@ -12,6 +12,7 @@
     "test:rls": "vitest run tests/rls.integration.test.ts"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "lucide-react": "^1.25.0",

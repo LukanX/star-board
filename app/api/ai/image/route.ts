@@ -14,7 +14,7 @@ import { dispatchImageBackgroundJob } from "@/lib/ai/image-jobs";
 export const runtime = "nodejs";
 
 function shouldUseBackgroundImageGeneration(env: ReturnType<typeof getServerEnv>) {
-  return env.NETLIFY_IMAGE_GENERATION === "background" || (process.env.NETLIFY === "true" && process.env.NETLIFY_IMAGE_GENERATION !== "sync");
+  return process.env.NETLIFY === "true" || env.NETLIFY_IMAGE_GENERATION === "background";
 }
 
 export async function POST(request: Request) {
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
       };
 
       try {
-        await dispatchImageBackgroundJob(request.url, job, env.SUPABASE_SECRET_KEY);
+        await dispatchImageBackgroundJob(process.env.URL ?? env.NEXT_PUBLIC_APP_URL ?? request.url, job, env.SUPABASE_SECRET_KEY);
       } catch {
         await context.supabase.from("ai_generation_runs").update({ status: "failed", error_message: "The image background worker could not be reached." }).eq("id", generationRun.id);
         return NextResponse.json({ error: "Image generation could not be started. Check the Netlify background function deployment." }, { status: 503 });

@@ -64,7 +64,7 @@ Set these server-only values in the Netlify site environment:
 - `SUPABASE_SECRET_KEY`: the Supabase secret key. Never expose this as a `NEXT_PUBLIC_` variable.
 - `OPENROUTER_API_KEY`: the OpenRouter key used by the background worker.
 
-Netlify provides `NETLIFY=true`, so no mode variable is required. Set `NETLIFY_IMAGE_GENERATION=sync` only when intentionally testing the old synchronous path; set it to `background` to force the queue mode in another deployment environment. Apply migration `0012_async_image_generation.sql` before using the deployed art studio.
+Netlify provides `NETLIFY=true` and `URL`; deployed requests always use the background path even if a stale `NETLIFY_IMAGE_GENERATION=sync` variable is present, and the worker is dispatched through Netlify's public `URL`. Set `NETLIFY_IMAGE_GENERATION=background` to force the queue mode in another deployment environment; leave it as `sync` for local synchronous testing. Apply migration `0012_async_image_generation.sql` before using the deployed art studio.
 
 The migrations create campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, a private `campaign-art` storage bucket, and the genre-neutral Places archive. Places form an arbitrary-depth tree through `parent_place_id`; sibling names are unique within a campaign, cycles are rejected in PostgreSQL, deleting a parent promotes children to roots, and deleting a Place clears primary-place links on NPCs, factions, jobs, and episodes. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
 

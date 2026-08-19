@@ -1,6 +1,10 @@
 [build]
-  command = "npm run build"
-  functions = "netlify/functions"
+  command = "npm run build -- --webpack && node -e \"require('fs').rmSync('.next-deploy', { recursive: true, force: true }); require('fs').cpSync('.next', '.next-deploy', { recursive: true })\""
+  publish = ".next-deploy"
 
 [functions]
+  directory = "netlify/functions"
   node_bundler = "esbuild"
+
+[build.environment]
+  NODE_VERSION = "20"

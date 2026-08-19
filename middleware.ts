@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicEnv } from "@/lib/env";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const env = getPublicEnv();
   const response = NextResponse.next({ request });
 
