@@ -130,20 +130,50 @@ describe("POST /api/ai/image", () => {
   });
 
   it("queues image generation for the Netlify background worker", async () => {
-    const supabase = createSupabaseMock();
-    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
-    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
-    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    const previousSiteUrl = process.env.URL;
+    process.env.URL = "https://star-board.netlify.app";
 
-    const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
-    const payload = await response.json();
+    try {
+      const supabase = createSupabaseMock();
+      mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+      mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+      mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+      mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
 
-    expect(response.status).toBe(202);
-    expect(payload.job).toMatchObject({ generationRunId: "00000000-0000-4000-8000-000000000003", status: "pending", targetKind: "npc", mode: "create", subject: "A masked station broker" });
-    expect(payload.prompt).toEqual(expect.any(String));
-    expect(mocks.generateImage).not.toHaveBeenCalled();
-    expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith(expect.stringContaining("/api/ai/image"), expect.objectContaining({ generationRunId: payload.job.generationRunId, model: "openai/gpt-image-1" }), "worker-secret");
+      const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
+      const payload = await response.json();
+
+      expect(response.status).toBe(202);
+      expect(payload.job).toMatchObject({ generationRunId: "00000000-0000-4000-8000-000000000003", status: "pending", targetKind: "npc", mode: "create", subject: "A masked station broker" });
+      expect(payload.prompt).toEqual(expect.any(String));
+      expect(mocks.generateImage).not.toHaveBeenCalled();
+      expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith("https://star-board.netlify.app", expect.objectContaining({ generationRunId: payload.job.generationRunId, model: "openai/gpt-image-1" }), "worker-secret");
+    } finally {
+      if (previousSiteUrl === undefined) delete process.env.URL;
+      else process.env.URL = previousSiteUrl;
+    }
+  });
+
+  it("queues on Netlify even when a stale sync mode is configured", async () => {
+    const previousNetlifyFlag = process.env.NETLIFY;
+    process.env.NETLIFY = "true";
+
+    try {
+      const supabase = createSupabaseMock();
+      mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+      mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "sync" });
+      mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+      mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+
+      const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
+
+      expect(response.status).toBe(202);
+      expect(mocks.generateImage).not.toHaveBeenCalled();
+      expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalled();
+    } finally {
+      if (previousNetlifyFlag === undefined) delete process.env.NETLIFY;
+      else process.env.NETLIFY = previousNetlifyFlag;
+    }
   });
 
   it("surfaces provider rate limits instead of masking them as an application failure", async () => {
