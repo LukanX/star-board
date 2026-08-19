@@ -51,7 +51,7 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0012_async_image_generation.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0014_character_profile_and_visual_prompt.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
 

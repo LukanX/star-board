@@ -115,6 +115,8 @@ type ApiCharacter = {
   class_name: string;
   level: number;
   backstory_markdown: string;
+  physical_description: string;
+  art_subject: string | null;
   art_path: string | null;
   art_url?: string | null;
   art_prompt: string | null;
@@ -199,8 +201,10 @@ type Character = {
   image: string | null;
   status: "ACTIVE" | "RESTING";
   backstoryMarkdown: string;
+  physicalDescription: string;
   artPath?: string | null;
   artUrl?: string | null;
+  artSubject?: string | null;
   artPrompt?: string | null;
   artProvider?: string | null;
 };
@@ -211,6 +215,8 @@ type CharacterDraft = {
   className: string;
   level: number;
   backstoryMarkdown: string;
+  physicalDescription: string;
+  artSubject: string;
   artPath: string | null;
   artUrl: string | null;
   artPrompt: string | null;
@@ -436,8 +442,10 @@ function mapApiCharacter(character: ApiCharacter, index: number): Character {
     image: getAttachedArtUrl(character.art_url, character.art_path),
     status: "ACTIVE",
     backstoryMarkdown: character.backstory_markdown,
+    physicalDescription: character.physical_description,
     artPath: character.art_path,
     artUrl: character.art_url ?? null,
+    artSubject: character.art_subject,
     artPrompt: character.art_prompt,
     artProvider: character.art_provider ?? null,
   };
@@ -493,10 +501,10 @@ function getOverviewMetrics(missions: Mission[], members: ApiCampaignMember[], n
   };
 }
 
-const emptyCharacterDraft: CharacterDraft = { name: "", species: "", className: "", level: 1, backstoryMarkdown: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
+const emptyCharacterDraft: CharacterDraft = { name: "", species: "", className: "", level: 1, backstoryMarkdown: "", physicalDescription: "", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
 
 function toCharacterDraft(character: Character): CharacterDraft {
-  return { name: character.name, species: character.species, className: character.className, level: Number(character.detail.match(/Level (\d+)/)?.[1] ?? 1), backstoryMarkdown: character.backstoryMarkdown, artPath: character.artPath ?? null, artUrl: character.artUrl ?? null, artPrompt: character.artPrompt ?? null, artProvider: character.artProvider ?? null };
+  return { name: character.name, species: character.species, className: character.className, level: Number(character.detail.match(/Level (\d+)/)?.[1] ?? 1), backstoryMarkdown: character.backstoryMarkdown, physicalDescription: character.physicalDescription, artSubject: character.artSubject ?? "", artPath: character.artPath ?? null, artUrl: character.artUrl ?? null, artPrompt: character.artPrompt ?? null, artProvider: character.artProvider ?? null };
 }
 
 function VisualAsset({ src, label, className = "" }: { src: string | null; label: string; className?: string }) {
@@ -505,6 +513,12 @@ function VisualAsset({ src, label, className = "" }: { src: string | null; label
 
 function getAttachedArtUrl(signedUrl: string | null | undefined, path: string | null | undefined) {
   return signedUrl ?? (path?.startsWith("http") ? path : null);
+}
+
+function FactionCardArt({ faction }: { faction: FactionRecord }) {
+  const src = getAttachedArtUrl(faction.art_url, faction.art_path);
+
+  return <div aria-label={`${faction.name} emblem`} className={`faction-emblem ${src ? "has-art" : "no-art"}`} role="img" style={src ? { backgroundImage: `url(${src})` } : undefined}>{src ? null : <Network size={24} />}</div>;
 }
 
 function RecordPortrait({ src, label, className, fallback }: { src: string | null; label: string; className: string; fallback: React.ReactNode }) {
@@ -806,14 +820,17 @@ function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAc
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
   const [draft, setDraft] = useState<CharacterDraft>(emptyCharacterDraft);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useCampaignArtEditor(editorOpen ? { campaignId, kind: "character", value: draft.artPath, url: draft.artUrl, currentPrompt: draft.artPrompt, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
+  useCampaignArtEditor(editorOpen ? { campaignId, kind: "character", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), currentPrompt: draft.artPrompt, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
+  const characterAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/character" entityLabel="character portrait" mode={editingCharacter ? "refine" : "create"} toolLabel="PLAYER TOOL" showModelPicker={false} requestFields={{ name: draft.name, species: draft.species, className: draft.className, level: draft.level, backstoryMarkdown: draft.backstoryMarkdown, physicalDescription: draft.physicalDescription }} currentDraft={{ name: draft.name, species: draft.species, className: draft.className, backstoryMarkdown: draft.backstoryMarkdown, physicalDescription: draft.physicalDescription, visualPrompt: draft.artSubject }} fields={[{ key: "visualPrompt", label: "Image generation prompt", maxLength: 1600, multiline: true }]} onApply={(candidate) => setDraft((current) => ({ ...current, artSubject: candidate.visualPrompt ?? current.artSubject }))} /> : null;
   const featuredCharacter = characters[0] ?? null;
 
   const openEditor = (character?: Character) => {
     setEditingCharacter(character ?? null);
     setDraft(character ? toCharacterDraft(character) : emptyCharacterDraft);
+    setAssistantOpen(false);
     setError(null);
     setEditorOpen(true);
   };
@@ -821,6 +838,7 @@ function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAc
   const closeEditor = () => {
     setEditorOpen(false);
     setEditingCharacter(null);
+    setAssistantOpen(false);
     setError(null);
   };
 
@@ -885,7 +903,7 @@ function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAc
   };
 
   return <PageLayout eyebrow="ARCHIVE // CREW ROSTER" title="Characters" description="The people, androids, and mysteries currently recorded in this campaign." action="ADD CHARACTER" onAction={() => openEditor()}>
-    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">{isGM ? "GM / PLAYER RECORD" : "PLAYER RECORD"}</p><h2>{editingCharacter ? `Edit ${editingCharacter.name}` : "Add a character"}</h2></div><button className="icon-button" aria-label="Close character editor" onClick={closeEditor} title="Close character editor" type="button"><X size={17} /></button></div><form className="character-form" onSubmit={saveCharacter}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Class<input maxLength={160} value={draft.className} onChange={(event) => setDraft((current) => ({ ...current, className: event.target.value }))} /></label><label>Level<input type="number" min="1" max="20" value={draft.level} onChange={(event) => setDraft((current) => ({ ...current, level: Number(event.target.value) }))} /></label></div><label>Backstory<textarea maxLength={20000} placeholder="Write what the crew knows about this character." value={draft.backstoryMarkdown} onChange={(event) => setDraft((current) => ({ ...current, backstoryMarkdown: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingCharacter ? "SAVE CHANGES" : "ADD TO ROSTER"}</button>{editingCharacter ? <button className="button button-danger" disabled={isSaving} onClick={deleteCharacter} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={closeEditor} type="button">CANCEL</button></div></form></section> : null}
+    {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">{isGM ? "GM / PLAYER RECORD" : "PLAYER RECORD"}</p><h2>{editingCharacter ? `Edit ${editingCharacter.name}` : "Add a character"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE PORTRAIT TOOL" : "GENERATE PORTRAIT PROMPT"}</button><button className="icon-button" aria-label="Close character editor" onClick={closeEditor} title="Close character editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? characterAssistant : null}<form className="character-form" onSubmit={saveCharacter}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Class<input maxLength={160} value={draft.className} onChange={(event) => setDraft((current) => ({ ...current, className: event.target.value }))} /></label><label>Level<input type="number" min="1" max="20" value={draft.level} onChange={(event) => setDraft((current) => ({ ...current, level: Number(event.target.value) }))} /></label></div><label>Backstory<textarea maxLength={20000} placeholder="Write what the crew knows about this character." value={draft.backstoryMarkdown} onChange={(event) => setDraft((current) => ({ ...current, backstoryMarkdown: event.target.value }))} /></label><label>Physical appearance<textarea maxLength={4000} placeholder="Describe the features, build, hair, eyes, skin, clothing, and other details the crew should recognize." value={draft.physicalDescription} onChange={(event) => setDraft((current) => ({ ...current, physicalDescription: event.target.value }))} /></label><label>Image generation prompt<textarea maxLength={1600} placeholder="Describe the visual direction to reuse for future character art." value={draft.artSubject} onChange={(event) => setDraft((current) => ({ ...current, artSubject: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingCharacter ? "SAVE CHANGES" : "ADD TO ROSTER"}</button>{editingCharacter ? <button className="button button-danger" disabled={isSaving} onClick={deleteCharacter} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={closeEditor} type="button">CANCEL</button></div></form></section> : null}
     {characters.length ? <div className="character-grid">{characters.map((character) => <article className="character-card" key={character.id}><VisualAsset src={character.image} label={`${character.name} portrait`} className={`character-art character-${character.color}`} /><div className="character-body"><div className="card-status-row"><StatusPill color={character.status === "ACTIVE" ? "cyan" : "muted"}>{character.status}</StatusPill><button className="icon-button" aria-label={`Open ${character.name} options`} onClick={() => openEditor(character)} title="Character options" type="button"><MoreHorizontal size={16} /></button></div><h3>{character.name}</h3><p>{character.subtitle}</p><span className="mono-detail">{character.detail}</span><button className="card-link" onClick={() => openEditor(character)} type="button">OPEN RECORD <ArrowUpRight size={13} /></button></div></article>)}</div> : <div className="character-empty"><UsersRound size={22} /><h2>No characters in the roster yet.</h2><p>Add the first crew record to begin the campaign manifest.</p></div>}
     {featuredCharacter ? <section className="lower-band"><div className="lower-copy"><p className="eyebrow">PLAYER VIEW</p><h2>{featuredCharacter.name}&apos;s public record.</h2><p>Characters can carry a portrait, a Markdown backstory, and the notes their players want the crew to know.</p></div><div className="markdown-preview"><div className="preview-toolbar"><FileText size={14} /> BACKSTORY.MD <span>PLAYER VISIBLE</span></div><p>{featuredCharacter.backstoryMarkdown || "No public backstory recorded yet."}</p></div></section> : null}
   </PageLayout>;
@@ -997,7 +1015,7 @@ function FactionsView({ factions: factionRecords, places, campaignId, isGM, onFa
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const factionAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/faction" entityLabel="faction" mode={editingFaction ? "refine" : "create"} requestFields={{ name: draft.name, status: draft.status }} currentDraft={{ name: draft.name, status: draft.status, description: draft.description, visualPrompt: draft.artSubject }} fields={[{ key: "name", label: "Name", maxLength: 160 }, { key: "status", label: "Status", maxLength: 80 }, { key: "description", label: "Public description", maxLength: 4000, multiline: true }, { key: "visualPrompt", label: "Emblem or scene description", maxLength: 1600, multiline: true }]} onApply={(candidate) => setDraft((current) => ({ ...current, name: candidate.name ?? current.name, status: candidate.status ?? current.status, description: candidate.description ?? current.description, artSubject: candidate.visualPrompt ?? current.artSubject }))} /> : null;
+  const factionAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/faction" entityLabel="faction" mode={editingFaction ? "refine" : "create"} requestFields={{ name: draft.name, status: draft.status }} currentDraft={{ name: draft.name, status: draft.status, description: draft.description, visualPrompt: draft.artSubject }} fields={[{ key: "name", label: "Name", maxLength: 160 }, { key: "status", label: "Status", maxLength: 80 }, { key: "description", label: "Public description", maxLength: 4000, multiline: true }, { key: "visualPrompt", label: "Emblem or logo description", maxLength: 1600, multiline: true }]} onApply={(candidate) => setDraft((current) => ({ ...current, name: candidate.name ?? current.name, status: candidate.status ?? current.status, description: candidate.description ?? current.description, artSubject: candidate.visualPrompt ?? current.artSubject }))} /> : null;
   useCampaignArtEditor(editorOpen ? { campaignId, kind: "faction", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
 
   const openEditor = (faction?: FactionRecord) => {
@@ -1061,7 +1079,8 @@ function FactionsView({ factions: factionRecords, places, campaignId, isGM, onFa
 
   return <PageLayout eyebrow="ARCHIVE // POWER MAP" title="Factions" description="The groups shaping this campaign. Use them as mission givers and campaign context." action={isGM ? "ADD FACTION" : undefined} onAction={() => openEditor()}>
     {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">GM FACTION RECORD</p><h2>{editingFaction ? `Edit ${editingFaction.name}` : "Add a faction"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE FACTION"}</button><button className="icon-button" aria-label="Close faction editor" onClick={() => setEditorOpen(false)} title="Close faction editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? factionAssistant : null}<form className="character-form" onSubmit={saveFaction}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Status<input required maxLength={80} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))} /></label></div><label>Public description<textarea maxLength={4000} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingFaction ? "SAVE CHANGES" : "ADD FACTION"}</button>{editingFaction ? <button className="button button-danger" disabled={isSaving} onClick={deleteFaction} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={() => setEditorOpen(false)} type="button">CANCEL</button></div></form></section> : null}
-    {editorOpen ? <label className="place-quick-field">Primary place<select value={draft.placeId ?? ""} onChange={(event) => setDraft((current) => ({ ...current, placeId: event.target.value || null }))}><option value="">NO PRIMARY PLACE</option>{flattenPlaceTree(places).map(({ place, depth }) => <option key={place.id} value={place.id}>{`${"  ".repeat(depth)}${depth ? "|- " : ""}${place.name} [${place.kind}]`}</option>)}</select></label> : null}{factionRecords.length ? <div className="faction-grid">{factionRecords.map((faction) => <article aria-label={`Open public file for ${faction.name}`} className={`faction-card faction-${faction.color}`} key={faction.id} onClick={() => setSelectedFaction(faction)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedFaction(faction); } }} role="button" tabIndex={0}><div className="faction-top"><div className="faction-emblem"><Network size={20} /></div><StatusPill color={faction.color}>{faction.status.toUpperCase()}</StatusPill></div><h3>{faction.name}</h3><p>{faction.description || "No public description recorded."}</p><div className="faction-footer"><span><strong>CAMPAIGN</strong><small>{getPlaceBreadcrumb(places, faction.place_id) || "MISSION CONTEXT"}</small></span>{isGM ? <button className="icon-button" aria-label={`Edit ${faction.name}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openEditor(faction); }} title={`Edit ${faction.name}`} type="button"><Pencil size={15} /></button> : <button className="icon-button" aria-label={`Open ${faction.name}`} onClick={(event) => { event.stopPropagation(); setSelectedFaction(faction); }} title={`Open ${faction.name}`} type="button"><ArrowUpRight size={16} /></button>}</div></article>)}</div> : <div className="character-empty"><Network size={22} /><h2>No factions recorded yet.</h2><p>{isGM ? "Add the first faction to establish campaign context." : "The GM has not recorded any factions yet."}</p></div>}
+    {editorOpen ? <label className="place-quick-field">Primary place<select value={draft.placeId ?? ""} onChange={(event) => setDraft((current) => ({ ...current, placeId: event.target.value || null }))}><option value="">NO PRIMARY PLACE</option>{flattenPlaceTree(places).map(({ place, depth }) => <option key={place.id} value={place.id}>{`${"  ".repeat(depth)}${depth ? "|- " : ""}${place.name} [${place.kind}]`}</option>)}</select></label> : null}
+    {factionRecords.length ? <div className="faction-grid">{factionRecords.map((faction) => <article aria-label={`Open public file for ${faction.name}`} className={`faction-card faction-${faction.color}`} key={faction.id} onClick={() => setSelectedFaction(faction)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedFaction(faction); } }} role="button" tabIndex={0}><div className="faction-top"><FactionCardArt faction={faction} /><StatusPill color={faction.color}>{faction.status.toUpperCase()}</StatusPill></div><h3>{faction.name}</h3><p>{faction.description || "No public description recorded."}</p><div className="faction-footer"><span><strong>CAMPAIGN</strong><small>{getPlaceBreadcrumb(places, faction.place_id) || "MISSION CONTEXT"}</small></span>{isGM ? <button className="icon-button" aria-label={`Edit ${faction.name}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openEditor(faction); }} title={`Edit ${faction.name}`} type="button"><Pencil size={15} /></button> : <button className="icon-button" aria-label={`Open ${faction.name}`} onClick={(event) => { event.stopPropagation(); setSelectedFaction(faction); }} title={`Open ${faction.name}`} type="button"><ArrowUpRight size={16} /></button>}</div></article>)}</div> : <div className="character-empty"><Network size={22} /><h2>No factions recorded yet.</h2><p>{isGM ? "Add the first faction to establish campaign context." : "The GM has not recorded any factions yet."}</p></div>}
     {selectedFaction && !editorOpen ? <section className="record-detail"><div className="section-heading"><div><p className="eyebrow">PUBLIC FACTION FILE</p><h2>{selectedFaction.name}</h2><p className="record-detail-meta">{selectedFaction.status.toUpperCase()}</p></div>{isGM ? <button className="button button-secondary" onClick={() => openEditor(selectedFaction)} type="button"><Pencil size={14} /> EDIT FACTION</button> : null}</div><p>{selectedFaction.description || "No public description recorded yet."}</p></section> : null}
   </PageLayout>;
 }

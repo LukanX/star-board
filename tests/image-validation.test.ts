@@ -115,6 +115,14 @@ describe("image generation schemas", () => {
     expect(prompt).toContain("Subject: A pilot with a cracked visor");
   });
 
+  it("directs faction artwork toward a standalone symbol or logo", () => {
+    const prompt = buildArtPrompt("The Glass Meridian", undefined, undefined, undefined, "faction");
+
+    expect(prompt).toContain("only one standalone faction symbol or logo");
+    expect(prompt).toContain("Do not create characters");
+    expect(prompt).not.toContain("no logos");
+  });
+
   it("accepts Places as a campaign artwork target", () => {
     expect(campaignArtKindSchema.parse("place")).toBe("place");
   });

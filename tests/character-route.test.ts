@@ -92,13 +92,13 @@ describe("character routes", () => {
   });
 
   it("attributes a new character to the authenticated owner", async () => {
-    const character = { id: characterId, owner_id: userId, name: "Nova", species: "Android", class_name: "Mechanic", level: 3, backstory_markdown: "", art_path: null, art_prompt: "A cinematic portrait", art_provider: "openrouter" };
+    const character = { id: characterId, owner_id: userId, name: "Nova", species: "Android", class_name: "Mechanic", level: 3, backstory_markdown: "", physical_description: "Tall with silver eyes.", art_subject: "A silver-eyed mechanic in a worn flight jacket.", art_path: null, art_prompt: "A cinematic portrait", art_provider: "openrouter" };
     const query = createQuery(character);
     const supabase = { from: vi.fn().mockReturnValue(query) };
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
     mocks.getCampaignRole.mockResolvedValue("player");
 
-    const response = await createCharacter(request({ name: " Nova ", species: "Android", className: "Mechanic", level: 3, artPrompt: "A cinematic portrait", artProvider: "openrouter" }), campaignParams());
+    const response = await createCharacter(request({ name: " Nova ", species: "Android", className: "Mechanic", level: 3, physicalDescription: "Tall with silver eyes.", artSubject: "A silver-eyed mechanic in a worn flight jacket.", artPrompt: "A cinematic portrait", artProvider: "openrouter" }), campaignParams());
     const payload = await response.json();
 
     expect(response.status).toBe(201);
@@ -111,6 +111,8 @@ describe("character routes", () => {
       class_name: "Mechanic",
       level: 3,
       backstory_markdown: "",
+      physical_description: "Tall with silver eyes.",
+      art_subject: "A silver-eyed mechanic in a worn flight jacket.",
       art_path: null,
       art_prompt: "A cinematic portrait",
       art_provider: "openrouter",

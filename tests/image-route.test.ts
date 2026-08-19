@@ -104,8 +104,8 @@ describe("POST /api/ai/image", () => {
     const response = await POST(createRequest({
       campaignId,
       mode: "create",
-      targetKind: "npc",
-      subject: "A masked station broker",
+      targetKind: "faction",
+      subject: "The Glass Meridian",
       model: "openai/gpt-image-1",
       aspectRatio: "16:9",
       size: "3840x2160",
@@ -113,7 +113,8 @@ describe("POST /api/ai/image", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mocks.generateImage).toHaveBeenCalledWith(expect.stringContaining("masked station broker"), "openai/gpt-image-1", { aspectRatio: "16:9", size: "3840x2160" });
+  expect(mocks.generateImage).toHaveBeenCalledWith(expect.stringContaining("The Glass Meridian"), "openai/gpt-image-1", { aspectRatio: "16:9", size: "3840x2160" });
+  expect(mocks.generateImage.mock.calls[0][0]).toContain("only one standalone faction symbol or logo");
     expect(payload.draft).toMatchObject({
       generationRunId: "00000000-0000-4000-8000-000000000003",
       aspectRatio: "16:9",
