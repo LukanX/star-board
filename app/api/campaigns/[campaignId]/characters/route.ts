@@ -36,7 +36,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
     }
 
     const characters = await addCampaignArtUrls(context.supabase, data ?? []);
-    return NextResponse.json({ role: membership.role, displayName: membership.displayName, characters });
+    const charactersWithPermissions = characters.map((character) => ({ ...character, can_edit: membership.role === "gm" || character.owner_id === context.user.id }));
+    return NextResponse.json({ role: membership.role, displayName: membership.displayName, characters: charactersWithPermissions });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
@@ -96,7 +97,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     }
 
     const [character] = await addCampaignArtUrls(context.supabase, [data]);
-    return NextResponse.json({ character }, { status: 201 });
+    return NextResponse.json({ character: { ...character, can_edit: true } }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }

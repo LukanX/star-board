@@ -78,6 +78,30 @@ describe("character routes", () => {
     expect(mocks.getCampaignMembership).not.toHaveBeenCalled();
   });
 
+  it("marks character editing permission for the owner but not another player", async () => {
+    const characters = [
+      { id: characterId, owner_id: userId, name: "Nova" },
+      { id: "00000000-0000-4000-8000-000000000004", owner_id: "00000000-0000-4000-8000-000000000005", name: "Rook" },
+    ];
+    const query = createQuery(characters);
+    query.order.mockResolvedValue({ data: characters, error: null });
+    const supabase = { from: vi.fn().mockReturnValue(query) };
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Player" });
+
+    const response = await listCharacters(new Request("http://localhost"), campaignParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.characters.map((character: { can_edit: boolean }) => character.can_edit)).toEqual([true, false]);
+
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "GM" });
+    const gmResponse = await listCharacters(new Request("http://localhost"), campaignParams());
+    const gmPayload = await gmResponse.json();
+
+    expect(gmPayload.characters.map((character: { can_edit: boolean }) => character.can_edit)).toEqual([true, true]);
+  });
+
   it("rejects character creation for a non-member", async () => {
     const supabase = { from: vi.fn() };
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });

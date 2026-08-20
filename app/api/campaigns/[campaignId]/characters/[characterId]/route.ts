@@ -73,7 +73,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
 
     const [character] = await addCampaignArtUrls(context.supabase, [data]);
-    return NextResponse.json({ character });
+    return NextResponse.json({ character: { ...character, can_edit: true } });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }

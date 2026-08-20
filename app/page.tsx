@@ -121,6 +121,7 @@ type ApiCharacter = {
   art_url?: string | null;
   art_prompt: string | null;
   art_provider?: string | null;
+  can_edit?: boolean;
 };
 
 type ApiNpc = {
@@ -192,9 +193,11 @@ type FactionRecord = ApiFaction & { color: "pink" | "cyan" | "amber" };
 
 type Character = {
   id: string;
+  ownerId: string;
   name: string;
   species: string;
   className: string;
+  level: number;
   subtitle: string;
   detail: string;
   color: "pink" | "cyan" | "purple" | "amber";
@@ -207,6 +210,7 @@ type Character = {
   artSubject?: string | null;
   artPrompt?: string | null;
   artProvider?: string | null;
+  canEdit: boolean;
 };
 
 type CharacterDraft = {
@@ -229,7 +233,7 @@ function mapApiJob(job: ApiJob, index: number): Mission {
   return {
     id: job.id,
     title: job.title,
-    category: `${job.status.toUpperCase()} SIGNAL`,
+    category: job.status === "open" ? "OPEN JOB" : `${job.status.toUpperCase()} SIGNAL`,
     summary: job.summary || "No public mission brief recorded.",
     giver: job.giver.name,
     giverType: job.giver.type,
@@ -433,9 +437,11 @@ function mapApiCharacter(character: ApiCharacter, index: number): Character {
 
   return {
     id: character.id,
+    ownerId: character.owner_id,
     name: character.name,
     species: character.species,
     className: character.class_name,
+    level: character.level,
     subtitle,
     detail,
     color: colors[index % colors.length],
@@ -448,6 +454,7 @@ function mapApiCharacter(character: ApiCharacter, index: number): Character {
     artSubject: character.art_subject,
     artPrompt: character.art_prompt,
     artProvider: character.art_provider ?? null,
+    canEdit: character.can_edit ?? false,
   };
 }
 
@@ -504,7 +511,7 @@ function getOverviewMetrics(missions: Mission[], members: ApiCampaignMember[], n
 const emptyCharacterDraft: CharacterDraft = { name: "", species: "", className: "", level: 1, backstoryMarkdown: "", physicalDescription: "", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
 
 function toCharacterDraft(character: Character): CharacterDraft {
-  return { name: character.name, species: character.species, className: character.className, level: Number(character.detail.match(/Level (\d+)/)?.[1] ?? 1), backstoryMarkdown: character.backstoryMarkdown, physicalDescription: character.physicalDescription, artSubject: character.artSubject ?? "", artPath: character.artPath ?? null, artUrl: character.artUrl ?? null, artPrompt: character.artPrompt ?? null, artProvider: character.artProvider ?? null };
+  return { name: character.name, species: character.species, className: character.className, level: character.level, backstoryMarkdown: character.backstoryMarkdown, physicalDescription: character.physicalDescription, artSubject: character.artSubject ?? "", artPath: character.artPath ?? null, artUrl: character.artUrl ?? null, artPrompt: character.artPrompt ?? null, artProvider: character.artProvider ?? null };
 }
 
 function VisualAsset({ src, label, className = "" }: { src: string | null; label: string; className?: string }) {
@@ -730,7 +737,7 @@ function OverviewView({ campaign, missions, characters, npcs, factions, places, 
 function MetricCard({ label, value, detail, icon: Icon, accent }: { label: string; value: string; detail: string; icon: LucideIcon; accent: string }) { return <div className={`metric-card metric-${accent}`}><div className="metric-head"><span>{label}</span><Icon size={16} /></div><strong>{value}</strong><small>{detail}</small><div className="metric-bar"><span /></div></div>; }
 
 function MissionCard({ mission, isGM, index, onVote, onEdit, onPromote, compact = false }: { mission: Mission; isGM: boolean; index: number; onVote: (id: string) => void; onEdit?: () => void; onPromote?: (id: string) => void; compact?: boolean }) {
-  return <article className={`mission-card mission-${mission.accent} ${compact ? "mission-compact" : ""}`}><VisualAsset src={mission.image} label={`${mission.title} artwork`} className="mission-art" /><div className="mission-art-overlay" /><div className="mission-index">0{index + 1}</div><div className="mission-content"><div className="mission-meta"><StatusPill color={mission.accent}>{mission.category}</StatusPill></div><h3>{mission.title}</h3><p>{mission.summary}</p><div className="mission-footer"><span className="giver"><span className="giver-glyph">{mission.giverType === "NPC" ? "N" : "F"}</span><span><small>{mission.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}</small><strong>{mission.giver}</strong></span></span></div></div><div className="mission-vote"><span><strong>{mission.votes.toString().padStart(2, "0")}</strong> votes</span>{mission.status === "open" ? <button className={`vote-button ${mission.voted ? "vote-active" : ""}`} onClick={() => onVote(mission.id)} type="button"><Vote size={15} /> {mission.voted ? "VOTED" : "VOTE"}</button> : null}{isGM && onEdit ? <button className="mission-more icon-button" aria-label={`Edit ${mission.title}`} onClick={onEdit} title="Edit mission" type="button"><MoreHorizontal size={16} /></button> : null}{isGM && mission.status === "open" && onPromote ? <button className="mission-more mission-promote icon-button" aria-label={`Promote ${mission.title} to an episode`} onClick={() => onPromote(mission.id)} title="Promote to episode" type="button"><Sparkles size={16} /></button> : null}</div></article>;
+  return <article className={`mission-card mission-${mission.accent} ${compact ? "mission-compact" : ""}`}><VisualAsset src={mission.image} label={`${mission.title} artwork`} className="mission-art" /><div className="mission-art-overlay" /><div className="mission-index">0{index + 1}</div><div className="mission-content"><div className="mission-meta"><StatusPill color={mission.status === "open" ? "open" : mission.accent}>{mission.status === "open" ? "OPEN JOB" : mission.category}</StatusPill></div><h3>{mission.title}</h3><p>{mission.summary}</p><div className="mission-footer"><span className="giver"><span className="giver-glyph">{mission.giverType === "NPC" ? "N" : "F"}</span><span><small>{mission.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}</small><strong>{mission.giver}</strong></span></span></div></div><div className="mission-vote"><span><strong>{mission.votes.toString().padStart(2, "0")}</strong> votes</span>{mission.status === "open" ? <button className={`vote-button ${mission.voted ? "vote-active" : ""}`} onClick={() => onVote(mission.id)} type="button"><Vote size={15} /> {mission.voted ? "VOTED" : "VOTE"}</button> : null}{isGM && onEdit ? <button className="mission-more icon-button" aria-label={`Edit ${mission.title}`} onClick={onEdit} title="Edit mission" type="button"><MoreHorizontal size={16} /></button> : null}{isGM && mission.status === "open" && onPromote ? <button className="mission-more mission-promote icon-button" aria-label={`Promote ${mission.title} to an episode`} onClick={() => onPromote(mission.id)} title="Promote to episode" type="button"><Sparkles size={16} /></button> : null}</div></article>;
 }
 
 type JobDraft = { title: string; summary: string; playerNotesMarkdown: string; gmNotesMarkdown: string; hook: string; giverType: "npc" | "faction"; giverId: string; placeId: string | null; status: "draft" | "open" | "archived"; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
@@ -819,13 +826,13 @@ function JobsView({ missions, campaignId, isGM, npcs, factions, places, onMissio
 function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAction }: { characters: Character[]; campaignId: string | null; isGM: boolean; onCharactersChange: Dispatch<SetStateAction<Character[]>>; onAction: (message: string) => void }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
+  const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [draft, setDraft] = useState<CharacterDraft>(emptyCharacterDraft);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useCampaignArtEditor(editorOpen ? { campaignId, kind: "character", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, onSubjectChange: (subject) => setDraft((current) => ({ ...current, artSubject: subject })), currentPrompt: draft.artPrompt, onChange: (path) => setDraft((current) => ({ ...current, artPath: path })), onUrlChange: (url) => setDraft((current) => ({ ...current, artUrl: url })), onPromptChange: (prompt) => setDraft((current) => ({ ...current, artPrompt: prompt })), onProviderChange: (provider) => setDraft((current) => ({ ...current, artProvider: provider })) } : null);
   const characterAssistant = editorOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/character" entityLabel="character portrait" mode={editingCharacter ? "refine" : "create"} toolLabel="PLAYER TOOL" showModelPicker={false} requestFields={{ name: draft.name, species: draft.species, className: draft.className, level: draft.level, backstoryMarkdown: draft.backstoryMarkdown, physicalDescription: draft.physicalDescription }} currentDraft={{ name: draft.name, species: draft.species, className: draft.className, backstoryMarkdown: draft.backstoryMarkdown, physicalDescription: draft.physicalDescription, visualPrompt: draft.artSubject }} fields={[{ key: "visualPrompt", label: "Image generation prompt", maxLength: 1600, multiline: true }]} onApply={(candidate) => setDraft((current) => ({ ...current, artSubject: candidate.visualPrompt ?? current.artSubject }))} /> : null;
-  const featuredCharacter = characters[0] ?? null;
 
   const openEditor = (character?: Character) => {
     setEditingCharacter(character ?? null);
@@ -866,10 +873,13 @@ function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAc
       }
 
       const savedCharacter = result.character;
+      const editingIndex = editingCharacter ? characters.findIndex((character) => character.id === editingCharacter.id) : characters.length;
+      const mappedCharacter = mapApiCharacter(savedCharacter, editingIndex >= 0 ? editingIndex : characters.length);
       onCharactersChange((current) => {
         if (!editingCharacter) return [...current, mapApiCharacter(savedCharacter, current.length)];
-        return current.map((character, index) => character.id === editingCharacter.id ? mapApiCharacter(savedCharacter, index) : character);
+        return current.map((character) => character.id === editingCharacter.id ? mappedCharacter : character);
       });
+      if (editingCharacter) setSelectedCharacter((current) => current?.id === editingCharacter.id ? mappedCharacter : current);
       closeEditor();
       onAction(editingCharacter ? `${savedCharacter.name} updated.` : `${savedCharacter.name} added to the roster.`);
     } catch (saveError: unknown) {
@@ -893,6 +903,7 @@ function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAc
       if (!response.ok) throw new Error(result.error ?? "Character could not be deleted.");
 
       onCharactersChange((current) => current.filter((character) => character.id !== editingCharacter.id));
+      setSelectedCharacter((current) => current?.id === editingCharacter.id ? null : current);
       closeEditor();
       onAction(`${editingCharacter.name} removed from the roster.`);
     } catch (deleteError: unknown) {
@@ -904,8 +915,8 @@ function CharactersView({ characters, campaignId, isGM, onCharactersChange, onAc
 
   return <PageLayout eyebrow="ARCHIVE // CREW ROSTER" title="Characters" description="The people, androids, and mysteries currently recorded in this campaign." action="ADD CHARACTER" onAction={() => openEditor()}>
     {editorOpen ? <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">{isGM ? "GM / PLAYER RECORD" : "PLAYER RECORD"}</p><h2>{editingCharacter ? `Edit ${editingCharacter.name}` : "Add a character"}</h2></div><div className="editor-heading-actions"><button className="button button-secondary" disabled={isSaving} onClick={() => setAssistantOpen((current) => !current)} type="button"><Sparkles size={14} /> {assistantOpen ? "CLOSE PORTRAIT TOOL" : "GENERATE PORTRAIT PROMPT"}</button><button className="icon-button" aria-label="Close character editor" onClick={closeEditor} title="Close character editor" type="button"><X size={17} /></button></div></div>{assistantOpen ? characterAssistant : null}<form className="character-form" onSubmit={saveCharacter}><div className="character-form-grid"><label>Name<input required maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Species<input maxLength={120} value={draft.species} onChange={(event) => setDraft((current) => ({ ...current, species: event.target.value }))} /></label><label>Class<input maxLength={160} value={draft.className} onChange={(event) => setDraft((current) => ({ ...current, className: event.target.value }))} /></label><label>Level<input type="number" min="1" max="20" value={draft.level} onChange={(event) => setDraft((current) => ({ ...current, level: Number(event.target.value) }))} /></label></div><label>Backstory<textarea maxLength={20000} placeholder="Write what the crew knows about this character." value={draft.backstoryMarkdown} onChange={(event) => setDraft((current) => ({ ...current, backstoryMarkdown: event.target.value }))} /></label><label>Physical appearance<textarea maxLength={4000} placeholder="Describe the features, build, hair, eyes, skin, clothing, and other details the crew should recognize." value={draft.physicalDescription} onChange={(event) => setDraft((current) => ({ ...current, physicalDescription: event.target.value }))} /></label><label>Image generation prompt<textarea maxLength={1600} placeholder="Describe the visual direction to reuse for future character art." value={draft.artSubject} onChange={(event) => setDraft((current) => ({ ...current, artSubject: event.target.value }))} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" disabled={isSaving} type="submit"><CirclePlus size={15} /> {isSaving ? "SAVING..." : editingCharacter ? "SAVE CHANGES" : "ADD TO ROSTER"}</button>{editingCharacter ? <button className="button button-danger" disabled={isSaving} onClick={deleteCharacter} type="button">REMOVE</button> : null}<button className="text-action" disabled={isSaving} onClick={closeEditor} type="button">CANCEL</button></div></form></section> : null}
-    {characters.length ? <div className="character-grid">{characters.map((character) => <article className="character-card" key={character.id}><VisualAsset src={character.image} label={`${character.name} portrait`} className={`character-art character-${character.color}`} /><div className="character-body"><div className="card-status-row"><StatusPill color={character.status === "ACTIVE" ? "cyan" : "muted"}>{character.status}</StatusPill><button className="icon-button" aria-label={`Open ${character.name} options`} onClick={() => openEditor(character)} title="Character options" type="button"><MoreHorizontal size={16} /></button></div><h3>{character.name}</h3><p>{character.subtitle}</p><span className="mono-detail">{character.detail}</span><button className="card-link" onClick={() => openEditor(character)} type="button">OPEN RECORD <ArrowUpRight size={13} /></button></div></article>)}</div> : <div className="character-empty"><UsersRound size={22} /><h2>No characters in the roster yet.</h2><p>Add the first crew record to begin the campaign manifest.</p></div>}
-    {featuredCharacter ? <section className="lower-band"><div className="lower-copy"><p className="eyebrow">PLAYER VIEW</p><h2>{featuredCharacter.name}&apos;s public record.</h2><p>Characters can carry a portrait, a Markdown backstory, and the notes their players want the crew to know.</p></div><div className="markdown-preview"><div className="preview-toolbar"><FileText size={14} /> BACKSTORY.MD <span>PLAYER VISIBLE</span></div><p>{featuredCharacter.backstoryMarkdown || "No public backstory recorded yet."}</p></div></section> : null}
+    {characters.length ? <div className="character-grid">{characters.map((character) => <article className={`character-card ${selectedCharacter?.id === character.id ? "character-card-selected" : ""}`} key={character.id}><button aria-label={`View ${character.name} public record`} className="character-card-main" onClick={() => setSelectedCharacter(character)} type="button"><VisualAsset src={character.image} label={`${character.name} portrait`} className={`character-art character-${character.color}`} /><div className="character-card-overlay"><div className="card-status-row"><StatusPill color={character.status === "ACTIVE" ? "cyan" : "muted"}>{character.status === "ACTIVE" ? "Active" : "Resting"}</StatusPill></div><div className="character-card-copy"><h3>{character.name}</h3><p>{["Level", character.level, character.species, character.className].filter(Boolean).join(" ")}</p></div></div></button>{character.canEdit ? <button aria-label={`Edit ${character.name}`} className="character-edit-button icon-button" onClick={() => openEditor(character)} title="Edit character" type="button"><Pencil size={15} /></button> : null}</article>)}</div> : <div className="character-empty"><UsersRound size={22} /><h2>No characters in the roster yet.</h2><p>Add the first crew record to begin the campaign manifest.</p></div>}
+    {selectedCharacter ? <section aria-labelledby="character-public-record-title" className="character-public-record" id="character-public-record"><div className="character-public-heading"><div><p className="eyebrow">PLAYER VIEW // PUBLIC RECORD</p><h2 id="character-public-record-title">{selectedCharacter.name}</h2><p className="character-public-meta">{["Level", selectedCharacter.level, selectedCharacter.species, selectedCharacter.className].filter(Boolean).join(" ")}</p></div>{selectedCharacter.canEdit ? <button aria-label={`Edit ${selectedCharacter.name}`} className="icon-button" onClick={() => openEditor(selectedCharacter)} title="Edit character" type="button"><Pencil size={16} /></button> : null}</div><div className="character-public-portrait-frame"><VisualAsset src={selectedCharacter.image} label={`${selectedCharacter.name} full portrait`} className="character-public-portrait" /></div><div className="character-public-copy"><div className="markdown-preview"><div className="preview-toolbar"><FileText size={14} /> BACKSTORY.MD <span>PLAYER VISIBLE</span></div><p>{selectedCharacter.backstoryMarkdown || "No public backstory recorded yet."}</p></div>{selectedCharacter.physicalDescription ? <div className="character-public-detail"><p className="eyebrow">PHYSICAL APPEARANCE</p><p>{selectedCharacter.physicalDescription}</p></div> : null}</div></section> : null}
   </PageLayout>;
 }
 
