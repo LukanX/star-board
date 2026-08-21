@@ -10,6 +10,7 @@ export type CampaignArtEditorTarget = {
   campaignId: string | null;
   kind: ArtKind;
   value: string | null;
+  trackUnsavedUploads?: boolean;
   url?: string | null;
   subject?: string;
   currentPrompt?: string | null;
@@ -23,6 +24,15 @@ export type CampaignArtEditorTarget = {
 
 const listeners = new Set<() => void>();
 let currentTarget: CampaignArtEditorTarget | null = null;
+const persistedArtKeys = new Set<string>();
+
+function persistedArtKey(campaignId: string, path: string) {
+  return `${campaignId}:${path}`;
+}
+
+export function markCampaignArtPersisted(campaignId: string, path: string | null | undefined) {
+  if (path) persistedArtKeys.add(persistedArtKey(campaignId, path));
+}
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
@@ -52,7 +62,7 @@ export function CampaignArtEditorSlot() {
   return target ? <CampaignArtField key={target.kind} {...target} /> : null;
 }
 
-export default function CampaignArtField({ campaignId, kind, value, url, subject, currentPrompt, onSubjectChange, onChange, onUrlChange, onPromptChange, onProviderChange, onApproved }: CampaignArtEditorTarget) {
+export default function CampaignArtField({ campaignId, kind, value, trackUnsavedUploads = false, url, subject, currentPrompt, onSubjectChange, onChange, onUrlChange, onPromptChange, onProviderChange, onApproved }: CampaignArtEditorTarget) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadedPathsRef = useRef(new Set<string>());
   const persistedPathRef = useRef<string | null>(value && !value.startsWith("http") ? value : null);
@@ -62,12 +72,17 @@ export default function CampaignArtField({ campaignId, kind, value, url, subject
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    persistedPathRef.current = value && !value.startsWith("http") ? value : null;
-  }, [value]);
+    if (!trackUnsavedUploads) persistedPathRef.current = value && !value.startsWith("http") ? value : null;
+  }, [trackUnsavedUploads, value]);
 
   useEffect(() => () => {
     if (!campaignId) return;
-    const pathsToRemove = [...uploadedPathsRef.current].filter((path) => path !== persistedPathRef.current);
+    const pathsToRemove = [...uploadedPathsRef.current].filter((path) => {
+      const key = persistedArtKey(campaignId, path);
+      const wasPersisted = path === persistedPathRef.current || persistedArtKeys.has(key);
+      if (persistedArtKeys.has(key)) persistedArtKeys.delete(key);
+      return !wasPersisted;
+    });
     for (const path of pathsToRemove) {
       void fetch(`/api/campaigns/${encodeURIComponent(campaignId ?? "")}/art?path=${encodeURIComponent(path)}`, { method: "DELETE" });
     }

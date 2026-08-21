@@ -47,7 +47,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unable to load episode notes." }, { status: 503 });
     }
 
-    const authorIds = [...new Set((notes ?? []).map((note) => note.author_id))];
+    const visibleNotes = (notes ?? []).filter((note) => membership.role === "gm" || note.visibility === "player");
+    const authorIds = [...new Set(visibleNotes.map((note) => note.author_id))];
     const authorsResult = authorIds.length
       ? await context.supabase.from("profiles").select("id, display_name").in("id", authorIds)
       : { data: [], error: null };
@@ -57,7 +58,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     }
 
     const authors = new Map((authorsResult.data ?? []).map((author) => [author.id, author.display_name]));
-    const episodeNotes = (notes ?? []).map((note) => ({
+    const episodeNotes = visibleNotes.map((note) => ({
       ...note,
       author: { id: note.author_id, displayName: authors.get(note.author_id) ?? "Crew member" },
       permissions: {

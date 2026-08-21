@@ -298,4 +298,5 @@ h1, h2, h3, p { margin-top: 0; } h1 { margin-bottom: 10px; color: var(--ink); fo
 .place-detail-art { width: 100%; min-height: 150px; aspect-ratio: 16 / 7; border: 1px solid rgba(98,232,255,.24); }
 @media (max-width: 420px) { .place-tree-art { width: 34px; height: 34px; flex-basis: 34px; }.place-detail-art { min-height: 120px; } }
 @media (max-width: 420px) { .character-art { height: auto; } }
+.member-current { width: 32px; height: 32px; display: inline-grid; place-items: center; flex: 0 0 32px; border: 1px solid rgba(98,232,255,.25); color: var(--cyan); background: rgba(98,232,255,.06); }
 @media (max-width: 760px) { .character-art { height: auto; }.character-public-record { grid-template-columns: 1fr; gap: 17px; padding: 17px; }.character-public-portrait-frame { width: min(100%, 420px); justify-self: center; }.character-public-heading h2 { font-size: 22px; } }

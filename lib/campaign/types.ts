@@ -1,0 +1,34 @@
+import type { PlaceRecord } from "@/lib/places";
+
+export type CampaignRecord = { id: string; name: string; system: string; description: string; created_by: string };
+export type CampaignMembership = { role: "gm" | "player"; display_name: string; campaign: CampaignRecord | CampaignRecord[] | null };
+
+export type Mission = {
+  id: string; title: string; category: string; summary: string; giver: string; giverType: "NPC" | "FACTION"; votes: number;
+  accent: "cyan" | "pink" | "amber"; image: string | null; voted: boolean; status: "draft" | "open" | "promoted" | "archived";
+  playerNotesMarkdown: string; giverId: string; placeId: string | null; artPath?: string | null; artUrl?: string | null;
+  artPrompt?: string | null; artProvider?: string | null; artSubject?: string | null; hook?: string; gmNotesMarkdown?: string;
+};
+export type ApiJob = {
+  id: string; title: string; summary: string; status: "draft" | "open" | "promoted" | "archived"; player_notes_markdown: string;
+  hook?: string; gm_notes_markdown?: string; giver_npc_id: string | null; giver_faction_id: string | null; place_id: string | null;
+  art_path: string | null; art_subject: string | null; art_url?: string | null; art_prompt: string | null; art_provider: string | null;
+  giver: { type: "NPC" | "FACTION"; name: string }; votes: number; voted: boolean;
+};
+export type ApiCharacter = { id: string; owner_id: string; name: string; species: string; class_name: string; level: number; backstory_markdown: string; physical_description: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; can_edit?: boolean };
+export type Character = { id: string; ownerId: string; name: string; species: string; className: string; level: number; subtitle: string; detail: string; color: "pink" | "cyan" | "purple" | "amber"; image: string | null; status: "ACTIVE" | "RESTING"; backstoryMarkdown: string; physicalDescription: string; artPath?: string | null; artUrl?: string | null; artSubject?: string | null; artPrompt?: string | null; artProvider?: string | null; canEdit: boolean };
+export type CharacterDraft = { name: string; species: string; className: string; level: number; backstoryMarkdown: string; physicalDescription: string; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
+export type ApiNpc = { id: string; author_id: string; name: string; species: string; role: string; description: string; player_notes_markdown: string; place_id: string | null; gm_notes_markdown?: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
+export type NpcRecord = ApiNpc & { color: "pink" | "cyan" | "amber" };
+export type ApiFaction = { id: string; author_id: string; name: string; description: string; status: string; place_id: string | null; art_path: string | null; art_subject: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
+export type FactionRecord = ApiFaction & { color: "pink" | "cyan" | "amber" };
+export type ApiEpisode = { id: string; campaign_id: string; source_job_id: string | null; place_id: string | null; created_by: string; title: string; summary: string; player_context_markdown: string; status: "planned" | "active" | "complete" | "archived"; started_at: string | null; completed_at: string | null; created_at: string; updated_at: string; noteCount: number };
+export type EpisodeRecord = ApiEpisode & { accent: "cyan" | "pink" | "amber" };
+export type EpisodeNote = { id: string; title: string; body_markdown: string; visibility: "player" | "gm"; author_id: string; created_at: string; updated_at: string; author: { id: string; displayName: string }; permissions: { canEdit: boolean; canDelete: boolean } };
+export type ApiCampaignMember = { userId: string; role: "gm" | "player"; displayName: string; joinedAt: string };
+export type NoteVisibility = "player" | "gm";
+export type NoteAccent = "cyan" | "pink" | "amber" | "purple";
+export type ApiCampaignNote = { id: string; campaign_id: string; episode_id: string | null; author_id: string; title: string; body_markdown: string; visibility: NoteVisibility; created_at: string; updated_at: string; updated_by: string | null; author: { id: string; displayName: string }; permissions: { canEdit: boolean; canDelete: boolean } };
+export type CampaignNote = ApiCampaignNote & { accent: NoteAccent; age?: string };
+export type CampaignNoteEpisode = { id: string; title: string; status: string };
+export type ApiPlace = PlaceRecord & { author_id: string; description: string; player_notes_markdown: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; created_at: string; updated_at: string; gm_notes_markdown?: string };

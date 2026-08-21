@@ -3,32 +3,8 @@
 import { useState } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { BookOpen, ChevronRight, CirclePlus, FileText, LockKeyhole, X } from "lucide-react";
-
-type NoteVisibility = "player" | "gm";
-type NoteAccent = "cyan" | "pink" | "amber" | "purple";
-
-export type ApiCampaignNote = {
-  id: string;
-  campaign_id: string;
-  episode_id: string | null;
-  author_id: string;
-  title: string;
-  body_markdown: string;
-  visibility: NoteVisibility;
-  created_at: string;
-  updated_at: string;
-  updated_by: string | null;
-  author: { id: string; displayName: string };
-  permissions: { canEdit: boolean; canDelete: boolean };
-};
-
-export type CampaignNote = ApiCampaignNote & { accent: NoteAccent; age?: string };
-
-export type CampaignNoteEpisode = {
-  id: string;
-  title: string;
-  status: string;
-};
+export type { ApiCampaignNote, CampaignNote, CampaignNoteEpisode, NoteAccent, NoteVisibility } from "@/lib/campaign/types";
+import type { ApiCampaignNote, CampaignNote, CampaignNoteEpisode, NoteAccent, NoteVisibility } from "@/lib/campaign/types";
 
 type NoteDraft = {
   title: string;

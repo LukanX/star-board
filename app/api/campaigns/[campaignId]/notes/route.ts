@@ -59,8 +59,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unable to load campaign notes." }, { status: 503 });
     }
 
-    const authors = await getAuthors(context.supabase, data ?? []);
-    const notes = (data ?? []).map((note) => withAuthor(note, authors, context.user.id, membership.role));
+    const visibleNotes = (data ?? []).filter((note) => membership.role === "gm" || note.visibility === "player");
+    const authors = await getAuthors(context.supabase, visibleNotes);
+    const notes = visibleNotes.map((note) => withAuthor(note, authors, context.user.id, membership.role));
 
     return NextResponse.json({ role: membership.role, displayName: membership.displayName, notes });
   } catch {

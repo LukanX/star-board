@@ -12,8 +12,10 @@ vi.mock("@/lib/auth/permissions", () => ({
 
 import { GET as listEpisodes } from "@/app/api/campaigns/[campaignId]/episodes/route";
 import { GET as getEpisode } from "@/app/api/campaigns/[campaignId]/episodes/[episodeId]/route";
+import { GET as listNotes } from "@/app/api/campaigns/[campaignId]/notes/route";
+import { GET as getNote } from "@/app/api/campaigns/[campaignId]/notes/[noteId]/route";
 import { POST as createNote } from "@/app/api/campaigns/[campaignId]/notes/route";
-import { PATCH as updateNote } from "@/app/api/campaigns/[campaignId]/notes/[noteId]/route";
+import { DELETE as deleteNote, PATCH as updateNote } from "@/app/api/campaigns/[campaignId]/notes/[noteId]/route";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -24,6 +26,7 @@ type QueryResult = { data: unknown; error: unknown };
 type Query = {
   insert: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
   select: ReturnType<typeof vi.fn>;
   eq: ReturnType<typeof vi.fn>;
   order: ReturnType<typeof vi.fn>;
@@ -38,6 +41,7 @@ function createQuery(result: QueryResult): Query {
   const query = {
     insert: vi.fn(),
     update: vi.fn(),
+    delete: vi.fn(),
     select: vi.fn(),
     eq: vi.fn(),
     order: vi.fn(),
@@ -49,6 +53,7 @@ function createQuery(result: QueryResult): Query {
 
   query.insert.mockReturnValue(query);
   query.update.mockReturnValue(query);
+  query.delete.mockReturnValue(query);
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
   query.order.mockReturnValue(query);
@@ -134,9 +139,10 @@ describe("notes and episode routes", () => {
   });
 
   it("clears an episode assignment without changing other note fields", async () => {
+    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: userId, visibility: "player" }, error: null });
     const noteQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: userId, title: "Global log", body_markdown: "", visibility: "player" }, error: null });
     const profileQuery = createQuery({ data: { id: userId, display_name: "Pilot" }, error: null });
-    const { supabase } = createSupabase({ campaign_notes: [noteQuery], profiles: [profileQuery] });
+    const { supabase } = createSupabase({ campaign_notes: [existingNoteQuery, noteQuery], profiles: [profileQuery] });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
 
     const response = await updateNote(request({ episodeId: null }, "PATCH"), noteParams());
@@ -149,9 +155,77 @@ describe("notes and episode routes", () => {
     expect(noteQuery.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
   });
 
+  it("rejects a player from updating another player's note", async () => {
+    const noteQuery = createQuery({ data: { id: noteId, author_id: "00000000-0000-4000-8000-000000000005", visibility: "player" }, error: null });
+    const { supabase } = createSupabase({ campaign_notes: [noteQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await updateNote(request({ title: "Tampered log" }, "PATCH"), noteParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("Note author or GM access is required.");
+    expect(noteQuery.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a player from deleting another player's note", async () => {
+    const noteQuery = createQuery({ data: { id: noteId, author_id: "00000000-0000-4000-8000-000000000005", visibility: "player" }, error: null });
+    const { supabase } = createSupabase({ campaign_notes: [noteQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await deleteNote(new Request("http://localhost", { method: "DELETE" }), noteParams());
+    const payload = await response.json().catch(() => ({}));
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("Note author or GM access is required.");
+    expect(noteQuery.delete).not.toHaveBeenCalled();
+  });
+
+  it("allows a GM to update a player-authored note", async () => {
+    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: "00000000-0000-4000-8000-000000000005", visibility: "player" }, error: null });
+    const noteQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: "00000000-0000-4000-8000-000000000005", title: "Updated log", body_markdown: "", visibility: "player" }, error: null });
+    const profileQuery = createQuery({ data: { id: "00000000-0000-4000-8000-000000000005", display_name: "Archivist" }, error: null });
+    const { supabase } = createSupabase({ campaign_notes: [existingNoteQuery, noteQuery], profiles: [profileQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "Director" });
+
+    const response = await updateNote(request({ title: "Updated log" }, "PATCH"), noteParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.note).toMatchObject({ id: noteId, title: "Updated log", permissions: { canEdit: true, canDelete: true } });
+    expect(noteQuery.update).toHaveBeenCalledWith({ title: "Updated log", updated_by: userId });
+  });
+
+  it("allows a GM to delete a player-authored note", async () => {
+    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: "00000000-0000-4000-8000-000000000005", visibility: "player" }, error: null });
+    const deleteQuery = createQuery({ data: { id: noteId }, error: null });
+    const { supabase } = createSupabase({ campaign_notes: [existingNoteQuery, deleteQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "Director" });
+
+    const response = await deleteNote(new Request("http://localhost", { method: "DELETE" }), noteParams());
+
+    expect(response.status).toBe(204);
+    expect(deleteQuery.delete).toHaveBeenCalled();
+  });
+
+  it("rejects a player from changing their own note to GM-only visibility", async () => {
+    const noteQuery = createQuery({ data: { id: noteId, author_id: userId, visibility: "player" }, error: null });
+    const { supabase } = createSupabase({ campaign_notes: [noteQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await updateNote(request({ visibility: "gm" }, "PATCH"), noteParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("GM access is required for private notes.");
+    expect(noteQuery.update).not.toHaveBeenCalled();
+  });
+
   it("reports campaign-scoped episode note counts", async () => {
     const episodeQuery = createQuery({ data: [{ id: episodeId, title: "Relay", status: "active" }], error: null });
-    const notesQuery = createQuery({ data: [{ episode_id: episodeId }, { episode_id: episodeId }, { episode_id: null }], error: null });
+    const notesQuery = createQuery({ data: [{ episode_id: episodeId, visibility: "player" }, { episode_id: episodeId, visibility: "gm" }, { episode_id: null, visibility: "player" }], error: null });
     const { supabase } = createSupabase({ episodes: [episodeQuery], campaign_notes: [notesQuery] });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
 
@@ -159,8 +233,57 @@ describe("notes and episode routes", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload.episodes).toEqual([{ id: episodeId, title: "Relay", status: "active", noteCount: 2 }]);
+    expect(payload.episodes).toEqual([{ id: episodeId, title: "Relay", status: "active", noteCount: 1 }]);
     expect(notesQuery.not).toHaveBeenCalledWith("episode_id", "is", null);
+  });
+
+  it("does not return GM-only episode notes to players", async () => {
+    const episodeQuery = createQuery({ data: { id: episodeId, campaign_id: campaignId, title: "Relay", status: "active" }, error: null });
+    const notesQuery = createQuery({ data: [
+      { id: "player-note", title: "Public log", body_markdown: "Visible.", visibility: "player", author_id: userId },
+      { id: "gm-note", title: "Private log", body_markdown: "Hidden.", visibility: "gm", author_id: userId },
+    ], error: null });
+    const profileQuery = createQuery({ data: [{ id: userId, display_name: "Pilot" }], error: null });
+    const { supabase } = createSupabase({ episodes: [episodeQuery], campaign_notes: [notesQuery], profiles: [profileQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await getEpisode(new Request("http://localhost"), episodeParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.notes).toEqual([expect.objectContaining({ id: "player-note" })]);
+    expect(payload.notes).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: "gm-note" })]));
+    expect(payload.episode.noteCount).toBe(1);
+  });
+
+  it("does not return GM-only campaign notes in player list reads", async () => {
+    const notesQuery = createQuery({ data: [
+      { id: "player-note", campaign_id: campaignId, episode_id: null, author_id: userId, title: "Public log", body_markdown: "Visible.", visibility: "player" },
+      { id: "gm-note", campaign_id: campaignId, episode_id: null, author_id: userId, title: "Private log", body_markdown: "Hidden.", visibility: "gm" },
+    ], error: null });
+    const profileQuery = createQuery({ data: [{ id: userId, display_name: "Pilot" }], error: null });
+    const { supabase } = createSupabase({ campaign_notes: [notesQuery], profiles: [profileQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await listNotes(new Request("http://localhost"), campaignParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.notes).toEqual([expect.objectContaining({ id: "player-note" })]);
+    expect(payload.notes).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: "gm-note" })]));
+  });
+
+  it("does not reveal a GM-only campaign note to players by id", async () => {
+    const notesQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: userId, title: "Private log", body_markdown: "Hidden.", visibility: "gm" }, error: null });
+    const { supabase, from } = createSupabase({ campaign_notes: [notesQuery], profiles: [] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await getNote(new Request("http://localhost"), noteParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(payload.error).toBe("Campaign note not found.");
+    expect(from).toHaveBeenCalledTimes(1);
   });
 
   it("returns episode notes with author and owner permissions", async () => {

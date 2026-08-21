@@ -4,22 +4,11 @@ import { useMemo, useState } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
 import { CampaignArtEditorSlot, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
-import { buildPlaceTree, flattenPlaceTree, getPlaceBreadcrumb, isPlaceDescendant, type PlaceRecord, type PlaceTreeNode } from "@/lib/places";
+import { buildPlaceTree, flattenPlaceTree, getPlaceBreadcrumb, isPlaceDescendant, type PlaceTreeNode } from "@/lib/places";
+import type { ApiPlace } from "@/lib/campaign/types";
 import { ArrowUpRight, ChevronDown, ChevronRight, CirclePlus, FileText, LockKeyhole, Map, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 
-export type ApiPlace = PlaceRecord & {
-  author_id: string;
-  description: string;
-  player_notes_markdown: string;
-  art_subject: string | null;
-  art_path: string | null;
-  art_url?: string | null;
-  art_prompt: string | null;
-  art_provider?: string | null;
-  created_at: string;
-  updated_at: string;
-  gm_notes_markdown?: string;
-};
+export type { ApiPlace } from "@/lib/campaign/types";
 
 type PlaceDraft = {
   name: string;

@@ -1,0 +1,27 @@
+"use client";
+
+import { useState } from "react";
+import type { FormEvent } from "react";
+import { useCampaignArtEditor } from "@/components/archive/CampaignArtField";
+import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
+import type { ApiCharacter, CharacterDraft } from "@/lib/campaign/types";
+
+const emptyDraft: CharacterDraft = { name: "", species: "", className: "", level: 1, backstoryMarkdown: "", physicalDescription: "", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null };
+
+export default function CharacterEditor({ campaignId, character, onSaved, onCancel }: { campaignId: string; character?: ApiCharacter; onSaved?: (character: ApiCharacter) => void; onCancel?: () => void }) {
+  const [draft, setDraft] = useState<CharacterDraft>(character ? { name: character.name, species: character.species, className: character.class_name, level: character.level, backstoryMarkdown: character.backstory_markdown, physicalDescription: character.physical_description, artSubject: character.art_subject ?? "", artPath: character.art_path, artUrl: character.art_url ?? null, artPrompt: character.art_prompt, artProvider: character.art_provider ?? null } : emptyDraft);
+  const [error, setError] = useState<string | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  useCampaignArtEditor({ campaignId, kind: "character", value: draft.artPath, url: draft.artUrl, subject: draft.artSubject, currentPrompt: draft.artPrompt, onSubjectChange: (value) => setDraft((current) => ({ ...current, artSubject: value })), onChange: (value) => setDraft((current) => ({ ...current, artPath: value })), onUrlChange: (value) => setDraft((current) => ({ ...current, artUrl: value })), onPromptChange: (value) => setDraft((current) => ({ ...current, artPrompt: value })), onProviderChange: (value) => setDraft((current) => ({ ...current, artProvider: value })) });
+  const update = (field: keyof CharacterDraft, value: string | number | null) => setDraft((current) => ({ ...current, [field]: value }));
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setError(null);
+    try {
+      const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/characters${character ? `/${encodeURIComponent(character.id)}` : ""}`, { method: character ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
+      const result = await response.json() as { error?: string; character?: ApiCharacter };
+      if (!response.ok || !result.character) throw new Error(result.error ?? "Character could not be saved.");
+      onSaved?.(result.character);
+    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Character could not be saved."); }
+  };
+  return <section className="character-editor"><div className="editor-heading"><div><p className="eyebrow">{character ? "EDIT RECORD" : "NEW RECORD"}</p><h2>{character ? `Edit ${character.name}` : "Add a character"}</h2></div><button className="icon-button" onClick={onCancel} type="button">X</button></div>{assistantOpen ? <AiDraftAssistant campaignId={campaignId} endpoint="/api/ai/character" entityLabel="character portrait" mode={character ? "refine" : "create"} toolLabel="PLAYER TOOL" showModelPicker={false} requestFields={{ name: draft.name, species: draft.species, className: draft.className, level: draft.level, backstoryMarkdown: draft.backstoryMarkdown, physicalDescription: draft.physicalDescription }} currentDraft={{ name: draft.name, species: draft.species, className: draft.className, backstoryMarkdown: draft.backstoryMarkdown, physicalDescription: draft.physicalDescription, visualPrompt: draft.artSubject }} fields={[{ key: "visualPrompt", label: "Image generation prompt", maxLength: 1600, multiline: true }]} onApply={(candidate) => update("artSubject", candidate.visualPrompt ?? draft.artSubject)} /> : null}<button className="button button-secondary" onClick={() => setAssistantOpen((value) => !value)} type="button">{assistantOpen ? "CLOSE PORTRAIT TOOL" : "GENERATE PORTRAIT PROMPT"}</button><form className="character-form" onSubmit={save}><div className="character-form-grid"><label>Name<input required value={draft.name} onChange={(event) => update("name", event.target.value)} /></label><label>Species<input value={draft.species} onChange={(event) => update("species", event.target.value)} /></label><label>Class<input value={draft.className} onChange={(event) => update("className", event.target.value)} /></label><label>Level<input type="number" min="1" max="20" value={draft.level} onChange={(event) => update("level", Number(event.target.value))} /></label></div><label>Backstory<textarea value={draft.backstoryMarkdown} onChange={(event) => update("backstoryMarkdown", event.target.value)} /></label><label>Physical appearance<textarea value={draft.physicalDescription} onChange={(event) => update("physicalDescription", event.target.value)} /></label>{error ? <p className="form-error" role="alert">{error}</p> : null}<div className="character-form-actions"><button className="button button-primary" type="submit">SAVE CHARACTER</button><button className="button button-secondary" onClick={onCancel} type="button">CANCEL</button></div></form></section>;
+}
