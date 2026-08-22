@@ -9,6 +9,13 @@ import MetricCard from "@/components/ui/MetricCard";
 import SectionHeading from "@/components/ui/SectionHeading";
 import { panelClassName } from "@/components/ui/recordStyles";
 import {
+  accentIconCyanClassName,
+  eyebrowBrightClassName,
+  eyebrowClassName,
+  liveDotBrightClassName,
+  microLabelClassName,
+} from "@/components/ui/terminalStyles";
+import {
   mapApiCharacter,
   mapApiEpisode,
   mapApiFaction,
@@ -249,18 +256,18 @@ function OverviewView({
     <>
       <div className="page-intro overview-intro flex items-center justify-between gap-6 mb-[29px] max-[760px]:items-start max-[760px]:flex-col max-[760px]:gap-[19px] max-[760px]:mb-[25px]">
         <div>
-          <p className="eyebrow eyebrow-bright">
-            <span className="live-dot" /> {campaign.system.toUpperCase()} {"//"}{" "}
+          <p className={eyebrowBrightClassName}>
+            <span className={liveDotBrightClassName} /> {campaign.system.toUpperCase()} {"//"}{" "}
             CAMPAIGN OVERVIEW
           </p>
           <h1>{campaign.name}</h1>
-          <p className="intro-copy">
+          <p className="m-0 max-w-[510px] text-[var(--muted)] text-[13px] leading-[1.6]">
             {campaign.description || "No campaign brief recorded yet."}
           </p>
         </div>
-        <div className="intro-actions">
-          <div className="last-sync">
-            <span>CAMPAIGN RECORDS</span>
+        <div className="flex items-center gap-[23px] max-[760px]:w-full max-[760px]:justify-between">
+          <div className="border-l border-[var(--line)] pl-[17px] max-[420px]:hidden [&_span]:mb-[5px] [&_span]:block [&_span]:text-[8px] [&_strong]:block [&_strong]:text-[var(--muted)] [&_strong]:font-mono [&_strong]:text-[10px] [&_strong]:font-medium">
+            <span className={microLabelClassName}>CAMPAIGN RECORDS</span>
             <strong>LIVE</strong>
           </div>
           <CampaignRouteLink
@@ -274,7 +281,7 @@ function OverviewView({
       <div className="relative flex min-h-[82px] items-center overflow-hidden mb-[17px] border border-[rgba(98,232,255,.21)] bg-[linear-gradient(104deg,rgba(98,232,255,.1),rgba(98,232,255,.035)_42%,rgba(255,92,154,.05))] p-6 max-[760px]:flex-col max-[760px]:items-start max-[760px]:gap-[14px] max-[760px]:p-[17px]">
         <div className="absolute inset-0 opacity-[.19] bg-[linear-gradient(90deg,transparent_0_49%,rgba(98,232,255,.28)_50%,transparent_51%),linear-gradient(rgba(98,232,255,.15)_1px,transparent_1px)] bg-[length:48px_48px,100%_10px] [mask-image:linear-gradient(90deg,black,transparent_74%)]" />
         <div className="relative z-[1]">
-          <span className="micro-label mb-[7px] block !text-[var(--cyan)]">
+          <span className={`${microLabelClassName} mb-[7px] block !text-[var(--cyan)]`}>
             CAMPAIGN BRIEF
           </span>
           <strong className="block text-[14px] font-[540] text-[#dcebf2]">
@@ -340,7 +347,7 @@ function OverviewView({
         <section className={`${panelClassName} min-w-0`}>
           <div className="panel-topline flex items-start justify-between px-[21px] pb-4 pt-5">
             <div>
-              <p className="eyebrow mb-2">MISSION CONTROL</p>
+              <p className={`${eyebrowClassName} !mb-2`}>MISSION CONTROL</p>
               <h2>Job board</h2>
             </div>
           </div>
@@ -422,10 +429,10 @@ function OverviewView({
           <section className={panelClassName}>
             <div className="panel-topline flex items-start justify-between px-[21px] pb-4 pt-5">
               <div>
-                <p className="eyebrow mb-2">CAMPAIGN SNAPSHOT</p>
+                <p className={`${eyebrowClassName} !mb-2`}>CAMPAIGN SNAPSHOT</p>
                 <h2>Record coverage</h2>
               </div>
-              <Activity size={17} className="accent-icon-cyan" />
+              <Activity size={17} className={accentIconCyanClassName} />
             </div>
             <div className="grid grid-cols-2 border-t border-[var(--line)]">
               <CampaignRouteLink

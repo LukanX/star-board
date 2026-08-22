@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LoaderCircle, Sparkles } from "lucide-react";
 import AiModelPicker from "@/components/archive/AiModelPicker";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 
 export type AiDraftField = {
   key: string;
@@ -131,7 +132,7 @@ function AiDraftAssistantContent({
     >
       <div className="flex items-start justify-between gap-3 text-[var(--purple)]">
         <div>
-          <p className="eyebrow mb-[5px] text-[var(--purple)]">
+          <p className={`${eyebrowClassName} !mb-[5px] text-[var(--purple)]`}>
             {toolLabel} {"//"} {entityLabel.toUpperCase()} DRAFT
           </p>
           <h3 className="m-0 text-[14px]">Build a starting point</h3>

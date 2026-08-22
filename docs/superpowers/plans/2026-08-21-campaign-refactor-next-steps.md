@@ -40,7 +40,7 @@
 - The initial `CampaignCockpit` null render crash is fixed: campaign-dependent navigation mapping runs after the loading/error guards. Regression coverage is in `tests/campaign-cockpit.test.tsx`.
 - Full validation at this checkpoint: 181 tests passed, 6 skipped; typecheck passed; production build passed; lint had 0 errors and 29 existing warnings; `git diff --check` passed.
 
-### Remaining work
+### Historical remaining work (superseded by the current handoff)
 
 - The overview route now receives its campaign records from a server-owned `getCampaignOverview` read and the focused client component owns only vote synchronization and toast state.
 - Authenticated browser coverage now covers the overview shell and direct route loading; back/forward, permission, dirty-form, and mobile journeys remain.
@@ -82,8 +82,8 @@ git diff --check
 - `CampaignRouteShell` must render `CampaignShell`, `CampaignSidebar`, and `CampaignTopbar` for the overview root as well as every feature route.
 - `CampaignCockpit` should return overview content and its toast host, not a second shell, sidebar, or topbar.
 
-- [ ] **Step 1: Add a failing Playwright shell-ownership check.** In the local authenticated journey described by `tests/e2e/README.md`, load `/campaigns/[campaignId]` and assert that the page has exactly one `.sidebar`, one `.topbar`, and one `.app-shell`. Keep the existing initial loading assertion in `tests/campaign-cockpit.test.tsx`.
-- [ ] **Step 2: Run the focused test and confirm it fails against the current nested-shell exception.**
+- [x] **Step 1: Add a failing Playwright shell-ownership check.** In the local authenticated journey described by `tests/e2e/README.md`, load `/campaigns/[campaignId]` and assert that the page has exactly one `.sidebar`, one `.topbar`, and one `.app-shell`. Keep the existing initial loading assertion in `tests/campaign-cockpit.test.tsx`.
+- [x] **Step 2: Run the focused test and confirm it fails against the current nested-shell exception.**
 
 ```powershell
 npm test -- tests/campaign-cockpit.test.tsx tests/campaign-sidebar.test.tsx
@@ -115,7 +115,7 @@ npm run build
 - `campaignNavigation` in `lib/campaign/navigation.ts` remains metadata for the persistent shell, not a view registry.
 
 - [x] **Step 1: Inventory every symbol still exported or imported from `CampaignCockpit`.** Use `rg` for `CampaignCockpit`, `OverviewView`, `JobsView`, `CharactersView`, `NpcsView`, `FactionsView`, `PlacesView`, `EpisodesView`, `CampaignNotesView`, `MembersView`, and `CampaignSettingsView`. Record only live consumers before deletion.
-- [ ] **Step 2: Add a test that the overview controller cannot select a non-overview view.** The controller no longer has feature-view branches, but a separate regression for this explicit contract remains optional follow-up work.
+- **Optional follow-up not added:** The controller no longer has feature-view branches, so a separate regression for selecting a non-overview view would duplicate the source contract rather than protect a live behavior.
 - [x] **Step 3: Remove `activeView`, old SPA view branches, and their dead handler/state dependencies from `CampaignCockpit` one feature group at a time.** Keep the overview fetches required by the dashboard until Task 3 decides whether they move to server reads.
 - [x] **Step 4: Remove unused icon imports, archive imports, and navigation constants revealed by the deletion.** Do not clean unrelated warnings in other files.
 - [x] **Step 5: Run feature route tests and typecheck after each deletion group.** A deletion group is complete only when the corresponding routed page still builds and its focused test passes.
@@ -143,7 +143,7 @@ npm run typecheck
 - [x] **Step 2: Add a focused server contract test for the chosen overview read boundary.** Verify campaign scoping and role/display-name behavior through the existing `getCampaignRouteAccess` pattern; keep database and RLS behavior unchanged.
 - [x] **Step 3: Move only the reads that are safe and useful to the server page.** Do not move mutation handlers, vote synchronization, AI calls, or art upload logic into server components.
 - [x] **Step 4: Keep the overview client component responsible for vote state, toast state, and optimistic refresh.** Pass it typed data instead of making it discover campaign identity from `window.location`.
-- [ ] **Step 5: Verify direct URL, refresh, and unauthorized behavior for overview and one representative detail route.** Use Playwright with the local authenticated fixture when available.
+- [x] **Step 5: Verify direct URL, refresh, and unauthorized behavior for overview and one representative detail route.** Use Playwright with the local authenticated fixture when available.
 
 ```powershell
 npm test -- tests/campaign-server.test.ts tests/campaign-cockpit.test.tsx
@@ -194,15 +194,15 @@ npx eslint "components/ui" "components/characters" "components/npcs" "components
 - Keep the current CSS variable names where they are used as the visual design tokens; expose them through the existing Tailwind 4 `@theme inline` block.
 
 - [x] **Step 1: Inventory selectors and usage before deleting CSS.** Run `rg` for each class in `app/globals.css`; group selectors into shell, shared UI, forms, archive, dashboard, and feature-specific buckets. The shell inventory confirmed ownership in `CampaignShell`, `CampaignRouteShell`, `CampaignSidebar`, and `CampaignTopbar` before the first migration edits.
-- [ ] **Step 2: Migrate the shell bucket.** Convert `.app-shell`, `.app-content`, `.sidebar`, `.side-nav`, `.topbar`, `.content-frame`, and their responsive states in the shell components. Preserve the grid overlay and mobile navigation behavior.
+- [x] **Step 2: Migrate the shell bucket.** Convert `.app-shell`, `.app-content`, `.sidebar`, `.side-nav`, `.topbar`, `.content-frame`, and their responsive states in the shell components. Preserve the grid overlay and mobile navigation behavior.
 
 	Progress checkpoint: outer frame, content surface, sidebar desktop structure, navigation growth, topbar structure, responsive content spacing, and the mobile drawer state now use Tailwind utilities. The focused shell journey covers direct load, refresh, one-shell ownership, and mobile drawer open/close at 390px; the migrated drawer no longer depends on the global `.sidebar` or `.sidebar-open` state selectors.
-- [ ] **Step 3: Migrate shared UI and form buckets.** Convert panels, buttons, fields, headings, empty states, metric cards, and editor action rows using the extracted components from Task 4.
+- [x] **Step 3: Migrate shared UI and form buckets.** Convert panels, buttons, fields, headings, empty states, metric cards, and editor action rows using the extracted components from Task 4.
 
 	Progress checkpoint: `MetricCard`, `EmptyState`, `StatusPill`, `VisualAsset`, `RecordPortrait`, `PageLayout`, `SectionHeading`, and `AppStatus` now carry their shared base layout utilities. Campaign overview and routed Places headings own the panel-topline layout, all live editor headings/action clusters own their flex, spacing, wrapping, typography, and 420px behavior, all text actions own their inline-flex, typography, cursor, hover, and 420px form-action utilities, forms/action rows own their base layout, responsive grid placement, and sub-760px action wrapping utilities, all icon-button owners carry their dimensions, layout, base, and hover utilities, and all shared button owners carry their base plus primary, secondary, danger, and AI variant utilities. The `character-empty`, AppStatus, mobile drawer, panel-topline, editor heading, editor h2 typography, editor heading action media, text-action, form, form-grid, form-action, action-wrap, 420px text-action, shared character-form control, field-lock, form-error, icon-button, button base, button-secondary, button-primary, button-danger, and button-ai declarations have been removed from globals; feature-specific button sizing/placement and decorative declarations remain until their owning route checks support removing them.
-- [ ] **Step 4: Migrate feature-specific buckets one route at a time.** Delete a selector only after `rg` reports no live usage and the corresponding route renders in the responsive smoke test.
-- [ ] **Step 5: Keep justified global rules.** Retain `:root`, `@theme inline`, body typography/background, box sizing, focus-visible behavior, and complex global visual effects that cannot be represented more clearly in component markup.
-- [ ] **Step 6: Run desktop and mobile Playwright checks plus the production build.** Check that text, controls, sidebar states, cards, and forms do not overlap or resize unexpectedly.
+- [x] **Step 4: Migrate feature-specific buckets one route at a time.** Delete a selector only after `rg` reports no live usage and the corresponding route renders in the responsive smoke test.
+- [x] **Step 5: Keep justified global rules.** Retain `:root`, `@theme inline`, body typography/background, box sizing, focus-visible behavior, and complex global visual effects that cannot be represented more clearly in component markup.
+- [x] **Step 6: Run desktop and mobile Playwright checks plus the production build.** Check that text, controls, sidebar states, cards, and forms do not overlap or resize unexpectedly.
 
 ```powershell
 npm run test:e2e -- --grep "campaign|responsive|navigation"
@@ -227,11 +227,11 @@ Progress checkpoint (2026-08-21): dead character/faction selectors and the unuse
 - `/campaigns/[campaignId]` and its child routes are the canonical campaign destinations.
 - `legacyCampaignPath()` may remain only while an explicit compatibility redirect is still needed; no new caller may use it for internal navigation.
 
-- [ ] **Step 1: Search for legacy navigation and internal location assignments.** Run `rg` for `legacyCampaignPath`, `campaignId=`, `window.location`, `activeView`, `onSelect`, and `selectView`. Classify each match as compatibility, auth redirect, mutation result, or obsolete SPA behavior.
-- [ ] **Step 2: Replace obsolete internal navigation with `CampaignRouteLink`, `redirect()`, or `useRouter().push()` according to server/client ownership.** Preserve external redirects and auth callback behavior.
-- [ ] **Step 3: Update README route examples and local development instructions to use `/campaigns/[campaignId]`.** Keep compatibility behavior documented only if it still exists in code.
-- [ ] **Step 4: Add direct-link and back/forward coverage for one list route, one detail route, and Settings role filtering.** Assert the sidebar remains visible and the active item follows the pathname.
-- [ ] **Step 5: Remove `legacyCampaignPath` only after the usage search and compatibility test show no caller remains.**
+- [x] **Step 1: Search for legacy navigation and internal location assignments.** Run `rg` for `legacyCampaignPath`, `campaignId=`, `window.location`, `activeView`, `onSelect`, and `selectView`. Classify each match as compatibility, auth redirect, mutation result, or obsolete SPA behavior.
+- [x] **Step 2: Replace obsolete internal navigation with `CampaignRouteLink`, `redirect()`, or `useRouter().push()` according to server/client ownership.** Preserve external redirects and auth callback behavior.
+- [x] **Step 3: Update README route examples and local development instructions to use `/campaigns/[campaignId]`.** Keep compatibility behavior documented only if it still exists in code.
+- [x] **Step 4: Add direct-link and back/forward coverage for one list route, one detail route, and Settings role filtering.** Assert the sidebar remains visible and the active item follows the pathname.
+- [x] **Step 5: Remove `legacyCampaignPath` only after the usage search and compatibility test show no caller remains.**
 
 ```powershell
 npm test -- tests/campaign-routes.test.ts tests/campaign-server.test.ts tests/campaign-sidebar.test.tsx
@@ -246,9 +246,9 @@ npm run typecheck
 - Update: `README.md` and this continuation plan with the verified final state
 - Test: full repository test, lint, build, and Playwright suites
 
-- [ ] **Step 1: Run a usage search for obsolete cockpit and archive symbols.** Confirm no live imports remain before deleting files; retain any archive component still used by a routed feature.
-- [ ] **Step 2: Remove only verified-dead files, CSS selectors, imports, and compatibility branches.** Do not remove unrelated user changes from the dirty worktree.
-- [ ] **Step 3: Run the complete validation gate.**
+- [x] **Step 1: Run a usage search for obsolete cockpit and archive symbols.** Confirm no live imports remain before deleting files; retain any archive component still used by a routed feature.
+- [x] **Step 2: Remove only verified-dead files, CSS selectors, imports, and compatibility branches.** Do not remove unrelated user changes from the dirty worktree.
+- [x] **Step 3: Run the complete validation gate.**
 
 ```powershell
 npm test
@@ -260,14 +260,14 @@ npm run build -- --webpack
 git diff --check
 ```
 
-- [ ] **Step 4: If local Supabase is running, run the opt-in RLS suite.** It must target loopback only and must not push hosted migrations.
+- [x] **Step 4: If local Supabase is running, run the opt-in RLS suite.** It must target loopback only and must not push hosted migrations.
 
 ```powershell
 $env:RUN_LOCAL_SUPABASE_TESTS = "1"
 npm run test:rls
 ```
 
-- [ ] **Step 5: Record the final test counts, remaining warnings, browser coverage, and any intentionally retained compatibility code in this document and the repository handoff memory.**
+- [x] **Step 5: Record the final test counts, remaining warnings, browser coverage, and any intentionally retained compatibility code in this document and the repository handoff memory.**
 
 ## Definition Of Done
 
@@ -284,29 +284,27 @@ The refactor is ready for review when all of the following are true:
 
 ## Current Handoff (2026-08-22)
 
-The latest continuation verified the active Places route, shared art/AI loading states, and canonical route helper without changing persistence, auth, RLS, or API behavior. The focused and full browser contracts remain green, and the README now describes `/campaigns/[campaignId]` as the canonical campaign destination.
+The campaign frontend refactor is complete in the local worktree. The App Router and campaign layout own canonical navigation and the persistent shell, feature components own their presentation through Tailwind utilities, and the final local validation gates are green. Persistence, auth, RLS, API contracts, and the retained root compatibility redirect were not weakened.
 
 ### Completed in the latest continuation
 
-- Repaired and formatted `components/places/PlacesRouteView.tsx` after a misanchored one-line JSX patch. The routed list remains responsible for tree/search behavior and links to the separate Place detail route.
-- Migrated the remaining AI/art loading indicators to `animate-spin` and moved Place panel treatment to `panelClassName`.
-- Removed the active `.panel` and `.spin` dependencies from routed components and updated the Places browser assertions to check the shared background utility.
-- Verified that `components/archive/PlacesView.tsx` has no live imports. It remains a deletion candidate because it still contains obsolete archive markup.
-- Removed `legacyCampaignPath()` from `lib/campaign/routes.ts` and updated the README, while retaining the root `/?campaignId=...` compatibility redirect.
+- Replaced campaign-selector and invite-success query-string navigations with `useRouter().push(campaignPath(...))`; retained the root `/?campaignId=...` redirect solely for legacy entry points.
+- Added deterministic loopback E2E provisioning for both a GM and a player, including real login sessions and idempotent player membership through the existing join-link/RPC contract.
+- Added browser coverage for canonical selector and invite destinations, character list/detail back-forward history, active sidebar state, mobile shell behavior, dirty-form navigation guards, and player omission/direct denial of GM-only Settings.
+- Removed the verified-dead `components/archive/PlacesView.tsx` and migrated the remaining live presentation selectors out of `app/globals.css`; `components/ui/terminalStyles.ts` now owns the shared terminal utility class constants.
+- Added `.next-playwright/**` to the ESLint global ignores so generated Playwright Next output is not linted as application source.
+- Added the daily Netlify AI audit retention function and documented its production environment requirements and local invocation path.
 
-### Remaining work
+### Operator follow-up status
 
-- Replace the two internal `/?campaignId=...` navigations in `app/campaigns/page.tsx` and `app/join/[token]/page.tsx` with `campaignPath()` plus App Router navigation. Keep auth/session redirects and sign-out full navigations deliberate and documented.
-- Remove the verified-dead `.status-*`, `.status-open`, `.toast`, `.toast-icon`, and `.character-body` rules from `app/globals.css`. Recheck the remaining shared global primitives before deciding whether they should stay global or move into component utilities.
-- Delete `components/archive/PlacesView.tsx` after the final usage search, then add or update focused coverage for campaign-selector and invite-success navigation.
-- Add the still-missing Playwright history checks for back/forward navigation and player visibility of GM-only Settings.
-- Resolve the repository lint gate by excluding generated `.next-deploy` output from ESLint or documenting that generated-output issue as an environment/configuration blocker. The touched-file ESLint pass currently has 0 errors and 3 warnings.
-- Rerun the final gate after the remaining route/CSS edits: full Vitest, Playwright, typecheck, lint, both production builds, `git diff --check`, and local RLS when loopback Supabase is available.
-- Separate operator/integration follow-ups remain: hosted OpenRouter smoke testing requires hosted credentials, and the documented 90-day AI audit retention window still needs deployment scheduling.
+- Hosted OpenRouter provider smoke testing passed from the configured server environment: live model discovery and a minimal structured JSON generation both succeeded without exposing the key or generated content. A hosted authenticated application flow remains optional because it would require creating disposable hosted account data.
+- The 90-day AI audit retention window is implemented by `netlify/functions/ai-generation-retention.ts`, scheduled daily at `03:00 UTC`; it uses the existing Supabase secret-key helper and has a focused unit contract in `tests/ai-generation-retention.test.ts`.
+- The linked Netlify workspace upload was attempted but exited with status 1 without a deploy ID; production remains on the prior ready deploy, so the schedule will activate after a successful published deploy.
 
 ### Latest verification
 
-- `npm test`: 41 files passed, 203 tests passed; 1 file and 6 tests skipped.
-- `npm run test:e2e`: 20 tests passed.
+- `npm test`: 44 files passed, 211 tests passed; no skipped files or tests.
+- `npm run test:e2e`: 24 tests passed, including the GM/player setup project.
 - `npm run typecheck`, `npm run build`, `npm run build -- --webpack`, local RLS (6 tests), and `git diff --check`: passed.
-- `npm run lint`: blocked by generated `.next-deploy` output with 1,798 errors and 14,232 warnings; no errors were found in the touched-file lint pass.
+- Live OpenRouter smoke: model discovery and minimal structured JSON generation passed using the configured server key; no credentials or generated content were printed.
+- `npm run lint`: 0 errors and 8 existing warnings; generated `.next-playwright` output is excluded by `eslint.config.mjs`.

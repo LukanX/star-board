@@ -9,6 +9,7 @@ import {
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 import { recordDetailClassName, recordDetailMetaClassName, recordMetaClassName } from "@/components/ui/recordStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { campaignEntityPath, campaignSectionPath } from "@/lib/campaign/routes";
 import type {
   ApiCampaignNote,
@@ -41,7 +42,7 @@ export default function NotePublicRecord({
       </Link>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="eyebrow">{visibilityLabel}</p>
+          <p className={eyebrowClassName}>{visibilityLabel}</p>
           <h2 id="note-public-record-title">{note.title}</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <span className={recordMetaClassName}>

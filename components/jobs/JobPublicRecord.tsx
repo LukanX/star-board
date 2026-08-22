@@ -12,6 +12,7 @@ import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/M
 import VisualAsset from "@/components/ui/VisualAsset";
 import StatusPill from "@/components/ui/StatusPill";
 import { recordDetailClassName, recordMetaClassName, recordRowActionsClassName } from "@/components/ui/recordStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import type { ApiPlace, Mission } from "@/lib/campaign/types";
@@ -45,7 +46,7 @@ export default function JobPublicRecord({
       </Link>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="eyebrow">MISSION FILE // {job.status.toUpperCase()}</p>
+          <p className={eyebrowClassName}>MISSION FILE // {job.status.toUpperCase()}</p>
           <h2 id="job-public-record-title">{job.title}</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <StatusPill color={job.status === "open" ? "open" : job.accent}>

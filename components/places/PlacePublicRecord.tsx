@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ArrowLeft, FileText, LockKeyhole, Map } from "lucide-react";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import { panelClassName, recordRowActionsClassName } from "@/components/ui/recordStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import type { ApiPlace } from "@/lib/campaign/types";
 import { getPlaceBreadcrumb } from "@/lib/places";
@@ -42,7 +43,7 @@ export default function PlacePublicRecord({
           className="flex items-start justify-between gap-[15px] pb-[17px] border-b border-[var(--line)] max-[420px]:gap-[8px]"
         >
           <div className="min-w-0">
-            <p className="eyebrow">{place.kind.toUpperCase()} RECORD</p>
+            <p className={eyebrowClassName}>{place.kind.toUpperCase()} RECORD</p>
             <h2
               className="m-0 mb-2 text-[24px] [overflow-wrap:anywhere] max-[760px]:text-[20px]"
               id="place-public-record-title"
@@ -72,7 +73,7 @@ export default function PlacePublicRecord({
           className="grid gap-[18px] pt-[19px]"
         >
           <div data-place-public-brief="true" className="grid gap-[8px]">
-            <p className="eyebrow">PUBLIC BRIEF</p>
+            <p className={eyebrowClassName}>PUBLIC BRIEF</p>
             <p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">
               {place.description || "No public description recorded yet."}
             </p>

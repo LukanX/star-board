@@ -3,6 +3,7 @@ import { BookOpen, Map, UserRound } from "lucide-react";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import RecordPortrait from "@/components/ui/RecordPortrait";
 import { recordDetailClassName, recordDetailMetaClassName, recordMetaClassName } from "@/components/ui/recordStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { getAttachedArtUrl } from "@/lib/campaign/mappers";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import { getPlaceBreadcrumb } from "@/lib/places";
@@ -45,7 +46,7 @@ export default function NpcPublicRecord({
         </div>
         <div data-npc-detail-copy="true" className="min-w-0 grid gap-3">
           <div>
-            <p className="eyebrow">PUBLIC CONTACT FILE</p>
+            <p className={eyebrowClassName}>PUBLIC CONTACT FILE</p>
             <h2 id="npc-public-record-title">{npc.name}</h2>
             <p className={recordDetailMetaClassName}>
               {npc.species || "Unclassified"}

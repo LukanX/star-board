@@ -11,6 +11,10 @@ import { campaignEntityPath } from "@/lib/campaign/routes";
 import type { ApiPlace } from "@/lib/campaign/types";
 import { buildPlaceTree, getPlaceBreadcrumb } from "@/lib/places";
 import { panelClassName } from "@/components/ui/recordStyles";
+import {
+  accentIconCyanClassName,
+  eyebrowClassName,
+} from "@/components/ui/terminalStyles";
 
 type EditorState = { place?: ApiPlace; parentPlaceId: string | null };
 
@@ -116,7 +120,7 @@ export default function PlacesRouteView({
           data-places-toolbar-heading="true"
           className="grid gap-[7px]"
         >
-          <p className="eyebrow m-0">
+          <p className={`${eyebrowClassName} !m-0`}>
             {places.length.toString().padStart(2, "0")} RECORDED PLACES
           </p>
           <strong className="text-[var(--ink)] text-[13px] font-[550]">
@@ -147,10 +151,10 @@ export default function PlacesRouteView({
           >
             <div className="panel-topline flex items-start justify-between border-b border-[var(--line)] px-[21px] pb-4 pt-5">
               <div>
-                <p className="eyebrow mb-2">PLACE TREE</p>
+                <p className={`${eyebrowClassName} !mb-2`}>PLACE TREE</p>
                 <h2>Atlas structure</h2>
               </div>
-              <Map className="accent-icon-cyan" size={17} />
+              <Map className={accentIconCyanClassName} size={17} />
             </div>
             {normalizedSearch ? (
               <div
@@ -217,8 +221,8 @@ export default function PlacesRouteView({
               data-places-detail="true"
               className="min-w-0 p-[21px] max-[760px]:p-[17px]"
             >
-              <Map className="accent-icon-cyan" size={24} />
-              <p className="eyebrow">ROUTE-OWNED PLACE FILES</p>
+              <Map className={accentIconCyanClassName} size={24} />
+              <p className={eyebrowClassName}>ROUTE-OWNED PLACE FILES</p>
               <h2>Choose a place from the atlas.</h2>
               <p>
                 Open a record to inspect its public brief, notes, breadcrumb,

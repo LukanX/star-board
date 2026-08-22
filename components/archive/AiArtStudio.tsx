@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LoaderCircle, Sparkles, UploadCloud, X } from "lucide-react";
 import AiModelPicker from "@/components/archive/AiModelPicker";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import {
   defaultImageAspectRatio,
   defaultImageSize,
@@ -344,7 +345,7 @@ function AiArtStudioContent({
     <section className="grid gap-[10px] p-[13px] border border-[rgba(255,92,154,.3)] bg-[linear-gradient(120deg,rgba(255,92,154,.07),rgba(185,146,255,.035))]">
       <div className="flex items-start justify-between gap-3 text-[var(--pink)]">
         <div>
-          <p className="eyebrow mb-[5px] text-[var(--pink)]">GM TOOL // IMAGE DRAFT</p>
+          <p className={`${eyebrowClassName} !mb-[5px] text-[var(--pink)]`}>GM TOOL // IMAGE DRAFT</p>
           <h3 className="m-0 text-[14px]">Shape the visual signal</h3>
         </div>
         <Sparkles size={17} />

@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { CirclePlus, LockKeyhole, Trash2, X } from "lucide-react";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type {
   ApiCampaignNote,
   CampaignNoteEpisode,
@@ -141,7 +142,7 @@ export default function NoteEditor({
     <section className={`${editorPanelClassName} mb-5`} data-editor-panel="true">
       <div className="editor-heading flex items-start justify-between gap-4 mb-[18px]">
         <div>
-          <p className="eyebrow">{isGM ? "GM / PLAYER NOTE" : "PLAYER NOTE"}</p>
+          <p className={eyebrowClassName}>{isGM ? "GM / PLAYER NOTE" : "PLAYER NOTE"}</p>
           <h2 className="mt-[6px] text-[19px]">
             {note ? `Edit ${note.title}` : "Add a campaign note"}
           </h2>

@@ -10,6 +10,7 @@ import {
 } from "@/components/archive/CampaignArtField";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { ApiPlace } from "@/lib/campaign/types";
 import { flattenPlaceTree, isPlaceDescendant } from "@/lib/places";
 
@@ -188,7 +189,7 @@ export default function PlaceEditor({
     <section className={`${editorPanelClassName} mb-[18px]`} data-editor-panel="true">
       <div className="editor-heading flex items-start justify-between gap-4 mb-[18px]">
         <div>
-          <p className="eyebrow">GM PLACE RECORD</p>
+          <p className={eyebrowClassName}>GM PLACE RECORD</p>
           <h2 className="mt-[6px] text-[19px]">
             {place
               ? `Edit ${place.name}`

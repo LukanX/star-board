@@ -1,3 +1,4 @@
+import path from "node:path";
 import { expect, test } from "./fixtures";
 
 test("keeps one persistent shell on a direct campaign load and refresh", async ({
@@ -80,6 +81,170 @@ test("preserves campaign creation action sizing", async ({ page }) => {
   await expect(createButton).toHaveClass(/mt-\[10px\]/);
   await expect(createButton).toHaveCSS("width", "368px");
   await expect(createButton).toHaveCSS("margin-top", "10px");
+});
+
+test("opens a selected campaign at its canonical route", async ({
+  page,
+  campaign,
+}) => {
+  let usedLegacyNavigation = false;
+  await page.route("**/?campaignId=*", async (route) => {
+    usedLegacyNavigation = true;
+    await route.abort();
+  });
+
+  await page.goto("/campaigns");
+  await page.locator("button").filter({ hasText: campaign.campaignName }).click();
+
+  await expect(page).toHaveURL(
+    new RegExp(`/campaigns/${campaign.campaignId}$`),
+  );
+  expect(usedLegacyNavigation).toBe(false);
+});
+
+test("returns from a successful invite to the canonical campaign route", async ({
+  page,
+  campaign,
+}) => {
+  let usedLegacyNavigation = false;
+  await page.route("**/?campaignId=*", async (route) => {
+    usedLegacyNavigation = true;
+    await route.abort();
+  });
+  await page.route("**/api/campaigns/join", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ campaignId: campaign.campaignId }),
+      status: 200,
+    });
+  });
+
+  await page.goto("/join/playwright-invite-token");
+  await page
+    .getByRole("button", { name: "ACCEPT INVITATION", exact: true })
+    .click();
+  await expect(
+    page.getByText("Returning to the cockpit...", { exact: false }),
+  ).toBeVisible();
+
+  await expect(page).toHaveURL(
+    new RegExp(`/campaigns/${campaign.campaignId}$`),
+  );
+  expect(usedLegacyNavigation).toBe(false);
+});
+
+test("preserves back and forward history between a character list and detail route", async ({
+  page,
+  campaign,
+}) => {
+  const characterName = `History Contract ${Date.now()}`;
+  let characterId: string | null = null;
+
+  try {
+    await page.goto(`/campaigns/${campaign.campaignId}`);
+    const createResponse = await page.request.post(
+      new URL(
+        `/api/campaigns/${campaign.campaignId}/characters`,
+        page.url(),
+      ).toString(),
+      {
+        data: {
+          name: characterName,
+          species: "Android",
+          className: "Navigator",
+          level: 1,
+          backstoryMarkdown: "Created for browser history verification.",
+        },
+      },
+    );
+    expect(createResponse.ok()).toBeTruthy();
+    const createPayload = (await createResponse.json()) as {
+      character?: { id?: string };
+    };
+    characterId = createPayload.character?.id ?? null;
+    expect(characterId).toBeTruthy();
+
+    await page.goto(`/campaigns/${campaign.campaignId}/characters`);
+    await page
+      .getByRole("link", { name: `View ${characterName} public record` })
+      .click();
+    await expect(page).toHaveURL(
+      new RegExp(`/campaigns/${campaign.campaignId}/characters/${characterId}$`),
+    );
+
+    const charactersLink = page.getByRole("link", {
+      name: "Characters",
+      exact: true,
+    });
+    await expect(charactersLink).toHaveClass(
+      /bg-\[rgba\(98,232,255,\.095\)\]/,
+    );
+
+    await page.goBack();
+    await expect(page).toHaveURL(
+      new RegExp(`/campaigns/${campaign.campaignId}/characters$`),
+    );
+    await expect(
+      page.getByRole("link", { name: `View ${characterName} public record` }),
+    ).toBeVisible();
+    await expect(charactersLink).toHaveClass(
+      /bg-\[rgba\(98,232,255,\.095\)\]/,
+    );
+
+    await page.goForward();
+    await expect(page).toHaveURL(
+      new RegExp(`/campaigns/${campaign.campaignId}/characters/${characterId}$`),
+    );
+    await expect(charactersLink).toHaveClass(
+      /bg-\[rgba\(98,232,255,\.095\)\]/,
+    );
+  } finally {
+    if (characterId) {
+      await page.request.delete(
+        new URL(
+          `/api/campaigns/${campaign.campaignId}/characters/${characterId}`,
+          page.url(),
+        ).toString(),
+      );
+    }
+  }
+});
+
+test("keeps GM-only Settings hidden and inaccessible to a player", async ({
+  browser,
+  campaign,
+}) => {
+  const playerContext = await browser.newContext({
+    storageState: path.resolve("playwright/.auth/player.json"),
+  });
+  const playerPage = await playerContext.newPage();
+
+  try {
+    await playerPage.goto(`/campaigns/${campaign.campaignId}`);
+    await expect(playerPage.locator("[data-campaign-shell]")).toHaveCount(1);
+    await expect(
+      playerPage.getByRole("link", {
+        name: "Campaign settings",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+
+    const settingsResponse = await playerPage.goto(
+      `/campaigns/${campaign.campaignId}/settings`,
+    );
+    expect(settingsResponse).not.toBeNull();
+    await expect(
+      playerPage.getByText("Campaign unavailable.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      playerPage.getByRole("heading", {
+        name: "Campaign settings",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+  } finally {
+    await playerContext.close();
+  }
 });
 
 test("preserves mobile campaign join-link action placement", async ({
@@ -497,6 +662,12 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
       new RegExp(`/campaigns/${campaign.campaignId}/npcs/[^/]+$`),
     );
 
+    const npcDetailPath = `/campaigns/${campaign.campaignId}/npcs/${createdNpcId}`;
+    await page.goto(npcDetailPath);
+    await expect(page).toHaveURL(new RegExp(`${npcDetailPath}$`));
+    await page.reload();
+    await expect(page).toHaveURL(new RegExp(`${npcDetailPath}$`));
+
     const preview = page.locator("[data-npc-detail-preview]");
     await expect(preview).toHaveCount(1);
     await expect(preview).toHaveClass(/grid/);
@@ -534,9 +705,12 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
 
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileColumns = await preview.evaluate((element) =>
-      getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/),
+      getComputedStyle(element).gridTemplateColumns.trim(),
     );
-    expect(mobileColumns).toHaveLength(1);
+    expect(
+      mobileColumns.split(/\s+/).length === 1 ||
+        /^repeat\(1,\s*minmax\(0px,\s*1fr\)\)$/.test(mobileColumns),
+    ).toBe(true);
     await expect(portrait).toHaveCSS("width", "220px");
     await expect(portrait).toHaveCSS("height", "220px");
     await expect(portrait).toHaveCSS("min-width", "0px");

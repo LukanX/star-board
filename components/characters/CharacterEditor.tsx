@@ -6,6 +6,7 @@ import { useCampaignArtEditor } from "@/components/archive/CampaignArtField";
 import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName } from "@/components/ui/editorStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { ApiCharacter, CharacterDraft } from "@/lib/campaign/types";
 
 const emptyDraft: CharacterDraft = {
@@ -109,7 +110,7 @@ export default function CharacterEditor({
     <section className={`${editorPanelClassName} mb-5`} data-editor-panel="true">
       <div className="editor-heading flex items-start justify-between gap-4 mb-[18px]">
         <div>
-          <p className="eyebrow">{character ? "EDIT RECORD" : "NEW RECORD"}</p>
+            <p className={eyebrowClassName}>{character ? "EDIT RECORD" : "NEW RECORD"}</p>
           <h2 className="mt-[6px] text-[19px]">
             {character ? `Edit ${character.name}` : "Add a character"}
           </h2>

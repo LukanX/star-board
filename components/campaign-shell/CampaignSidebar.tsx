@@ -4,6 +4,12 @@ import type { ComponentType } from "react";
 import { ChevronDown, Hexagon, Orbit, X } from "lucide-react";
 import SignOutButton from "@/components/auth/SignOutButton";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
+import {
+  microLabelClassName,
+  mutedIconClassName,
+  userAvatarClassName,
+  liveDotClassName,
+} from "@/components/ui/terminalStyles";
 
 export type CampaignSidebarNavItem = {
   id: string;
@@ -70,10 +76,10 @@ export function CampaignSidebar({
           <Hexagon size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <span className="micro-label">ACTIVE CAMPAIGN</span>
+          <span className={microLabelClassName}>ACTIVE CAMPAIGN</span>
           <strong className="mt-[5px] block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-[650] tracking-[.02em] text-[var(--ink)]">{campaignName}</strong>
         </div>
-        <ChevronDown size={15} className="muted-icon" />
+        <ChevronDown size={15} className={mutedIconClassName} />
       </CampaignRouteLink>
       <nav className="side-nav flex-1" aria-label="Campaign navigation">
         {navItems.map((group) => (
@@ -105,10 +111,10 @@ export function CampaignSidebar({
       </nav>
       <div className="side-footer mt-auto">
         <div className="mb-[14px] ml-3 flex items-center gap-[7px] text-[#607080] font-mono text-[8px] tracking-[.11em]">
-          <span className="live-dot" /> SUPABASE SYNC ACTIVE
+          <span className={liveDotClassName} /> SUPABASE SYNC ACTIVE
         </div>
         <div className="mt-[9px] flex items-center gap-[9px] border-t border-[var(--line)] px-[10px] pb-0 pt-[17px]">
-          <div className="avatar avatar-user">
+          <div className={userAvatarClassName}>
             {displayName.slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">

@@ -22,6 +22,10 @@ import {
   authStatusClassName,
   authSubmitClassName,
 } from "@/components/auth/authStyles";
+import {
+  eyebrowBrightClassName,
+  liveDotBrightClassName,
+} from "@/components/ui/terminalStyles";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type AuthMode = "create" | "signin" | "reset";
@@ -108,7 +112,7 @@ export default function LoginPage() {
       <div className={`${authSignalClassName} ${authSignalTwoClassName}`} />
       <section className={authPanelClassName}>
         <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN OPERATIONS</small></span></div>
-        <div className={authHeadingClassName}><p className="eyebrow eyebrow-bright"><span className="live-dot" /> {isCreatingAccount ? "ACCOUNT CREATION" : isResettingPassword ? "PASSWORD RESET" : "SIGN IN"}</p><h1>{isCreatingAccount ? "Create your account." : isResettingPassword ? "Reset your password." : "Sign in to Star Board."}</h1><p>{isCreatingAccount ? "Use your email address and password to access your campaign console." : isResettingPassword ? "Enter your email address and we will send you a secure password reset link." : "Enter your email address and password to open your campaign console."}</p></div>
+        <div className={authHeadingClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> {isCreatingAccount ? "ACCOUNT CREATION" : isResettingPassword ? "PASSWORD RESET" : "SIGN IN"}</p><h1>{isCreatingAccount ? "Create your account." : isResettingPassword ? "Reset your password." : "Sign in to Star Board."}</h1><p>{isCreatingAccount ? "Use your email address and password to access your campaign console." : isResettingPassword ? "Enter your email address and we will send you a secure password reset link." : "Enter your email address and password to open your campaign console."}</p></div>
         <form className={authFormClassName} onSubmit={handleSubmit}>
           <label htmlFor="email">Email address</label>
           <input autoComplete="email" id="email" onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" required type="email" value={email} />

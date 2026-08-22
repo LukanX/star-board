@@ -9,6 +9,11 @@ import {
 } from "@/components/ui/recordStyles";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
 import {
+  eyebrowBrightClassName,
+  eyebrowClassName,
+  metaDividerClassName,
+} from "@/components/ui/terminalStyles";
+import {
   BookOpen,
   ChevronRight,
   CirclePlus,
@@ -224,7 +229,7 @@ export default function CampaignNotesView({
         <section className={`${editorPanelClassName} mb-5`} data-editor-panel="true">
           <div className="editor-heading flex items-start justify-between gap-4 mb-[18px]">
             <div>
-              <p className="eyebrow">
+              <p className={eyebrowClassName}>
                 {isGM ? "GM / PLAYER NOTE" : "PLAYER NOTE"}
               </p>
               <h2 className="mt-[6px] text-[19px]">
@@ -408,7 +413,7 @@ export default function CampaignNotesView({
                 <h3>{note.title}</h3>
                 <p>
                   Added by <strong>{note.author.displayName}</strong>{" "}
-                  <span className="meta-divider" /> {noteAge(note)}
+                  <span className={metaDividerClassName} /> {noteAge(note)}
                 </p>
               </div>
               <button
@@ -441,7 +446,7 @@ export default function CampaignNotesView({
       {selectedNote && !editorOpen ? (
         <section className={recordDetailClassName}>
           <div>
-            <p className="eyebrow">
+            <p className={eyebrowClassName}>
               {selectedNote.visibility === "gm" ? "GM NOTE" : "PLAYER NOTE"}
             </p>
             <h2>{selectedNote.title}</h2>
@@ -484,9 +489,9 @@ function PageLayout({
     <>
       <div className="page-intro flex items-end justify-between gap-6 mb-[29px] max-[760px]:items-start max-[760px]:flex-col max-[760px]:gap-[19px] max-[760px]:mb-[25px]">
         <div>
-          <p className="eyebrow eyebrow-bright">{eyebrow}</p>
+          <p className={eyebrowBrightClassName}>{eyebrow}</p>
           <h1>{title}</h1>
-          <p className="intro-copy">{description}</p>
+          <p className="m-0 max-w-[510px] text-[var(--muted)] text-[13px] leading-[1.6]">{description}</p>
         </div>
         {action ? (
           <button

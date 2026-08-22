@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import AiArtStudio from "@/components/archive/AiArtStudio";
 import { ImagePlus, LoaderCircle, Sparkles, X } from "lucide-react";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 
 type ArtKind = "character" | "npc" | "faction" | "job" | "place";
 
@@ -213,7 +214,7 @@ export default function CampaignArtField({
           {previewUrl ? null : <ImagePlus size={22} />}
         </div>
         <div className="min-w-0 grid content-center gap-[5px]">
-          <p className="eyebrow">CAMPAIGN ART</p>
+          <p className={eyebrowClassName}>CAMPAIGN ART</p>
           <strong className="text-[var(--ink)] font-mono text-[10px] tracking-[.08em]">
             {previewUrl ? "ART ASSET READY" : "NO ART ASSET"}
           </strong>

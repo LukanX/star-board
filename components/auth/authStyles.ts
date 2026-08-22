@@ -30,7 +30,7 @@ export const authBrandSubtitleClassName =
   "mt-1 block text-[var(--dim)] font-mono text-[7px] tracking-[.14em]";
 
 export const authHeadingClassName =
-  "pt-[37px] pb-7 [&_.eyebrow]:mb-[13px] [&_h1]:mb-3 [&_h1]:text-[clamp(32px,6vw,44px)] [&_p:last-child]:m-0 [&_p:last-child]:max-w-[360px] [&_p:last-child]:text-[var(--muted)] [&_p:last-child]:text-[12px] [&_p:last-child]:leading-[1.65] max-[520px]:pt-[29px]";
+  "pt-[37px] pb-7 [&>p:first-child]:mb-[13px] [&_h1]:mb-3 [&_h1]:text-[clamp(32px,6vw,44px)] [&_p:last-child]:m-0 [&_p:last-child]:max-w-[360px] [&_p:last-child]:text-[var(--muted)] [&_p:last-child]:text-[12px] [&_p:last-child]:leading-[1.65] max-[520px]:pt-[29px]";
 
 export const authFormClassName =
   "grid gap-[9px] [&_label]:text-[var(--dim)] [&_label]:font-mono [&_label]:text-[8px] [&_label]:tracking-[.14em] [&_input]:h-[44px] [&_input]:w-full [&_input]:border [&_input]:border-[rgba(139,151,169,.28)] [&_input]:bg-[#0a1118] [&_input]:px-[13px] [&_input]:text-[var(--ink)] [&_input]:font-mono [&_input]:text-[12px] [&_input]:outline-0 [&_input:focus]:border-[var(--cyan)] [&_input:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_input::placeholder]:text-[#4d5a6b]";

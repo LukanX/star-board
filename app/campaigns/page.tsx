@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight, Check, CirclePlus, Hexagon, Orbit, Radio, ShieldCheck } from "lucide-react";
 import {
   authBrandClassName,
@@ -10,6 +11,12 @@ import {
   authGridClassName,
 } from "@/components/auth/authStyles";
 import SignOutButton from "@/components/auth/SignOutButton";
+import {
+  eyebrowBrightClassName,
+  liveDotClassName,
+  liveDotBrightClassName,
+} from "@/components/ui/terminalStyles";
+import { campaignPath } from "@/lib/campaign/routes";
 
 const campaignsShellClassName =
   "relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_10%_0%,rgba(255,92,154,.1),transparent_28%),radial-gradient(circle_at_90%_100%,rgba(98,232,255,.1),transparent_30%),#080b11] px-6 py-[6vh] max-[760px]:px-3 max-[760px]:py-[18px]";
@@ -107,6 +114,7 @@ function getCampaign(membership: Membership) {
 }
 
 export default function CampaignsPage() {
+  const router = useRouter();
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -158,7 +166,7 @@ export default function CampaignsPage() {
         throw new Error(result.error ?? "Unable to create campaign.");
       }
 
-      window.location.href = `/?campaignId=${encodeURIComponent(result.campaignId)}`;
+      router.push(campaignPath(result.campaignId));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to create campaign.");
     } finally {
@@ -203,7 +211,7 @@ export default function CampaignsPage() {
           <div className={campaignsHeaderBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN OPERATIONS</small></span></div>
           <div className={campaignsHeaderActionsClassName}><span className={campaignsClearanceClassName}><ShieldCheck size={14} /> AUTHENTICATED CREW</span><SignOutButton className={campaignsSignOutClassName} /></div>
         </header>
-        <div className={campaignsIntroClassName}><p className="eyebrow eyebrow-bright"><span className="live-dot" /> CAMPAIGN MANIFEST</p><h1>Choose or create a campaign.</h1><p>Anyone with an account can open a new campaign. A GM invite is only needed to join an existing one.</p></div>
+        <div className={campaignsIntroClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> CAMPAIGN MANIFEST</p><h1>Choose or create a campaign.</h1><p>Anyone with an account can open a new campaign. A GM invite is only needed to join an existing one.</p></div>
         <div className={campaignsLayoutClassName}>
           <section className={campaignsSectionClassName} aria-label="Your campaigns">
             <div className={campaignsSectionHeadingClassName}><span>YOUR CAMPAIGNS</span><strong>{memberships.length.toString().padStart(2, "0")}</strong></div>
@@ -212,9 +220,9 @@ export default function CampaignsPage() {
 
               if (!campaign) return null;
 
-              return <div className={campaignChoiceWrapClassName} key={campaign.id}><button className={campaignChoiceClassName} onClick={() => { window.location.href = `/?campaignId=${encodeURIComponent(campaign.id)}`; }} type="button"><span className={campaignChoiceIconClassName}><Hexagon size={19} /></span><span className={campaignChoiceCopyClassName}><strong>{campaign.name}</strong><small>{campaign.system} {"//"} {membership.role === "gm" ? "GAME MASTER" : "PLAYER"}</small><span>{campaign.description || "No campaign brief recorded."}</span></span><ArrowUpRight className={campaignChoiceArrowClassName} size={17} /></button><form className={campaignDisplayFormClassName} onSubmit={(event) => { event.preventDefault(); void updateDisplayName(campaign.id); }}><label className={campaignDisplayLabelClassName} htmlFor={`display-name-${campaign.id}`}>YOUR NAME IN THIS CAMPAIGN</label><input className={campaignDisplayInputClassName} id={`display-name-${campaign.id}`} maxLength={120} onChange={(event) => setDisplayNames((current) => ({ ...current, [campaign.id]: event.target.value }))} value={displayNames[campaign.id] ?? membership.display_name} /><button aria-label={`Save display name for ${campaign.name}`} className={campaignDisplaySaveClassName} title="Save display name" type="submit"><Check size={14} /></button></form></div>;
+              return <div className={campaignChoiceWrapClassName} key={campaign.id}><button className={campaignChoiceClassName} onClick={() => router.push(campaignPath(campaign.id))} type="button"><span className={campaignChoiceIconClassName}><Hexagon size={19} /></span><span className={campaignChoiceCopyClassName}><strong>{campaign.name}</strong><small>{campaign.system} {"//"} {membership.role === "gm" ? "GAME MASTER" : "PLAYER"}</small><span>{campaign.description || "No campaign brief recorded."}</span></span><ArrowUpRight className={campaignChoiceArrowClassName} size={17} /></button><form className={campaignDisplayFormClassName} onSubmit={(event) => { event.preventDefault(); void updateDisplayName(campaign.id); }}><label className={campaignDisplayLabelClassName} htmlFor={`display-name-${campaign.id}`}>YOUR NAME IN THIS CAMPAIGN</label><input className={campaignDisplayInputClassName} id={`display-name-${campaign.id}`} maxLength={120} onChange={(event) => setDisplayNames((current) => ({ ...current, [campaign.id]: event.target.value }))} value={displayNames[campaign.id] ?? membership.display_name} /><button aria-label={`Save display name for ${campaign.name}`} className={campaignDisplaySaveClassName} title="Save display name" type="submit"><Check size={14} /></button></form></div>;
             }) : <div className={campaignEmptyClassName}><Radio size={20} /><p>Nothing on the manifest yet.</p><span>Your first campaign will become the crew&apos;s home signal.</span></div>}
-            <p className={campaignStatusClassName}><span className="live-dot" /> {status}</p>
+            <p className={campaignStatusClassName}><span className={liveDotClassName} /> {status}</p>
           </section>
           <section className={campaignsSectionClassName}>
             <div className={campaignsSectionHeadingClassName}><span>OPEN YOUR CAMPAIGN</span><CirclePlus size={16} /></div>

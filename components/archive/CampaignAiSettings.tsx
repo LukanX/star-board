@@ -11,6 +11,11 @@ import {
 } from "lucide-react";
 import { formatAiModelPricing } from "@/lib/ai/model-pricing";
 import { panelClassName } from "@/components/ui/recordStyles";
+import {
+  accentIconCyanClassName,
+  eyebrowClassName,
+  liveDotClassName,
+} from "@/components/ui/terminalStyles";
 
 type AiCapability = "structured-text" | "image";
 
@@ -234,10 +239,10 @@ export default function CampaignAiSettings({
     <section data-campaign-ai-settings className={`${panelClassName} w-full min-w-0 pt-px`}>
       <div className="panel-topline flex items-start justify-between px-[21px] pb-3 pt-5">
         <div>
-          <p className="eyebrow mb-2">GM CONTROL // AI ACCESS</p>
+          <p className={`${eyebrowClassName} !mb-2`}>GM CONTROL // AI ACCESS</p>
           <h2>Campaign model access</h2>
         </div>
-        <SlidersHorizontal size={17} className="accent-icon-cyan" />
+          <SlidersHorizontal size={17} className={accentIconCyanClassName} />
       </div>
       <div className="grid gap-[6px] px-[21px] pb-4 border-b border-[var(--line)]">
         <p className="m-0 text-[var(--muted)] text-[11px] leading-[1.5]">
@@ -250,7 +255,7 @@ export default function CampaignAiSettings({
         </span>
       </div>
       <p className="flex items-center gap-[7px] m-0 p-[12px_21px] text-[var(--dim)] font-mono text-[8px] tracking-[.06em] leading-[1.5]">
-        <span className="live-dot" />{" "}
+              <span className={liveDotClassName} />{" "}
         {campaignId ? status : "Select a campaign to manage model access."}
       </p>
       {error ? (

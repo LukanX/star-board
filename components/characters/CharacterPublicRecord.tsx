@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import VisualAsset from "@/components/ui/VisualAsset";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { Character } from "@/lib/campaign/types";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 
@@ -24,7 +25,7 @@ export default function CharacterPublicRecord({
       </Link>
       <div className="col-span-full flex items-start justify-between gap-[15px] pb-[17px] border-b border-[var(--line)]">
         <div>
-          <p className="eyebrow">PLAYER VIEW // PUBLIC RECORD</p>
+          <p className={eyebrowClassName}>PLAYER VIEW // PUBLIC RECORD</p>
           <h2
             className="m-0 mb-2 !text-[26px] max-[760px]:!text-[22px]"
             id="character-public-record-title"
@@ -59,7 +60,7 @@ export default function CharacterPublicRecord({
         </MarkdownPreview>
         {character.physicalDescription ? (
           <div className="p-[15px] border border-[rgba(98,232,255,.2)] bg-[rgba(98,232,255,.035)]">
-            <p className="eyebrow mb-2 text-[var(--cyan)]">
+            <p className={`${eyebrowClassName} !mb-2 text-[var(--cyan)]`}>
               PHYSICAL APPEARANCE
             </p>
             <p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65]">

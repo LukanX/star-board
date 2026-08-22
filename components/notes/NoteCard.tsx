@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BookOpen, ChevronRight, LockKeyhole } from "lucide-react";
 import { campaignEntityPath } from "@/lib/campaign/routes";
+import { metaDividerClassName } from "@/components/ui/terminalStyles";
 import type { CampaignNote } from "@/lib/campaign/types";
 
 function noteAge(note: CampaignNote) {
@@ -29,7 +30,7 @@ export default function NoteCard({ campaignId, note, episodeTitle }: { campaignI
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-3 text-[var(--dim)] font-mono text-[8px] tracking-[.1em]"><span>{scopeLabel}</span><span className={`inline-flex items-center gap-1 text-[var(--cyan)] ${note.visibility === "gm" ? "text-[var(--pink)]" : ""}`}>{note.visibility === "gm" ? <LockKeyhole size={12} /> : <BookOpen size={12} />} {visibilityLabel}</span></div>
       <h3 className="m-0 mt-[10px] mb-[6px] text-[14px]">{note.title}</h3>
-      <p className="m-0 text-[var(--dim)] text-[10px]">Added by <strong className="text-[var(--muted)] font-medium">{note.author.displayName}</strong> <span className="meta-divider" /> {noteAge(note)}</p>
+      <p className="m-0 text-[var(--dim)] text-[10px]">Added by <strong className="text-[var(--muted)] font-medium">{note.author.displayName}</strong> <span className={metaDividerClassName} /> {noteAge(note)}</p>
     </div>
     <Link aria-label={`Open note ${note.title}`} className="w-8 h-8 inline-grid place-items-center border border-transparent bg-transparent text-[var(--muted)] cursor-pointer p-0 hover:text-[var(--ink)] hover:border-[var(--line)] hover:bg-[rgba(255,255,255,.035)]" href={campaignEntityPath(campaignId, "notes", note.id)} title={`Open ${note.title}`}><ChevronRight size={17} /></Link>
   </article>;

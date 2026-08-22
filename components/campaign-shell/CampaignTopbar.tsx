@@ -2,6 +2,7 @@
 
 import { ChevronRight, Command, Menu } from "lucide-react";
 import SignOutButton from "@/components/auth/SignOutButton";
+import { mutedIconClassName } from "@/components/ui/terminalStyles";
 
 export type CampaignTopbarProps = {
   campaignName: string;
@@ -30,7 +31,7 @@ export function CampaignTopbar({
           <Command size={14} />
         </div>
         <span className="text-[var(--dim)] font-mono text-[9px] tracking-[.13em] max-[760px]:hidden">{campaignName}</span>
-        <ChevronRight size={14} className="muted-icon max-[760px]:hidden" />
+        <ChevronRight size={14} className={`${mutedIconClassName} max-[760px]:hidden`} />
         <span className="text-[#cdd6e3] font-mono text-[9px] tracking-[.13em]">{activeLabel.toUpperCase()}</span>
       </div>
       <div className="topbar-right flex items-center gap-[10px] max-[760px]:gap-[5px]">

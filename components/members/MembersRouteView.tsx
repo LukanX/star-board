@@ -14,6 +14,11 @@ import MemberProfileForm from "@/components/members/MemberProfileForm";
 import EmptyState from "@/components/ui/EmptyState";
 import PageLayout from "@/components/ui/PageLayout";
 import { recordDetailClassName, recordDetailMetaClassName } from "@/components/ui/recordStyles";
+import {
+  eyebrowClassName,
+  legendCyanClassName,
+  legendPinkClassName,
+} from "@/components/ui/terminalStyles";
 import type { ApiCampaignMember } from "@/lib/campaign/types";
 
 type MemberRole = ApiCampaignMember["role"];
@@ -185,7 +190,7 @@ export default function MembersRouteView({
         className="grid grid-cols-2 gap-6 items-start mt-0 mb-5 p-[26px] border border-[var(--line)] bg-[linear-gradient(105deg,rgba(98,232,255,.05),rgba(255,92,154,.025))] max-[760px]:grid-cols-1 max-[760px]:p-[18px]"
       >
         <div>
-          <p className="eyebrow">ACCESS MODEL</p>
+          <p className={eyebrowClassName}>ACCESS MODEL</p>
           <h2 className="max-w-[360px] mb-[10px] text-[22px]">
             One campaign. Two levels of clearance.
           </h2>
@@ -200,10 +205,10 @@ export default function MembersRouteView({
             className="flex flex-col gap-[11px] py-[6px] text-[var(--dim)] font-mono text-[9px] tracking-[.11em]"
           >
             <span className="inline-flex items-center gap-[7px]">
-              <i className="legend-dot dot-cyan" /> PLAYER VISIBLE
+              <i className={legendCyanClassName} /> PLAYER VISIBLE
             </span>
             <span className="inline-flex items-center gap-[7px]">
-              <i className="legend-dot dot-pink" /> GM ONLY
+              <i className={legendPinkClassName} /> GM ONLY
             </span>
           </div>
           <MemberProfileForm
@@ -254,7 +259,7 @@ export default function MembersRouteView({
         <section className={recordDetailClassName}>
           <div className="editor-heading flex items-start justify-between gap-4 mb-[18px]">
             <div>
-              <p className="eyebrow">
+              <p className={eyebrowClassName}>
                 MEMBER ACCESS // {selectedMember.role.toUpperCase()}
               </p>
               <h2 className="mt-[6px] text-[19px]">
@@ -314,7 +319,7 @@ export default function MembersRouteView({
             <Send size={18} />
           </div>
           <div>
-            <p className="eyebrow">PLAYER JOIN LINK</p>
+            <p className={eyebrowClassName}>PLAYER JOIN LINK</p>
             <h3 className="m-0 mb-[7px] text-[var(--cyan)] font-mono text-[12px] font-[500] [overflow-wrap:anywhere] max-[760px]:text-[10px]">
               {joinUrl}
             </h3>

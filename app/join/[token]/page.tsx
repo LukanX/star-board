@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight, Link2, Orbit, Radio, ShieldCheck } from "lucide-react";
 import {
   authBrandClassName,
@@ -21,8 +22,14 @@ import {
   joinHeadingClassName,
   joinSubmitClassName,
 } from "@/components/auth/authStyles";
+import {
+  eyebrowBrightClassName,
+  liveDotBrightClassName,
+} from "@/components/ui/terminalStyles";
+import { campaignPath } from "@/lib/campaign/routes";
 
 export default function JoinCampaignPage({ params }: { params: Promise<{ token: string }> }) {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
 
@@ -50,7 +57,7 @@ export default function JoinCampaignPage({ params }: { params: Promise<{ token: 
 
       setMessage("You are cleared for campaign access. Returning to the cockpit...");
       window.setTimeout(() => {
-        window.location.href = `/?campaignId=${encodeURIComponent(result.campaignId)}`;
+        router.push(campaignPath(result.campaignId));
       }, 700);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to join campaign.");
@@ -66,7 +73,7 @@ export default function JoinCampaignPage({ params }: { params: Promise<{ token: 
       <div className={`${authSignalClassName} ${authSignalTwoClassName}`} />
       <section className={authPanelClassName}>
         <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN OPERATIONS</small></span></div>
-        <div className={`${authHeadingClassName} ${joinHeadingClassName}`}><p className="eyebrow eyebrow-bright"><span className="live-dot" /> CREW INVITATION</p><h1>Join the campaign.</h1><p>A GM has opened a secure berth for you. Confirm your access to enter the campaign cockpit.</p></div>
+        <div className={`${authHeadingClassName} ${joinHeadingClassName}`}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> CREW INVITATION</p><h1>Join the campaign.</h1><p>A GM has opened a secure berth for you. Confirm your access to enter the campaign cockpit.</p></div>
         <button className={`${authSubmitClassName} ${joinSubmitClassName}`} disabled={isJoining} onClick={redeem} type="button"><Radio size={16} /> {isJoining ? "VERIFYING..." : "ACCEPT INVITATION"} <ArrowUpRight size={15} /></button>
         {message ? <div className={authStatusClassName}><ShieldCheck size={15} /> <span>{message}</span></div> : null}
         <div className={authFooterClassName}><span className={authFooterItemClassName}><Link2 size={13} /> PRIVATE JOIN CHANNEL</span><span>PLAYER ACCESS ONLY</span></div>

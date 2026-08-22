@@ -11,6 +11,7 @@ import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/M
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 import StatusPill from "@/components/ui/StatusPill";
 import { recordDetailClassName, recordDetailMetaClassName, recordListClassName, recordMainClassName, recordMetaClassName, recordRowClassName, recordTitleRowClassName } from "@/components/ui/recordStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import type {
   ApiPlace,
@@ -45,7 +46,7 @@ export default function EpisodePublicRecord({
       </Link>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="eyebrow">
+          <p className={eyebrowClassName}>
             EPISODE DETAIL // {episode.status.toUpperCase()}
           </p>
           <h2 id="episode-public-record-title">{episode.title}</h2>
@@ -94,7 +95,7 @@ export default function EpisodePublicRecord({
       <section className="mt-6" aria-labelledby="episode-notes-title">
         <div className="section-heading flex items-start justify-between gap-[15px]">
           <div>
-            <p className="eyebrow">CAMPAIGN MEMORY</p>
+            <p className={eyebrowClassName}>CAMPAIGN MEMORY</p>
             <h3 id="episode-notes-title">Episode notes</h3>
           </div>
           <span className={recordDetailMetaClassName}>{notes.length} visible</span>

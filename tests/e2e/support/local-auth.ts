@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadEnv } from "vite";
 
@@ -26,6 +27,13 @@ export function getLocalE2eCredentials(): LocalE2eCredentials {
   return {
     email: process.env.PLAYWRIGHT_GM_EMAIL ?? "star-board-playwright-gm@local.test",
     password: process.env.PLAYWRIGHT_GM_PASSWORD ?? "local-playwright-password-2026",
+  };
+}
+
+export function getLocalE2ePlayerCredentials(): LocalE2eCredentials {
+  return {
+    email: process.env.PLAYWRIGHT_PLAYER_EMAIL ?? "star-board-playwright-player@local.test",
+    password: process.env.PLAYWRIGHT_PLAYER_PASSWORD ?? "local-playwright-player-password-2026",
   };
 }
 
@@ -64,7 +72,7 @@ async function authenticate(client: SupabaseClient, credentials: LocalE2eCredent
   const signedUp = await client.auth.signUp(credentials);
 
   if (signedUp.error || !signedUp.data.session) {
-    throw new Error(`Unable to authenticate the local Playwright GM: ${signedUp.error?.message ?? signedIn.error?.message ?? "no session returned"}`);
+    throw new Error(`Unable to authenticate the local Playwright user: ${signedUp.error?.message ?? signedIn.error?.message ?? "no session returned"}`);
   }
 }
 
@@ -99,4 +107,74 @@ export async function ensureLocalGmCampaign(): Promise<LocalE2eCampaign> {
   }
 
   return { campaignId: created.data, campaignName, credentials };
+}
+
+export async function ensureLocalPlayerMembership(campaignId: string): Promise<LocalE2eCredentials> {
+  const gmClient = createLocalClient();
+  await authenticate(gmClient, getLocalE2eCredentials());
+  const gmUser = (await gmClient.auth.getUser()).data.user;
+
+  if (!gmUser) {
+    throw new Error("The local Playwright GM session has no user.");
+  }
+
+  const playerCredentials = getLocalE2ePlayerCredentials();
+  const playerClient = createLocalClient();
+  await authenticate(playerClient, playerCredentials);
+  const playerUser = (await playerClient.auth.getUser()).data.user;
+
+  if (!playerUser) {
+    throw new Error("The local Playwright player session has no user.");
+  }
+
+  const membership = await playerClient
+    .from("campaign_members")
+    .select("campaign_id")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", playerUser.id)
+    .maybeSingle();
+
+  if (membership.error) {
+    throw new Error(`Unable to check the local Playwright player membership: ${membership.error.message}`);
+  }
+
+  if (membership.data) {
+    return playerCredentials;
+  }
+
+  const token = `${process.env.PLAYWRIGHT_PLAYER_JOIN_TOKEN ?? "star-board-playwright-player-join-token-2026"}-${campaignId}`;
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const existingLink = await gmClient
+    .from("campaign_join_links")
+    .select("id")
+    .eq("campaign_id", campaignId)
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (existingLink.error) {
+    throw new Error(`Unable to find the local Playwright player join link: ${existingLink.error.message}`);
+  }
+
+  if (!existingLink.data) {
+    const createdLink = await gmClient.from("campaign_join_links").insert({
+      campaign_id: campaignId,
+      created_by: gmUser.id,
+      token_hash: tokenHash,
+      max_uses: 1,
+    });
+
+    if (createdLink.error) {
+      throw new Error(`Unable to create the local Playwright player join link: ${createdLink.error.message}`);
+    }
+  }
+
+  const redeemed = await playerClient.rpc("redeem_campaign_join_link", {
+    join_token_hash: tokenHash,
+  });
+
+  if (redeemed.error || redeemed.data !== campaignId) {
+    throw new Error(`Unable to redeem the local Playwright player join link: ${redeemed.error?.message ?? "unexpected campaign id"}`);
+  }
+
+  return playerCredentials;
 }
