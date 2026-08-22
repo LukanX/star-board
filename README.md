@@ -21,7 +21,7 @@ Star Board is a persistent Starfinder 2e campaign operations console for GMs and
 
 6. Open `http://localhost:3000`. Unauthenticated visitors see sign-in and account-creation actions; authenticated users without a selected campaign are sent to `/campaigns`.
 
-The cockpit reads campaign records from Supabase. It does not seed demo jobs, characters, NPCs, factions, Places, notes, episodes, or members in the browser. Empty collections render empty states, and selecting a campaign from `/campaigns` opens it at `/?campaignId=...`. The authenticated shell includes sign-out controls in both the cockpit and campaign selector.
+The cockpit reads campaign records from Supabase. It does not seed demo jobs, characters, NPCs, factions, Places, notes, episodes, or members in the browser. Empty collections render empty states, and selecting a campaign from `/campaigns` opens its canonical `/campaigns/[campaignId]` route. The root route still redirects legacy `/?campaignId=...` links to that canonical destination. The authenticated shell includes sign-out controls in both the cockpit and campaign selector.
 
 ## Supabase setup
 

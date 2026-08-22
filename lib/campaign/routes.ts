@@ -26,10 +26,6 @@ export function campaignPath(campaignId: string): string {
   return `${campaignsPath()}/${encodedSegment(campaignId)}`;
 }
 
-export function legacyCampaignPath(campaignId: string): string {
-  return `/?${new URLSearchParams({ campaignId }).toString()}`;
-}
-
 export function campaignSectionPath(campaignId: string, section: CampaignSection): string {
   const rootPath = campaignPath(campaignId);
   return section === "overview" ? rootPath : `${rootPath}/${encodedSegment(section)}`;

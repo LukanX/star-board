@@ -33,20 +33,22 @@
 - `DirtyFormProvider` is mounted by the campaign layout.
 - Canonical builders and active-section parsing live in `lib/campaign/routes.ts`.
 - `CampaignRouteLink` wraps Next `Link` and confirms navigation when the dirty-form context is active.
-- `CampaignRouteShell` renders persistent navigation for non-overview routes and derives its active section from `usePathname()`.
+- `CampaignRouteShell` renders persistent navigation for the overview root and every feature route, deriving its active section from `usePathname()`.
 - Sidebar and overview shortcut links use canonical route anchors.
+- Deterministic loopback Playwright setup provisions/reuses a local GM campaign, signs in through the real login form, and writes ignored storage state under `playwright/.auth/`.
+- The first authenticated browser journey verifies campaign deep-link loading, refresh persistence, and exactly one `.app-shell`, `.sidebar`, and `.topbar`; the setup and journey pass locally.
 - The initial `CampaignCockpit` null render crash is fixed: campaign-dependent navigation mapping runs after the loading/error guards. Regression coverage is in `tests/campaign-cockpit.test.tsx`.
 - Full validation at this checkpoint: 181 tests passed, 6 skipped; typecheck passed; production build passed; lint had 0 errors and 29 existing warnings; `git diff --check` passed.
 
 ### Remaining work
 
-- `CampaignRouteShell` currently returns the overview child without a shell because `CampaignCockpit` still renders its own `CampaignShell`, sidebar, and topbar.
-- `CampaignCockpit` still contains all-collection bootstrap logic, legacy `activeView` state, old feature branches, and duplicated feature components even though routed feature pages exist.
+- The overview route now receives its campaign records from a server-owned `getCampaignOverview` read and the focused client component owns only vote synchronization and toast state.
+- Authenticated browser coverage now covers the overview shell and direct route loading; back/forward, permission, dirty-form, and mobile journeys remain.
 - Feature forms do not consistently register dirty state with `DirtyFormProvider`.
 - Repeated metrics, record cards, empty states, form fields, and editor action rows remain embedded in large feature components.
 - `app/globals.css` still contains most layout, panel, form, archive, and feature selectors despite Tailwind 4 being configured.
 - README text and any remaining compatibility redirects must be checked for stale root-SPA assumptions.
-- Authenticated Playwright coverage for direct route loading, navigation persistence, and dirty-form prompts remains incomplete.
+- Authenticated Playwright coverage for direct route loading and refresh is established; navigation history, permission visibility, dirty-form prompts, and mobile navigation remain incomplete.
 
 ## Fresh-Context Startup
 
@@ -87,10 +89,10 @@ git diff --check
 npm test -- tests/campaign-cockpit.test.tsx tests/campaign-sidebar.test.tsx
 ```
 
-- [ ] **Step 3: Remove the overview bypass from `CampaignRouteShell`.** Delete the pathname check that returns `children` for `campaignPath(campaignId)`; allow the same shell path to wrap the overview and all feature routes.
-- [ ] **Step 4: Change the successful `CampaignCockpit` render to return only the overview content and `CampaignToastHost`.** Remove its `CampaignShell`, `CampaignSidebar`, and `CampaignTopbar` wrapper from the returned JSX. Preserve `OverviewView`, voting, loading, auth, and error behavior.
-- [ ] **Step 5: Remove shell-only derived values from `CampaignCockpit`.** Delete `displayedNavItems`, `activeLabel`, and any sidebar-only props that are no longer consumed by the overview return. Keep data required by the overview metrics and snapshot links.
-- [ ] **Step 6: Run the focused tests, typecheck, and production build.** Confirm there is one shell on the overview and no regression in the initial loading guard.
+- [x] **Step 3: Remove the overview bypass from `CampaignRouteShell`.** Delete the pathname check that returns `children` for `campaignPath(campaignId)`; allow the same shell path to wrap the overview and all feature routes.
+- [x] **Step 4: Change the successful `CampaignCockpit` render to return only the overview content and `CampaignToastHost`.** Remove its `CampaignShell`, `CampaignSidebar`, and `CampaignTopbar` wrapper from the returned JSX. Preserve overview rendering and voting; route loading, auth, and error states remain at their App Router boundaries.
+- [x] **Step 5: Remove shell-only derived values from `CampaignCockpit`.** Delete `displayedNavItems`, `activeLabel`, and any sidebar-only props that are no longer consumed by the overview return. Keep data required by the overview metrics and snapshot links.
+- [x] **Step 6: Run the focused tests, typecheck, and production build.** Confirm there is one shell on the overview and no regression in the initial loading guard.
 
 ```powershell
 npm test -- tests/campaign-cockpit.test.tsx tests/campaign-sidebar.test.tsx tests/campaign-routes.test.ts
@@ -112,11 +114,11 @@ npm run build
 - `CampaignCockpit` owns only overview data and overview actions after this task; it must not select feature views through `activeView`.
 - `campaignNavigation` in `lib/campaign/navigation.ts` remains metadata for the persistent shell, not a view registry.
 
-- [ ] **Step 1: Inventory every symbol still exported or imported from `CampaignCockpit`.** Use `rg` for `CampaignCockpit`, `OverviewView`, `JobsView`, `CharactersView`, `NpcsView`, `FactionsView`, `PlacesView`, `EpisodesView`, `CampaignNotesView`, `MembersView`, and `CampaignSettingsView`. Record only live consumers before deletion.
-- [ ] **Step 2: Add a test that the overview controller cannot select a non-overview view.** The test should render the controller with its public props and assert the overview loading/content contract; do not test private state implementation.
-- [ ] **Step 3: Remove `activeView`, old SPA view branches, and their dead handler/state dependencies from `CampaignCockpit` one feature group at a time.** Keep the overview fetches required by the dashboard until Task 3 decides whether they move to server reads.
-- [ ] **Step 4: Remove unused icon imports, archive imports, and navigation constants revealed by the deletion.** Do not clean unrelated warnings in other files.
-- [ ] **Step 5: Run feature route tests and typecheck after each deletion group.** A deletion group is complete only when the corresponding routed page still builds and its focused test passes.
+- [x] **Step 1: Inventory every symbol still exported or imported from `CampaignCockpit`.** Use `rg` for `CampaignCockpit`, `OverviewView`, `JobsView`, `CharactersView`, `NpcsView`, `FactionsView`, `PlacesView`, `EpisodesView`, `CampaignNotesView`, `MembersView`, and `CampaignSettingsView`. Record only live consumers before deletion.
+- [ ] **Step 2: Add a test that the overview controller cannot select a non-overview view.** The controller no longer has feature-view branches, but a separate regression for this explicit contract remains optional follow-up work.
+- [x] **Step 3: Remove `activeView`, old SPA view branches, and their dead handler/state dependencies from `CampaignCockpit` one feature group at a time.** Keep the overview fetches required by the dashboard until Task 3 decides whether they move to server reads.
+- [x] **Step 4: Remove unused icon imports, archive imports, and navigation constants revealed by the deletion.** Do not clean unrelated warnings in other files.
+- [x] **Step 5: Run feature route tests and typecheck after each deletion group.** A deletion group is complete only when the corresponding routed page still builds and its focused test passes.
 
 ```powershell
 npm test -- tests/campaign-cockpit.test.tsx tests/character-server.test.ts tests/npc-faction-server.test.ts tests/places-server.test.ts tests/jobs-server.test.ts tests/episodes-server.test.ts tests/notes-server.test.ts tests/members-server.test.ts tests/settings-server.test.ts
@@ -137,10 +139,10 @@ npm run typecheck
 - Client views receive server-provided records and campaign IDs, then call APIs only for mutations and refreshes.
 - Loading, `notFound()`, and auth redirects remain route-boundary behavior; a client view must not recreate the campaign membership gate.
 
-- [ ] **Step 1: Map the overview data contract.** List the exact dashboard values currently derived from jobs, members, notes, episodes, characters, NPCs, factions, and places. Identify which values can be supplied by a server page without changing the API response shape.
-- [ ] **Step 2: Add a focused server contract test for the chosen overview read boundary.** Verify campaign scoping and role/display-name behavior through the existing `getCampaignRouteAccess` pattern; keep database and RLS behavior unchanged.
-- [ ] **Step 3: Move only the reads that are safe and useful to the server page.** Do not move mutation handlers, vote synchronization, AI calls, or art upload logic into server components.
-- [ ] **Step 4: Keep the overview client component responsible for vote state, toast state, and optimistic refresh.** Pass it typed data instead of making it discover campaign identity from `window.location`.
+- [x] **Step 1: Map the overview data contract.** List the exact dashboard values currently derived from jobs, members, notes, episodes, characters, NPCs, factions, and places. Identify which values can be supplied by a server page without changing the API response shape.
+- [x] **Step 2: Add a focused server contract test for the chosen overview read boundary.** Verify campaign scoping and role/display-name behavior through the existing `getCampaignRouteAccess` pattern; keep database and RLS behavior unchanged.
+- [x] **Step 3: Move only the reads that are safe and useful to the server page.** Do not move mutation handlers, vote synchronization, AI calls, or art upload logic into server components.
+- [x] **Step 4: Keep the overview client component responsible for vote state, toast state, and optimistic refresh.** Pass it typed data instead of making it discover campaign identity from `window.location`.
 - [ ] **Step 5: Verify direct URL, refresh, and unauthorized behavior for overview and one representative detail route.** Use Playwright with the local authenticated fixture when available.
 
 ```powershell
@@ -166,12 +168,12 @@ npm run build
 - `FormActions` accepts submit/cancel/delete action nodes and does not know about API routes.
 - Editors call `useDirtyForm()` and clear the dirty state after successful save, cancel, or explicit reset.
 
-- [ ] **Step 1: Extract `MetricCard` from `CampaignCockpit` without changing markup or CSS classes.** Add a render regression that checks its label, value, and detail output.
-- [ ] **Step 2: Extract the repeated empty collection state into `EmptyState`.** Migrate one route at a time and remove the old inline markup only after the route test passes.
-- [ ] **Step 3: Extract the mission card into `components/jobs/MissionCard.tsx`.** Preserve vote, edit, promote, artwork, and status behavior; do not move API calls into the card.
-- [ ] **Step 4: Compare editor field/action markup across characters, NPCs, factions, places, jobs, notes, members, and settings.** Create `FormField` or `FormActions` only for props that are identical in three or more editors.
-- [ ] **Step 5: Wire dirty state into the migrated editors.** Use the existing provider methods, clear after successful mutation and cancel, and keep `CampaignRouteLink` as the only route-navigation guard.
-- [ ] **Step 6: Run the affected route tests and a focused lint pass.** Do not broaden this task into a visual redesign.
+- [x] **Step 1: Extract `MetricCard` from `CampaignCockpit` without changing markup or CSS classes.** Add a render regression that checks its label, value, and detail output.
+- [x] **Step 2: Extract the repeated empty collection state into `EmptyState`.** Migrate one route at a time and remove the old inline markup only after the route test passes.
+- [x] **Step 3: Extract the mission card into `components/jobs/MissionCard.tsx`.** Preserve vote, edit, promote, artwork, and status behavior; do not move API calls into the card. The existing `JobCard` already owned this domain boundary, so the overview now reuses it and gains canonical detail links without adding a duplicate component.
+- [x] **Step 4: Compare editor field/action markup across characters, NPCs, factions, places, jobs, notes, members, and settings.** Create `FormField` or `FormActions` only for props that are identical in three or more editors. The editor fields and action rows differ enough that no shared field/action component was introduced.
+- [x] **Step 5: Wire dirty state into the migrated editors.** Use the existing provider methods, clear after successful mutation and cancel, and keep `CampaignRouteLink` as the only route-navigation guard. Character, NPC, faction, place, job, and note editors now register draft changes and clear after save, delete, or cancel; browser coverage exercises character, job, place, and note navigation.
+- [x] **Step 6: Run the affected route tests and a focused lint pass.** Do not broaden this task into a visual redesign.
 
 ```powershell
 npm test -- tests/campaign-sidebar.test.tsx tests/campaign-cockpit.test.tsx tests/character-actions.test.ts tests/job-action-route.test.ts
@@ -191,9 +193,13 @@ npx eslint "components/ui" "components/characters" "components/npcs" "components
 - Component layout, spacing, borders, colors, responsive breakpoints, and state styling should live in Tailwind class names or a small component-local stylesheet only when a selector cannot be expressed clearly with Tailwind.
 - Keep the current CSS variable names where they are used as the visual design tokens; expose them through the existing Tailwind 4 `@theme inline` block.
 
-- [ ] **Step 1: Inventory selectors and usage before deleting CSS.** Run `rg` for each class in `app/globals.css`; group selectors into shell, shared UI, forms, archive, dashboard, and feature-specific buckets.
+- [x] **Step 1: Inventory selectors and usage before deleting CSS.** Run `rg` for each class in `app/globals.css`; group selectors into shell, shared UI, forms, archive, dashboard, and feature-specific buckets. The shell inventory confirmed ownership in `CampaignShell`, `CampaignRouteShell`, `CampaignSidebar`, and `CampaignTopbar` before the first migration edits.
 - [ ] **Step 2: Migrate the shell bucket.** Convert `.app-shell`, `.app-content`, `.sidebar`, `.side-nav`, `.topbar`, `.content-frame`, and their responsive states in the shell components. Preserve the grid overlay and mobile navigation behavior.
+
+	Progress checkpoint: outer frame, content surface, sidebar desktop structure, navigation growth, topbar structure, responsive content spacing, and the mobile drawer state now use Tailwind utilities. The focused shell journey covers direct load, refresh, one-shell ownership, and mobile drawer open/close at 390px; the migrated drawer no longer depends on the global `.sidebar` or `.sidebar-open` state selectors.
 - [ ] **Step 3: Migrate shared UI and form buckets.** Convert panels, buttons, fields, headings, empty states, metric cards, and editor action rows using the extracted components from Task 4.
+
+	Progress checkpoint: `MetricCard`, `EmptyState`, `StatusPill`, `VisualAsset`, `RecordPortrait`, `PageLayout`, `SectionHeading`, and `AppStatus` now carry their shared base layout utilities. Campaign overview and routed Places headings own the panel-topline layout, all live editor headings/action clusters own their flex, spacing, wrapping, typography, and 420px behavior, all text actions own their inline-flex, typography, cursor, hover, and 420px form-action utilities, forms/action rows own their base layout, responsive grid placement, and sub-760px action wrapping utilities, all icon-button owners carry their dimensions, layout, base, and hover utilities, and all shared button owners carry their base plus primary, secondary, danger, and AI variant utilities. The `character-empty`, AppStatus, mobile drawer, panel-topline, editor heading, editor h2 typography, editor heading action media, text-action, form, form-grid, form-action, action-wrap, 420px text-action, shared character-form control, field-lock, form-error, icon-button, button base, button-secondary, button-primary, button-danger, and button-ai declarations have been removed from globals; feature-specific button sizing/placement and decorative declarations remain until their owning route checks support removing them.
 - [ ] **Step 4: Migrate feature-specific buckets one route at a time.** Delete a selector only after `rg` reports no live usage and the corresponding route renders in the responsive smoke test.
 - [ ] **Step 5: Keep justified global rules.** Retain `:root`, `@theme inline`, body typography/background, box sizing, focus-visible behavior, and complex global visual effects that cannot be represented more clearly in component markup.
 - [ ] **Step 6: Run desktop and mobile Playwright checks plus the production build.** Check that text, controls, sidebar states, cards, and forms do not overlap or resize unexpectedly.
@@ -203,6 +209,8 @@ npm run test:e2e -- --grep "campaign|responsive|navigation"
 npm run typecheck
 npm run build
 ```
+
+Progress checkpoint (2026-08-21): dead character/faction selectors and the unused mission ETA selector are removed. Job vote default, active, hover, and responsive states now use route-owned utilities, as do the mission artwork frame/overlay, mission index, giver glyph, card/content/meta/footer structure, jobs-grid and compact layout, responsive card sizing, and GM action positioning; the focused job vote Playwright contract passes. The public character detail responsive rule was restored after audit, and its mobile Playwright contract now verifies the single-column layout, compact spacing, centered portrait, and smaller heading. Faction card framing and the responsive faction collection grid now use route-owned utilities, and the focused faction browser contract passes. Character archive card framing, interaction states, overlay, copy typography, and responsive collection grid now use route-owned utilities, and the focused character browser contract passes. The public faction detail heading now uses route-owned flex utilities, and the focused faction browser contract still passes after removing its legacy selector. The NPC public detail preview, portrait frame, copy column, notes row, 760px collapse, and list-row interaction states now use route-owned utilities, and the focused NPC list/detail contract passes. Routed NoteCard row geometry, accent variants, metadata, visibility treatment, and typography now use route-owned utilities; Notes and Jobs filter toolbars, tabs, active states, and the Notes GM visibility toggle also use route-owned utilities, and the focused Notes and Jobs browser contracts pass after removing their legacy selectors. EpisodeCard row geometry, active background, number block, responsive alignment, summary, and open action now use route-owned utilities, and the focused EpisodeCard contract passes after removing its legacy selectors. MemberCard row geometry, copy typography, status spacing, joined-date visibility, responsive padding, and current-member marker now use route-owned utilities; the Members summary/clearance surface, collection container, and conditional join-link card also use route-owned responsive utilities, and the focused MemberCard, MembersRouteView, and authenticated join-link contracts pass after removing all audited member selectors from global CSS. The mission-specific global CSS audit is clean; remaining Task 5 work is in other feature styling buckets.
 
 ### Task 6: Remove compatibility assumptions and finish route-native navigation
 
@@ -273,3 +281,32 @@ The refactor is ready for review when all of the following are true:
 - Shared metrics, mission cards, empty states, and repeated editor controls have focused component boundaries with no behavior loss.
 - `app/globals.css` contains only justified global tokens/base rules/effects; feature layout and state styling is expressed through Tailwind/component markup.
 - Full Vitest, Playwright, typecheck, lint, normal build, webpack build, and `git diff --check` results are recorded. Local RLS validation is recorded when the loopback stack is available.
+
+## Current Handoff (2026-08-22)
+
+The latest continuation verified the active Places route, shared art/AI loading states, and canonical route helper without changing persistence, auth, RLS, or API behavior. The focused and full browser contracts remain green, and the README now describes `/campaigns/[campaignId]` as the canonical campaign destination.
+
+### Completed in the latest continuation
+
+- Repaired and formatted `components/places/PlacesRouteView.tsx` after a misanchored one-line JSX patch. The routed list remains responsible for tree/search behavior and links to the separate Place detail route.
+- Migrated the remaining AI/art loading indicators to `animate-spin` and moved Place panel treatment to `panelClassName`.
+- Removed the active `.panel` and `.spin` dependencies from routed components and updated the Places browser assertions to check the shared background utility.
+- Verified that `components/archive/PlacesView.tsx` has no live imports. It remains a deletion candidate because it still contains obsolete archive markup.
+- Removed `legacyCampaignPath()` from `lib/campaign/routes.ts` and updated the README, while retaining the root `/?campaignId=...` compatibility redirect.
+
+### Remaining work
+
+- Replace the two internal `/?campaignId=...` navigations in `app/campaigns/page.tsx` and `app/join/[token]/page.tsx` with `campaignPath()` plus App Router navigation. Keep auth/session redirects and sign-out full navigations deliberate and documented.
+- Remove the verified-dead `.status-*`, `.status-open`, `.toast`, `.toast-icon`, and `.character-body` rules from `app/globals.css`. Recheck the remaining shared global primitives before deciding whether they should stay global or move into component utilities.
+- Delete `components/archive/PlacesView.tsx` after the final usage search, then add or update focused coverage for campaign-selector and invite-success navigation.
+- Add the still-missing Playwright history checks for back/forward navigation and player visibility of GM-only Settings.
+- Resolve the repository lint gate by excluding generated `.next-deploy` output from ESLint or documenting that generated-output issue as an environment/configuration blocker. The touched-file ESLint pass currently has 0 errors and 3 warnings.
+- Rerun the final gate after the remaining route/CSS edits: full Vitest, Playwright, typecheck, lint, both production builds, `git diff --check`, and local RLS when loopback Supabase is available.
+- Separate operator/integration follow-ups remain: hosted OpenRouter smoke testing requires hosted credentials, and the documented 90-day AI audit retention window still needs deployment scheduling.
+
+### Latest verification
+
+- `npm test`: 41 files passed, 203 tests passed; 1 file and 6 tests skipped.
+- `npm run test:e2e`: 20 tests passed.
+- `npm run typecheck`, `npm run build`, `npm run build -- --webpack`, local RLS (6 tests), and `git diff --check`: passed.
+- `npm run lint`: blocked by generated `.next-deploy` output with 1,798 errors and 14,232 warnings; no errors were found in the touched-file lint pass.

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import PageLayout from "@/components/ui/PageLayout";
+import EmptyState from "@/components/ui/EmptyState";
 import CharacterCard from "@/components/characters/CharacterCard";
 import CharacterEditor from "@/components/characters/CharacterEditor";
 import { mapApiCharacter } from "@/lib/campaign/mappers";
@@ -12,6 +13,6 @@ export default function CharactersRouteView({ campaignId, initialCharacters }: {
   const [editorOpen, setEditorOpen] = useState(false);
   return <PageLayout eyebrow="ARCHIVE // CREW ROSTER" title="Characters" description="The people, androids, and mysteries currently recorded in this campaign." action="ADD CHARACTER" onAction={() => setEditorOpen(true)}>
     {editorOpen ? <CharacterEditor campaignId={campaignId} onCancel={() => setEditorOpen(false)} onSaved={(saved) => { setCharacters((current) => [...current, mapApiCharacter(saved, current.length)]); setEditorOpen(false); }} /> : null}
-    {characters.length ? <div className="character-grid">{characters.map((character) => <CharacterCard campaignId={campaignId} character={character} key={character.id} />)}</div> : <div className="character-empty"><h2>No characters in the roster yet.</h2><p>Add the first crew record to begin the campaign manifest.</p></div>}
+    {characters.length ? <div data-character-grid="true" className="grid grid-cols-4 gap-[14px] max-[1100px]:grid-cols-2 max-[760px]:gap-[9px] max-[420px]:grid-cols-1">{characters.map((character) => <CharacterCard campaignId={campaignId} character={character} key={character.id} />)}</div> : <EmptyState title="No characters in the roster yet." message="Add the first crew record to begin the campaign manifest." />}
   </PageLayout>;
 }

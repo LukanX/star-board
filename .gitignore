@@ -12,9 +12,12 @@
 
 # testing
 /coverage
+/test-results/
+/playwright/.auth/
 
 # next.js
 /.next/
+/.next-playwright/
 /.next-deploy/
 /out/
 

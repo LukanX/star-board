@@ -8,7 +8,7 @@ export type RecordPortraitProps = {
 };
 
 export function RecordPortrait({ src, label, className = "", fallback = null }: RecordPortraitProps) {
-  return <div aria-label={label} className={className} role={src ? "img" : undefined} style={src ? { backgroundImage: `url(${src})`, backgroundPosition: "center", backgroundSize: "cover" } : undefined}>{src ? null : fallback}</div>;
+  return <div aria-label={label} className={`${className} overflow-hidden bg-center bg-cover bg-no-repeat`} role={src ? "img" : undefined} style={src ? { backgroundImage: `url(${src})`, backgroundPosition: "center", backgroundSize: "cover" } : undefined}>{src ? null : fallback}</div>;
 }
 
 export default RecordPortrait;

@@ -5,7 +5,6 @@ import {
   campaignSectionPath,
   campaignsPath,
   getCampaignSectionFromPath,
-  legacyCampaignPath,
   loginPath,
 } from "@/lib/campaign/routes";
 import { campaignNavigation, getCampaignNavigationItem } from "@/lib/campaign/navigation";
@@ -54,9 +53,6 @@ describe("campaign route contracts", () => {
     );
   });
 
-  it("builds the legacy campaign query path", () => {
-    expect(legacyCampaignPath("crew alpha/beta")).toBe("/?campaignId=crew+alpha%2Fbeta");
-  });
 });
 
 describe("campaign navigation metadata", () => {

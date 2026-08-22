@@ -3,12 +3,28 @@ import { UserRound } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/auth/SignOutButton", () => ({ default: () => null }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/campaigns/campaign-42" }));
 
 import CampaignSidebar from "@/components/campaign-shell/CampaignSidebar";
+import CampaignRouteShell from "@/components/campaign-shell/CampaignRouteShell";
 import DirtyFormProvider from "@/components/campaign-shell/DirtyFormProvider";
 import SectionHeading from "@/components/ui/SectionHeading";
 
 describe("CampaignSidebar route navigation", () => {
+  it("keeps the campaign shell mounted on the overview route", () => {
+    const markup = renderToStaticMarkup(
+      <DirtyFormProvider>
+        <CampaignRouteShell campaignId="campaign-42" campaignName="Signal Lost" displayName="Director" isGM>
+          <div>Overview content</div>
+        </CampaignRouteShell>
+      </DirtyFormProvider>,
+    );
+
+    expect(markup.match(/data-campaign-shell/g) ?? []).toHaveLength(1);
+    expect(markup.match(/data-campaign-sidebar/g) ?? []).toHaveLength(1);
+    expect(markup.match(/data-campaign-topbar/g) ?? []).toHaveLength(1);
+  });
+
   it("renders campaign sections as canonical links instead of SPA selection buttons", () => {
     const markup = renderToStaticMarkup(
       <DirtyFormProvider>
@@ -26,8 +42,8 @@ describe("CampaignSidebar route navigation", () => {
     );
 
     expect(markup).toContain('href="/campaigns/campaign-42/npcs"');
-    expect(markup).toContain('<a class="nav-item nav-item-active"');
-    expect(markup).not.toContain('<button class="nav-item nav-item-active"');
+    expect(markup).toMatch(/<a class="[^"]*bg-\[rgba\(98,232,255,\.095\)\][^"]*" href="\/campaigns\/campaign-42\/npcs"/);
+    expect(markup).not.toMatch(/<button[^>]*href="\/campaigns\/campaign-42\/npcs"/);
   });
 
   it("renders overview section actions as canonical links", () => {
@@ -38,6 +54,6 @@ describe("CampaignSidebar route navigation", () => {
     );
 
     expect(markup).toContain('href="/campaigns/campaign-42/members"');
-    expect(markup).toContain('class="text-action"');
+    expect(markup).toMatch(/class="[^"]*\btext-action\b[^"]*"/);
   });
 });
