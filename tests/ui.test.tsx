@@ -322,14 +322,28 @@ describe("MembersRouteView", () => {
 
 describe("VisualAsset", () => {
   it("preserves asset and fallback state semantics", () => {
-    const assetMarkup = renderToStaticMarkup(<VisualAsset label="Mission artwork" src="/mission.png" />);
-    const fallbackMarkup = renderToStaticMarkup(<VisualAsset label="Mission artwork" src={null} />);
+    const assetMarkup = renderToStaticMarkup(
+      <VisualAsset
+        downloadName="Ghost Signal"
+        label="Mission artwork"
+        src="/mission.png"
+      />,
+    );
+    const fallbackMarkup = renderToStaticMarkup(
+      <VisualAsset
+        downloadName="Ghost Signal"
+        label="Mission artwork"
+        src={null}
+      />,
+    );
 
     expect(assetMarkup).toContain('role="img"');
     expect(assetMarkup).toContain("has-asset");
     expect(assetMarkup).toContain("/mission.png");
+    expect(assetMarkup).toContain('aria-label="Download Ghost Signal artwork"');
     expect(fallbackMarkup).not.toContain('role="img"');
     expect(fallbackMarkup).toContain("no-asset");
+    expect(fallbackMarkup).not.toContain('aria-label="Download Ghost Signal artwork"');
   });
 });
 

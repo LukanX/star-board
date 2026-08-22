@@ -44,6 +44,7 @@ export default function CharacterPublicRecord({
         className="min-w-0 aspect-[3/4] overflow-hidden border border-[rgba(98,232,255,.24)] bg-[#0a1118] max-[760px]:w-[min(100%,420px)] max-[760px]:justify-self-center"
       >
         <VisualAsset
+          downloadName={character.name}
           src={character.image}
           label={`${character.name} full portrait`}
           className="w-full h-full bg-contain bg-center"

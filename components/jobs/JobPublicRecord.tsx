@@ -68,6 +68,7 @@ export default function JobPublicRecord({
         {actions ? <div className={recordRowActionsClassName}>{actions}</div> : null}
       </div>
       <VisualAsset
+        downloadName={job.title}
         src={job.image}
         label={`${job.title} artwork`}
         className="job-detail-art h-64 w-full border border-[var(--line)] bg-[var(--panel-deep)] bg-cover bg-center sm:h-80"

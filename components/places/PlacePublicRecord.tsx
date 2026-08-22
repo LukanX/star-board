@@ -2,8 +2,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeft, FileText, LockKeyhole, Map } from "lucide-react";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import ArtDownloadButton from "@/components/ui/ArtDownloadButton";
 import { panelClassName, recordRowActionsClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import { getAttachedArtUrl } from "@/lib/campaign/mappers";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import type { ApiPlace } from "@/lib/campaign/types";
 import { getPlaceBreadcrumb } from "@/lib/places";
@@ -22,6 +24,8 @@ export default function PlacePublicRecord({
   isGM: boolean;
   actions?: ReactNode;
 }) {
+  const artUrl = getAttachedArtUrl(place.art_url, place.art_path);
+
   return (
     <section
       data-place-detail-panel="true"
@@ -67,7 +71,10 @@ export default function PlacePublicRecord({
             </div>
           ) : null}
         </div>
-        <PlaceArt place={place} variant="detail" />
+        <div className="relative">
+          <PlaceArt place={place} variant="detail" />
+          {artUrl ? <ArtDownloadButton name={place.name} src={artUrl} /> : null}
+        </div>
         <div
           data-place-detail-body="true"
           className="grid gap-[18px] pt-[19px]"

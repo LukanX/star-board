@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BookOpen, Map, UserRound } from "lucide-react";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import ArtDownloadButton from "@/components/ui/ArtDownloadButton";
 import RecordPortrait from "@/components/ui/RecordPortrait";
 import { recordDetailClassName, recordDetailMetaClassName, recordMetaClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
@@ -18,6 +19,8 @@ export default function NpcPublicRecord({
   npc: NpcRecord;
   places: ApiPlace[];
 }) {
+  const artUrl = getAttachedArtUrl(npc.art_url, npc.art_path);
+
   return (
     <section
       aria-labelledby="npc-public-record-title"
@@ -35,14 +38,15 @@ export default function NpcPublicRecord({
       >
         <div
           data-npc-detail-portrait="true"
-          className="min-w-[180px] max-w-[260px] h-full aspect-square overflow-hidden border border-[rgba(98,232,255,.28)] bg-[#0a1118] max-[760px]:w-[min(100%,220px)] max-[760px]:min-w-0 max-[760px]:h-auto max-[760px]:justify-self-start"
+          className="relative min-w-[180px] max-w-[260px] h-full aspect-square overflow-hidden border border-[rgba(98,232,255,.28)] bg-[#0a1118] max-[760px]:w-[min(100%,220px)] max-[760px]:min-w-0 max-[760px]:h-auto max-[760px]:justify-self-start"
         >
           <RecordPortrait
-            src={getAttachedArtUrl(npc.art_url, npc.art_path)}
+            src={artUrl}
             label={`${npc.name} portrait`}
             className="w-full h-full"
             fallback={<UserRound size={19} />}
           />
+          {artUrl ? <ArtDownloadButton name={npc.name} src={artUrl} /> : null}
         </div>
         <div data-npc-detail-copy="true" className="min-w-0 grid gap-3">
           <div>
