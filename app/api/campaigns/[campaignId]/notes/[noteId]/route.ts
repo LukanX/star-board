@@ -8,6 +8,36 @@ export const runtime = "nodejs";
 
 const noteColumns = "id, campaign_id, episode_id, author_id, title, body_markdown, visibility, created_at, updated_at, updated_by";
 
+type SupabaseClient = Awaited<ReturnType<typeof getAuthenticatedUser>> extends infer Context
+  ? Context extends { supabase: infer Client }
+    ? Client
+    : never
+  : never;
+type NoteMutationRecord = { author_id: string; visibility: "player" | "gm" };
+type NoteMutationAccess = { response: NextResponse } | { note: NoteMutationRecord };
+
+async function authorizeNoteMutation(supabase: SupabaseClient, campaignId: string, noteId: string, userId: string, role: "gm" | "player"): Promise<NoteMutationAccess> {
+  const { data, error } = await supabase
+    .from("campaign_notes")
+    .select("author_id, visibility")
+    .eq("id", noteId)
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+
+  if (error) return { response: NextResponse.json({ error: "Unable to load campaign note." }, { status: 503 }) };
+  if (!data) return { response: NextResponse.json({ error: "Campaign note not found." }, { status: 404 }) };
+
+  const note = data as NoteMutationRecord;
+  if (role !== "gm" && note.visibility !== "player") {
+    return { response: NextResponse.json({ error: "Campaign note not found." }, { status: 404 }) };
+  }
+  if (role !== "gm" && note.author_id !== userId) {
+    return { response: NextResponse.json({ error: "Note author or GM access is required." }, { status: 403 }) };
+  }
+
+  return { note };
+}
+
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId, noteId } = await params;
 
@@ -39,6 +69,10 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Campaign note not found." }, { status: 404 });
     }
 
+    if (membership.role !== "gm" && data.visibility !== "player") {
+      return NextResponse.json({ error: "Campaign note not found." }, { status: 404 });
+    }
+
     const { data: author, error: authorError } = await context.supabase
       .from("profiles")
       .select("id, display_name")
@@ -63,7 +97,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 }
 
-export async function PATCH(request: Request, { params }: RouteContext) {
+export async function PATCH(request: Request, { params }: RouteContext): Promise<NextResponse> {
   const { campaignId, noteId } = await params;
   let body: unknown;
 
@@ -91,6 +125,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (!membership) {
       return NextResponse.json({ error: "Campaign membership is required." }, { status: 403 });
     }
+
+    const access = await authorizeNoteMutation(context.supabase, campaignId, noteId, context.user.id, membership.role);
+    if ("response" in access) return access.response;
 
     if (input.data.visibility === "gm" && membership.role !== "gm") {
       return NextResponse.json({ error: "GM access is required for private notes." }, { status: 403 });
@@ -153,7 +190,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+export async function DELETE(_request: Request, { params }: RouteContext): Promise<NextResponse> {
   const { campaignId, noteId } = await params;
 
   try {
@@ -168,6 +205,9 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     if (!membership) {
       return NextResponse.json({ error: "Campaign membership is required." }, { status: 403 });
     }
+
+    const access = await authorizeNoteMutation(context.supabase, campaignId, noteId, context.user.id, membership.role);
+    if ("response" in access) return access.response;
 
     const { data, error } = await context.supabase
       .from("campaign_notes")

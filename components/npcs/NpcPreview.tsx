@@ -1,0 +1,15 @@
+import { ArrowUpRight, BookOpen, LockKeyhole, Map, UserRound } from "lucide-react";
+import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
+import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import RecordPortrait from "@/components/ui/RecordPortrait";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import { getAttachedArtUrl } from "@/lib/campaign/mappers";
+import { campaignEntityPath } from "@/lib/campaign/routes";
+import type { ApiPlace, NpcRecord } from "@/lib/campaign/types";
+import { getPlaceBreadcrumb } from "@/lib/places";
+
+export default function NpcPreview({ campaignId, npc, places, isGM }: { campaignId: string; npc: NpcRecord; places: ApiPlace[]; isGM: boolean }) {
+  const artUrl = getAttachedArtUrl(npc.art_url, npc.art_path);
+
+  return <div data-npc-preview="true" className="grid gap-[17px]"><div data-archive-preview-heading="true" tabIndex={-1} className="min-w-0 outline-0"><p className={eyebrowClassName}>PUBLIC CONTACT PREVIEW</p><h2 className="m-0 text-[22px] [overflow-wrap:anywhere]">{npc.name}</h2><p className="mt-[8px] m-0 text-[var(--cyan)] font-mono text-[8px] tracking-[.1em]">{`${npc.species || "Unclassified"} // ${npc.role || "CONTACT"}`}</p></div><div className="relative min-w-0 w-[min(100%,220px)] aspect-square overflow-hidden border border-[rgba(98,232,255,.28)] bg-[#0a1118]"><RecordPortrait src={artUrl} label={`${npc.name} portrait`} className="w-full h-full" fallback={<UserRound size={19} />} /> </div><div data-npc-preview-copy="true" className="grid gap-[14px]"><p className="m-0 flex items-center gap-[6px] text-[var(--cyan)] font-mono text-[8px] tracking-[.07em] leading-[1.5] flex-wrap [overflow-wrap:anywhere]"><Map size={13} /> {getPlaceBreadcrumb(places, npc.place_id) || "NO PRIMARY PLACE"}</p><div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">{npc.description || "No public description recorded yet."}</p></div><MarkdownPreview data-npc-preview-notes="true"><MarkdownPreviewToolbar><BookOpen size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><p>{npc.player_notes_markdown || "No player notes recorded yet."}</p></MarkdownPreview>{isGM ? <MarkdownPreview data-npc-preview-private="true" className="border-[rgba(255,92,154,.25)]"><MarkdownPreviewToolbar className="text-[var(--pink)]"><LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span></MarkdownPreviewToolbar><p>{npc.gm_notes_markdown || "No private notes recorded yet."}</p></MarkdownPreview> : null}</div><CampaignRouteLink className="h-[37px] inline-flex w-fit items-center justify-center gap-2 border border-[var(--line)] bg-[rgba(98,232,255,.08)] px-[14px] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] hover:border-[var(--cyan)] hover:bg-[rgba(98,232,255,.14)]" href={campaignEntityPath(campaignId, "npcs", npc.id)}><ArrowUpRight aria-hidden="true" size={14} /> OPEN FULL RECORD</CampaignRouteLink></div>;
+}

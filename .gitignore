@@ -12,9 +12,12 @@
 
 # testing
 /coverage
+/test-results/
+/playwright/.auth/
 
 # next.js
 /.next/
+/.next-playwright/
 /.next-deploy/
 /out/
 
@@ -33,6 +36,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -46,3 +50,6 @@ next-env.d.ts
 
 # Local Netlify folder
 /.netlify
+
+# Superpowers
+/.superpowers

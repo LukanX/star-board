@@ -21,7 +21,7 @@ Star Board is a persistent Starfinder 2e campaign operations console for GMs and
 
 6. Open `http://localhost:3000`. Unauthenticated visitors see sign-in and account-creation actions; authenticated users without a selected campaign are sent to `/campaigns`.
 
-The cockpit reads campaign records from Supabase. It does not seed demo jobs, characters, NPCs, factions, Places, notes, episodes, or members in the browser. Empty collections render empty states, and selecting a campaign from `/campaigns` opens it at `/?campaignId=...`. The authenticated shell includes sign-out controls in both the cockpit and campaign selector.
+The cockpit reads campaign records from Supabase. It does not seed demo jobs, characters, NPCs, factions, Places, notes, episodes, or members in the browser. Empty collections render empty states, and selecting a campaign from `/campaigns` opens its canonical `/campaigns/[campaignId]` route. The root route still redirects legacy `/?campaignId=...` links to that canonical destination. The authenticated shell includes sign-out controls in both the cockpit and campaign selector.
 
 ## Supabase setup
 
@@ -89,6 +89,12 @@ Set `OPENROUTER_API_KEY` in the server environment to enable the GM-only routes:
 Text and image models can be changed with `OPENROUTER_TEXT_MODEL` and `OPENROUTER_IMAGE_MODEL`. `OPENROUTER_SITE_URL` and `OPENROUTER_APP_NAME` are optional attribution headers. GMs can choose compatible models from the live OpenRouter catalog, and campaign settings enforce the saved model allowlist for every generation request.
 
 Mission, NPC, faction, Place, and image responses are schema-validated. Place generation receives the selected parent hierarchy, but all AI output remains review-before-save. Image drafts are reviewed and approved before the selected asset is saved to a campaign record; generated approvals persist the originating prompt and provider, while manual uploads clear stale generation provenance. Provider failures preserve their HTTP status and safe request ID in the response, while bounded diagnostics are written to server logs without storing raw prompts or generated image data. AI usage is tracked by token and provider metadata, but generation-count quotas are not enforced. Keep the API key server-only.
+
+### AI audit retention
+
+`netlify/functions/ai-generation-retention.ts` runs once per day at `03:00 UTC` on published Netlify deploys. It uses the server-only `SUPABASE_SECRET_KEY` to delete `ai_generation_runs` metadata older than 90 days. It is a scheduled Netlify function, not a browser-facing Next.js route, and it does not store prompts or generated output.
+
+Production scheduling requires `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY` in the Netlify function/runtime environment. For a local smoke invocation, run `netlify dev` and invoke `ai-generation-retention` with the Netlify CLI. The one-off SQL fallback is retained at `supabase/snippets/ai-generation-retention.sql`.
 
 ## Validation
 

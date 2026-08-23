@@ -9,14 +9,16 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:rls": "vitest run tests/rls.integration.test.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
+    "@tailwindcss/cli": "^4.3.3",
     "lucide-react": "^1.25.0",
-    "next": "16.2.10",
+    "next": "^16.3.2",
     "openai": "^6.48.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -25,14 +27,15 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "^16.3.2",
     "supabase": "^2.109.1",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

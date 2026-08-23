@@ -29,7 +29,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
         .order("created_at", { ascending: false }),
       context.supabase
         .from("campaign_notes")
-        .select("episode_id")
+        .select("episode_id, visibility")
         .eq("campaign_id", campaignId)
         .not("episode_id", "is", null),
     ]);
@@ -40,7 +40,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const noteCounts = new Map<string, number>();
     for (const note of notesResult.data ?? []) {
-      if (note.episode_id) noteCounts.set(note.episode_id, (noteCounts.get(note.episode_id) ?? 0) + 1);
+      if (note.episode_id && (membership.role === "gm" || note.visibility === "player")) {
+        noteCounts.set(note.episode_id, (noteCounts.get(note.episode_id) ?? 0) + 1);
+      }
     }
 
     const episodes = (episodesResult.data ?? []).map((episode) => ({ ...episode, noteCount: noteCounts.get(episode.id) ?? 0 }));

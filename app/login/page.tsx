@@ -2,6 +2,30 @@
 
 import { FormEvent, startTransition, useEffect, useState } from "react";
 import { ArrowUpRight, KeyRound, Orbit, Radio, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  authBrandClassName,
+  authBrandNameClassName,
+  authBrandSubtitleClassName,
+  authBrandSymbolClassName,
+  authFooterClassName,
+  authFooterItemClassName,
+  authFormClassName,
+  authGridClassName,
+  authHeadingClassName,
+  authModeToggleClassName,
+  authPanelClassName,
+  authResetActionClassName,
+  authShellClassName,
+  authSignalClassName,
+  authSignalOneClassName,
+  authSignalTwoClassName,
+  authStatusClassName,
+  authSubmitClassName,
+} from "@/components/auth/authStyles";
+import {
+  eyebrowBrightClassName,
+  liveDotBrightClassName,
+} from "@/components/ui/terminalStyles";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type AuthMode = "create" | "signin" | "reset";
@@ -82,22 +106,22 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="auth-shell">
-      <div className="auth-grid" />
-      <div className="auth-signal auth-signal-one" />
-      <div className="auth-signal auth-signal-two" />
-      <section className="auth-panel">
-        <div className="auth-brand"><span className="auth-brand-symbol"><Orbit size={23} /></span><span><strong>STAR BOARD</strong><small>CAMPAIGN OPERATIONS</small></span></div>
-        <div className="auth-heading"><p className="eyebrow eyebrow-bright"><span className="live-dot" /> {isCreatingAccount ? "ACCOUNT CREATION" : isResettingPassword ? "PASSWORD RESET" : "SIGN IN"}</p><h1>{isCreatingAccount ? "Create your account." : isResettingPassword ? "Reset your password." : "Sign in to Star Board."}</h1><p>{isCreatingAccount ? "Use your email address and password to access your campaign console." : isResettingPassword ? "Enter your email address and we will send you a secure password reset link." : "Enter your email address and password to open your campaign console."}</p></div>
-        <form className="auth-form" onSubmit={handleSubmit}>
+    <main className={authShellClassName}>
+      <div className={authGridClassName} />
+      <div className={`${authSignalClassName} ${authSignalOneClassName}`} />
+      <div className={`${authSignalClassName} ${authSignalTwoClassName}`} />
+      <section className={authPanelClassName}>
+        <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN OPERATIONS</small></span></div>
+        <div className={authHeadingClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> {isCreatingAccount ? "ACCOUNT CREATION" : isResettingPassword ? "PASSWORD RESET" : "SIGN IN"}</p><h1>{isCreatingAccount ? "Create your account." : isResettingPassword ? "Reset your password." : "Sign in to Star Board."}</h1><p>{isCreatingAccount ? "Use your email address and password to access your campaign console." : isResettingPassword ? "Enter your email address and we will send you a secure password reset link." : "Enter your email address and password to open your campaign console."}</p></div>
+        <form className={authFormClassName} onSubmit={handleSubmit}>
           <label htmlFor="email">Email address</label>
           <input autoComplete="email" id="email" onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" required type="email" value={email} />
           {!isResettingPassword ? <><label htmlFor="password">Password</label><input autoComplete={isCreatingAccount ? "new-password" : "current-password"} id="password" minLength={8} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" required type="password" value={password} /></> : null}
-          <button className="button button-primary auth-submit" disabled={isSubmitting} type="submit"><Radio size={16} /> {isSubmitting ? "PROCESSING..." : isCreatingAccount ? "CREATE ACCOUNT" : isResettingPassword ? "SEND RESET LINK" : "SIGN IN"} <ArrowUpRight size={15} /></button>
+          <button className={authSubmitClassName} disabled={isSubmitting} type="submit"><Radio size={16} /> {isSubmitting ? "PROCESSING..." : isCreatingAccount ? "CREATE ACCOUNT" : isResettingPassword ? "SEND RESET LINK" : "SIGN IN"} <ArrowUpRight size={15} /></button>
         </form>
-        {mode === "signin" ? <button className="auth-reset-action" onClick={() => switchMode("reset")} type="button"><KeyRound size={13} /> Reset password</button> : null}
-        {status ? <div className="auth-status"><ShieldCheck size={15} /> <span>{status}</span></div> : null}
-        <div className="auth-footer"><span><Sparkles size={13} /> STARFINDER 2E CAMPAIGNS</span><button className="auth-mode-toggle" onClick={() => switchMode(isCreatingAccount || isResettingPassword ? "signin" : "create")} type="button">{isCreatingAccount ? "Already have an account? Sign in" : isResettingPassword ? "Return to sign in" : "New here? Create an account"}</button></div>
+        {mode === "signin" ? <button className={authResetActionClassName} onClick={() => switchMode("reset")} type="button"><KeyRound size={13} /> Reset password</button> : null}
+        {status ? <div className={authStatusClassName}><ShieldCheck size={15} /> <span>{status}</span></div> : null}
+        <div className={authFooterClassName}><span className={authFooterItemClassName}><Sparkles size={13} /> STARFINDER 2E CAMPAIGNS</span><button className={authModeToggleClassName} onClick={() => switchMode(isCreatingAccount || isResettingPassword ? "signin" : "create")} type="button">{isCreatingAccount ? "Already have an account? Sign in" : isResettingPassword ? "Return to sign in" : "New here? Create an account"}</button></div>
       </section>
     </main>
   );

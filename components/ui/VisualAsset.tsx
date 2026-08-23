@@ -1,0 +1,40 @@
+import ArtDownloadButton from "@/components/ui/ArtDownloadButton";
+
+export type VisualAssetProps = {
+  src: string | null;
+  label: string;
+  className?: string;
+  downloadName?: string;
+};
+
+export function VisualAsset({
+  src,
+  label,
+  className = "",
+  downloadName,
+}: VisualAssetProps) {
+  const stateClass = src
+    ? "has-asset bg-[#141b25] bg-center bg-no-repeat"
+    : "no-asset grid place-items-center bg-[#101721] bg-[repeating-linear-gradient(135deg,rgba(98,232,255,.08)_0_1px,transparent_1px_9px)] before:font-mono before:text-[7px] before:tracking-[.14em] before:text-[rgba(98,232,255,.55)] before:content-['NO_ARTWORK'] before:rotate-[-90deg]";
+  return (
+    <div
+      aria-label={src && downloadName ? undefined : label}
+      className={`visual-asset ${className} ${stateClass} ${src && downloadName ? "relative" : ""}`}
+      role={src && !downloadName ? "img" : undefined}
+      style={src ? { backgroundImage: `url(${src})` } : undefined}
+    >
+      {src && downloadName ? (
+        <>
+          <span
+            aria-label={label}
+            className="pointer-events-none absolute inset-0"
+            role="img"
+          />
+          <ArtDownloadButton name={downloadName} src={src} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+export default VisualAsset;
