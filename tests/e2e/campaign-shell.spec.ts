@@ -400,7 +400,9 @@ test("keeps faction emblems in route-owned utilities", async ({
     };
     createdFactionId = savePayload.faction?.id ?? null;
 
-    const emblem = page.locator(`[aria-label="${factionName} emblem"]`);
+    const emblem = page.locator(
+      `button[aria-label="Select ${factionName}"] [aria-label="${factionName} emblem"]`,
+    );
     await expect(emblem).toBeVisible();
     await expect(emblem).toHaveClass(/overflow-hidden/);
     await expect(emblem).toHaveClass(/w-\[64px\]/);
@@ -413,54 +415,42 @@ test("keeps faction emblems in route-owned utilities", async ({
 
     const factionGrid = page.locator("[data-faction-grid]");
     await expect(factionGrid).toHaveClass(/grid/);
-    await expect(factionGrid).toHaveClass(/grid-cols-3/);
+    await expect(factionGrid).toHaveClass(/grid-cols-1/);
     await expect(factionGrid).toHaveClass(/gap-\[14px\]/);
-    await expect(factionGrid).toHaveClass(/max-\[760px\]:grid-cols-2/);
     await expect(factionGrid).toHaveClass(/max-\[760px\]:gap-\[9px\]/);
-    await expect(factionGrid).toHaveClass(/max-\[420px\]:grid-cols-1/);
     await expect(factionGrid).not.toHaveClass(/faction-grid/);
 
     const factionCard = page.locator(
-      `a[aria-label="Open public file for ${factionName}"]`,
+      `button[aria-label="Select ${factionName}"]`,
     );
-    await expect(factionCard).toHaveClass(/relative/);
-    await expect(factionCard).toHaveClass(/min-h-\[202px\]/);
-    await expect(factionCard).toHaveClass(/p-\[18px\]/);
+    await expect(factionCard).toHaveClass(/flex/);
+    await expect(factionCard).toHaveClass(/items-center/);
+    await expect(factionCard).toHaveClass(/min-h-\[92px\]/);
+    await expect(factionCard).toHaveClass(/gap-\[14px\]/);
+    await expect(factionCard).toHaveClass(/p-\[14px_16px\]/);
     await expect(factionCard).toHaveClass(/overflow-hidden/);
     await expect(factionCard).toHaveClass(/border-\[var\(--line\)\]/);
     await expect(factionCard).toHaveClass(/bg-\[var\(--panel\)\]/);
-    await expect(factionCard).toHaveClass(/after:content-/);
-    await expect(factionCard).toHaveClass(/after:absolute/);
-    await expect(factionCard).toHaveClass(/after:-right-8/);
-    await expect(factionCard).toHaveClass(/after:-bottom-\[34px\]/);
-    await expect(factionCard).toHaveClass(/after:w-\[115px\]/);
-    await expect(factionCard).toHaveClass(/after:h-\[115px\]/);
-    await expect(factionCard).toHaveClass(/after:border-current/);
-    await expect(factionCard).toHaveClass(/after:opacity-\[\.14\]/);
-    await expect(factionCard).toHaveClass(/after:rotate-45/);
     await expect(factionCard).not.toHaveClass(/faction-card/);
-    const factionTop = factionCard.locator("[data-faction-top]");
-    await expect(factionTop).toHaveClass(/flex/);
-    await expect(factionTop).toHaveClass(/items-start/);
-    await expect(factionTop).toHaveClass(/justify-between/);
+    await expect(factionCard.getByRole("img")).toHaveCount(1);
     await expect(factionCard.getByRole("heading", { level: 3 })).toHaveClass(
-      /max-w-\[190px\]/,
+      /min-w-0/,
     );
     await expect(factionCard.getByRole("heading", { level: 3 })).toHaveClass(
-      /mt-\[28px\]/,
+      /m-0/,
     );
     await expect(factionCard.getByRole("heading", { level: 3 })).toHaveClass(
-      /mb-\[6px\]/,
+      /text-\[13px\]/,
     );
-    await expect(factionCard.locator("p")).toHaveClass(/m-0/);
-    const factionFooter = factionCard.locator("[data-faction-footer]");
-    await expect(factionFooter).toHaveClass(/mt-\[19px\]/);
-    await expect(factionFooter).toHaveClass(/items-end/);
-    await expect(factionFooter).toHaveClass(/justify-between/);
+    await expect(factionCard).not.toContainText("Independent brokers.");
+    await expect(factionCard).not.toContainText("ACTIVE");
+    await expect(factionCard).not.toContainText("CAMPAIGN");
+    await expect(factionCard.locator("[data-faction-top]")) .toHaveCount(0);
+    await expect(factionCard.locator("[data-faction-footer]")) .toHaveCount(0);
 
-    await page
-      .getByRole("link", { name: `Open public file for ${factionName}` })
-      .click();
+    await factionCard.click();
+    await expect(page.locator("[data-faction-preview]")).toBeVisible();
+    await page.getByRole("link", { name: "OPEN FULL RECORD" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/campaigns/${campaign.campaignId}/factions/[^/]+$`),
     );
@@ -646,8 +636,8 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
     expect(createdNpcId).toBeTruthy();
 
     await page.reload();
-    const npcCard = page.getByRole("link", {
-      name: `Open public file for ${npcName}`,
+    const npcCard = page.getByRole("button", {
+      name: `Select ${npcName}`,
     });
     await expect(npcCard).toHaveClass(/cursor-pointer/);
     await expect(npcCard).toHaveClass(/hover:bg-\[rgba\(98,232,255,\.045\)\]/);
@@ -658,6 +648,8 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
     await expect(npcCard).toHaveClass(/focus-visible:outline-offset-\[-1px\]/);
     await expect(npcCard).not.toHaveClass(/npc-record-row/);
     await npcCard.click();
+    await expect(page.locator("[data-npc-preview]")).toBeVisible();
+    await page.getByRole("link", { name: "OPEN FULL RECORD" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/campaigns/${campaign.campaignId}/npcs/[^/]+$`),
     );

@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import DirtyFormProvider from "@/components/campaign-shell/DirtyFormProvider";
 import CharacterPublicRecord from "@/components/characters/CharacterPublicRecord";
 import FactionPublicRecord from "@/components/factions/FactionPublicRecord";
 import JobPublicRecord from "@/components/jobs/JobPublicRecord";
@@ -39,50 +40,54 @@ describe("detail page artwork downloads", () => {
       {
         label: "NPC",
         markup: renderToStaticMarkup(
-          <NpcPublicRecord
-            campaignId="campaign-id"
-            npc={{
-              id: "npc-id",
-              author_id: "author-id",
-              name: "Relay Keeper",
-              species: "Android",
-              role: "Contact",
-              description: "Keeps the signal alive.",
-              player_notes_markdown: "Trusted contact.",
-              place_id: null,
-              art_subject: null,
-              art_path: "campaign-id/owner-id/npc.png",
-              art_url: artUrl,
-              art_prompt: null,
-              art_provider: null,
-              color: "pink",
-            }}
-            places={[]}
-          />,
+          <DirtyFormProvider>
+            <NpcPublicRecord
+              campaignId="campaign-id"
+              npc={{
+                id: "npc-id",
+                author_id: "author-id",
+                name: "Relay Keeper",
+                species: "Android",
+                role: "Contact",
+                description: "Keeps the signal alive.",
+                player_notes_markdown: "Trusted contact.",
+                place_id: null,
+                art_subject: null,
+                art_path: "campaign-id/owner-id/npc.png",
+                art_url: artUrl,
+                art_prompt: null,
+                art_provider: null,
+                color: "pink",
+              }}
+              places={[]}
+            />
+          </DirtyFormProvider>,
         ),
         accessibleName: "Download Relay Keeper artwork",
       },
       {
         label: "faction",
         markup: renderToStaticMarkup(
-          <FactionPublicRecord
-            campaignId="campaign-id"
-            faction={{
-              id: "faction-id",
-              author_id: "author-id",
-              name: "Drift Collective",
-              description: "Independent signal brokers.",
-              status: "active",
-              place_id: null,
-              art_subject: null,
-              art_path: "campaign-id/owner-id/faction.png",
-              art_url: artUrl,
-              art_prompt: null,
-              art_provider: null,
-              color: "amber",
-            }}
-            places={[]}
-          />,
+          <DirtyFormProvider>
+            <FactionPublicRecord
+              campaignId="campaign-id"
+              faction={{
+                id: "faction-id",
+                author_id: "author-id",
+                name: "Drift Collective",
+                description: "Independent signal brokers.",
+                status: "active",
+                place_id: null,
+                art_subject: null,
+                art_path: "campaign-id/owner-id/faction.png",
+                art_url: artUrl,
+                art_prompt: null,
+                art_provider: null,
+                color: "amber",
+              }}
+              places={[]}
+            />
+          </DirtyFormProvider>,
         ),
         accessibleName: "Download Drift Collective artwork",
       },
@@ -116,28 +121,30 @@ describe("detail page artwork downloads", () => {
       {
         label: "place",
         markup: renderToStaticMarkup(
-          <PlacePublicRecord
-            campaignId="campaign-id"
-            isGM={false}
-            place={{
-              id: "place-id",
-              campaign_id: "campaign-id",
-              parent_place_id: null,
-              name: "North Station",
-              kind: "station",
-              author_id: "author-id",
-              description: "An abandoned relay station.",
-              player_notes_markdown: "The signal starts here.",
-              art_subject: null,
-              art_path: "campaign-id/owner-id/place.png",
-              art_url: artUrl,
-              art_prompt: null,
-              art_provider: null,
-              created_at: "2026-08-22T00:00:00.000Z",
-              updated_at: "2026-08-22T00:00:00.000Z",
-            }}
-            places={[]}
-          />,
+          <DirtyFormProvider>
+            <PlacePublicRecord
+              campaignId="campaign-id"
+              isGM={false}
+              place={{
+                id: "place-id",
+                campaign_id: "campaign-id",
+                parent_place_id: null,
+                name: "North Station",
+                kind: "station",
+                author_id: "author-id",
+                description: "An abandoned relay station.",
+                player_notes_markdown: "The signal starts here.",
+                art_subject: null,
+                art_path: "campaign-id/owner-id/place.png",
+                art_url: artUrl,
+                art_prompt: null,
+                art_provider: null,
+                created_at: "2026-08-22T00:00:00.000Z",
+                updated_at: "2026-08-22T00:00:00.000Z",
+              }}
+              places={[]}
+            />
+          </DirtyFormProvider>,
         ),
         accessibleName: "Download North Station artwork",
       },
@@ -153,70 +160,76 @@ describe("detail page artwork downloads", () => {
   it("omits download controls from detail records without artwork", () => {
     const records = [
       renderToStaticMarkup(
-        <NpcPublicRecord
-          campaignId="campaign-id"
-          npc={{
-            id: "npc-id",
-            author_id: "author-id",
-            name: "Relay Keeper",
-            species: "Android",
-            role: "Contact",
-            description: "Keeps the signal alive.",
-            player_notes_markdown: "Trusted contact.",
-            place_id: null,
-            art_subject: null,
-            art_path: null,
-            art_url: null,
-            art_prompt: null,
-            art_provider: null,
-            color: "pink",
-          }}
-          places={[]}
-        />,
+        <DirtyFormProvider>
+          <NpcPublicRecord
+            campaignId="campaign-id"
+            npc={{
+              id: "npc-id",
+              author_id: "author-id",
+              name: "Relay Keeper",
+              species: "Android",
+              role: "Contact",
+              description: "Keeps the signal alive.",
+              player_notes_markdown: "Trusted contact.",
+              place_id: null,
+              art_subject: null,
+              art_path: null,
+              art_url: null,
+              art_prompt: null,
+              art_provider: null,
+              color: "pink",
+            }}
+            places={[]}
+          />
+        </DirtyFormProvider>,
       ),
       renderToStaticMarkup(
-        <FactionPublicRecord
-          campaignId="campaign-id"
-          faction={{
-            id: "faction-id",
-            author_id: "author-id",
-            name: "Drift Collective",
-            description: "Independent signal brokers.",
-            status: "active",
-            place_id: null,
-            art_subject: null,
-            art_path: null,
-            art_url: null,
-            art_prompt: null,
-            art_provider: null,
-            color: "amber",
-          }}
-          places={[]}
-        />,
+        <DirtyFormProvider>
+          <FactionPublicRecord
+            campaignId="campaign-id"
+            faction={{
+              id: "faction-id",
+              author_id: "author-id",
+              name: "Drift Collective",
+              description: "Independent signal brokers.",
+              status: "active",
+              place_id: null,
+              art_subject: null,
+              art_path: null,
+              art_url: null,
+              art_prompt: null,
+              art_provider: null,
+              color: "amber",
+            }}
+            places={[]}
+          />
+        </DirtyFormProvider>,
       ),
       renderToStaticMarkup(
-        <PlacePublicRecord
-          campaignId="campaign-id"
-          isGM={false}
-          place={{
-            id: "place-id",
-            campaign_id: "campaign-id",
-            parent_place_id: null,
-            name: "North Station",
-            kind: "station",
-            author_id: "author-id",
-            description: "An abandoned relay station.",
-            player_notes_markdown: "The signal starts here.",
-            art_subject: null,
-            art_path: null,
-            art_url: null,
-            art_prompt: null,
-            art_provider: null,
-            created_at: "2026-08-22T00:00:00.000Z",
-            updated_at: "2026-08-22T00:00:00.000Z",
-          }}
-          places={[]}
-        />,
+        <DirtyFormProvider>
+          <PlacePublicRecord
+            campaignId="campaign-id"
+            isGM={false}
+            place={{
+              id: "place-id",
+              campaign_id: "campaign-id",
+              parent_place_id: null,
+              name: "North Station",
+              kind: "station",
+              author_id: "author-id",
+              description: "An abandoned relay station.",
+              player_notes_markdown: "The signal starts here.",
+              art_subject: null,
+              art_path: null,
+              art_url: null,
+              art_prompt: null,
+              art_provider: null,
+              created_at: "2026-08-22T00:00:00.000Z",
+              updated_at: "2026-08-22T00:00:00.000Z",
+            }}
+            places={[]}
+          />
+        </DirtyFormProvider>,
       ),
     ];
 

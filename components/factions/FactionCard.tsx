@@ -1,10 +1,6 @@
-import Link from "next/link";
-import { Map, Network } from "lucide-react";
-import StatusPill from "@/components/ui/StatusPill";
+import { Network } from "lucide-react";
 import { getAttachedArtUrl } from "@/lib/campaign/mappers";
-import { campaignEntityPath } from "@/lib/campaign/routes";
-import { getPlaceBreadcrumb } from "@/lib/places";
-import type { ApiPlace, FactionRecord } from "@/lib/campaign/types";
+import type { FactionRecord } from "@/lib/campaign/types";
 
 export function FactionEmblem({ faction, iconSize }: { faction: FactionRecord; iconSize: number }) {
   const src = getAttachedArtUrl(faction.art_url, faction.art_path);
@@ -13,6 +9,11 @@ export function FactionEmblem({ faction, iconSize }: { faction: FactionRecord; i
   return <div aria-label={`${faction.name} emblem`} className={`w-[64px] h-[64px] flex-[0_0_64px] grid place-items-center overflow-hidden border border-current bg-[#0a1118] bg-center bg-no-repeat text-current ${artClasses}`} role="img" style={src ? { backgroundImage: `url(${src})` } : undefined}>{src ? null : <Network className="opacity-75" size={iconSize} />}</div>;
 }
 
-export default function FactionCard({ campaignId, faction, places }: { campaignId: string; faction: FactionRecord; places: ApiPlace[] }) {
-  return <Link aria-label={`Open public file for ${faction.name}`} className={`faction-${faction.color} block relative min-h-[202px] overflow-hidden border border-[var(--line)] bg-[var(--panel)] p-[18px] after:absolute after:-right-8 after:-bottom-[34px] after:h-[115px] after:w-[115px] after:rotate-45 after:border after:border-current after:opacity-[.14] after:content-['']`} href={campaignEntityPath(campaignId, "factions", faction.id)}><div data-faction-top="true" className="flex items-start justify-between"><FactionEmblem faction={faction} iconSize={24} /><StatusPill color={faction.color}>{faction.status.toUpperCase()}</StatusPill></div><h3 className="mt-[28px] mb-[6px] max-w-[190px] text-[15px] text-[var(--ink)]">{faction.name}</h3><p className="m-0 text-[10px] text-[var(--muted)]">{faction.description || "No public description recorded."}</p><div data-faction-footer="true" className="mt-[19px] flex items-end justify-between"><span><strong className="block font-mono text-[13px] font-medium text-current"><Map size={13} /> CAMPAIGN</strong><small className="mt-[3px] block font-mono text-[7px] text-[var(--dim)]">{getPlaceBreadcrumb(places, faction.place_id) || "MISSION CONTEXT"}</small></span></div></Link>;
+const factionSelectionClassNames = {
+  selected: "border-[rgba(98,232,255,.65)] bg-[rgba(98,232,255,.095)] hover:bg-[rgba(98,232,255,.14)]",
+  idle: "hover:border-[rgba(98,232,255,.45)]",
+};
+
+export default function FactionCard({ faction, selected, onSelect }: { faction: FactionRecord; selected: boolean; onSelect: (factionId: string) => void }) {
+  return <button aria-label={`Select ${faction.name}`} aria-controls="archive-preview-panel" aria-pressed={selected} className={`faction-${faction.color} flex min-h-[92px] w-full items-center gap-[14px] cursor-pointer overflow-hidden border border-[var(--line)] bg-[var(--panel)] p-[14px_16px] text-left focus-visible:outline-1 focus-visible:outline-[var(--cyan)] focus-visible:outline-offset-[-1px] ${factionSelectionClassNames[selected ? "selected" : "idle"]}`} onClick={() => onSelect(faction.id)} type="button"><FactionEmblem faction={faction} iconSize={24} /><h3 className="m-0 min-w-0 text-[13px] font-[550] text-[var(--ink)] [overflow-wrap:anywhere]">{faction.name}</h3></button>;
 }

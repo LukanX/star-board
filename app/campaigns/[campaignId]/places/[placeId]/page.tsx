@@ -4,7 +4,9 @@ import { getCampaignPlace, getCampaignPlaces } from "@/lib/campaign/places-serve
 
 export default async function PlacePage({ params }: { params: Promise<{ campaignId: string; placeId: string }> }) {
   const { campaignId, placeId } = await params;
-  const [placesResult, placeResult] = await Promise.all([getCampaignPlaces(campaignId), getCampaignPlace(campaignId, placeId)]);
+  const placesPromise = getCampaignPlaces(campaignId);
+  const placePromise = getCampaignPlace(campaignId, placeId, placesPromise);
+  const [placesResult, placeResult] = await Promise.all([placesPromise, placePromise]);
   if (!placesResult || !placeResult) notFound();
   return <PlaceDetailRouteView campaignId={campaignId} initialPlaces={placesResult.places} initialResult={placeResult} />;
 }

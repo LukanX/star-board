@@ -2,15 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { ArrowUpRight, CirclePlus, Map } from "lucide-react";
-import Link from "next/link";
 import EmptyState from "@/components/ui/EmptyState";
+import ArchiveMasterDetail from "@/components/ui/ArchiveMasterDetail";
 import PageLayout from "@/components/ui/PageLayout";
 import PlaceCard from "@/components/places/PlaceCard";
 import PlaceEditor from "@/components/places/PlaceEditor";
-import { campaignEntityPath } from "@/lib/campaign/routes";
+import PlacePreview from "@/components/places/PlacePreview";
 import type { ApiPlace } from "@/lib/campaign/types";
 import { buildPlaceTree, getPlaceBreadcrumb } from "@/lib/places";
-import { panelClassName } from "@/components/ui/recordStyles";
 import {
   accentIconCyanClassName,
   eyebrowClassName,
@@ -38,8 +37,10 @@ export default function PlacesRouteView({
       ),
   );
   const [search, setSearch] = useState("");
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const isGM = role === "gm";
   const placeTree = useMemo(() => buildPlaceTree(places), [places]);
+  const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? null;
   const normalizedSearch = search.trim().toLowerCase();
   const visiblePlaces = normalizedSearch
     ? places.filter((place) =>
@@ -75,6 +76,7 @@ export default function PlacesRouteView({
           )
         : [...current, savedPlace],
     );
+    setSelectedPlaceId(savedPlace.id);
     setEditorState(null);
   };
 
@@ -88,6 +90,7 @@ export default function PlacesRouteView({
             : place,
         ),
     );
+    setSelectedPlaceId((current) => current === deletedPlaceId ? null : current);
     setEditorState(null);
   };
 
@@ -141,96 +144,41 @@ export default function PlacesRouteView({
         </label>
       </div>
       {places.length ? (
-        <div
-          data-places-layout="true"
-          className="grid grid-cols-[minmax(260px,.78fr)_minmax(0,1.22fr)] gap-[14px] items-start max-[760px]:grid-cols-1"
-        >
-          <section
-            data-places-tree-panel="true"
-            className={`${panelClassName} min-w-0 overflow-hidden shadow-[0_12px_30px_rgba(0,0,0,.12)] max-[760px]:order-[1]`}
-          >
-            <div className="panel-topline flex items-start justify-between border-b border-[var(--line)] px-[21px] pb-4 pt-5">
-              <div>
-                <p className={`${eyebrowClassName} !mb-2`}>PLACE TREE</p>
-                <h2>Atlas structure</h2>
-              </div>
-              <Map className={accentIconCyanClassName} size={17} />
+        <ArchiveMasterDetail
+          selectedId={selectedPlaceId}
+          toolbar={null}
+          layoutDataAttribute="data-places-layout"
+          selectorPanelDataAttribute="data-places-tree-panel"
+          previewPanelDataAttribute="data-places-detail-panel"
+          previewContentDataAttribute="data-places-detail"
+          selectorEyebrow="PLACE TREE"
+          selectorTitle="Atlas structure"
+          selectorIcon={<Map size={17} />}
+          selector={normalizedSearch ? (
+            <div data-place-search-results="true" className="grid gap-[1px] p-[10px]">
+              {visiblePlaces.length ? visiblePlaces.map((place) => (
+                <button
+                  data-place-search-result="true"
+                  aria-label={`Select ${place.name}`}
+                  aria-controls="archive-preview-panel"
+                  aria-pressed={selectedPlaceId === place.id}
+                  className={`flex items-center justify-between gap-[12px] min-w-0 p-[11px_10px] border border-transparent text-[var(--ink)] text-left cursor-pointer ${selectedPlaceId === place.id ? "bg-[rgba(98,232,255,.095)] border-[rgba(98,232,255,.45)]" : "bg-[rgba(255,255,255,.018)] hover:border-[rgba(98,232,255,.3)] hover:bg-[rgba(98,232,255,.06)]"}`}
+                  key={place.id}
+                  onClick={() => setSelectedPlaceId(place.id)}
+                  type="button"
+                >
+                  <span className="min-w-0 grid gap-[4px]"><strong className="overflow-hidden text-[11px] font-[550] text-ellipsis whitespace-nowrap [overflow-wrap:anywhere]">{place.name}</strong><small className="overflow-hidden text-[var(--dim)] font-mono text-[8px] text-ellipsis whitespace-nowrap">{getPlaceBreadcrumb(places, place.id)}</small></span><ArrowUpRight aria-hidden="true" className="flex-[0_0_auto] text-[var(--cyan)]" size={14} />
+                </button>
+              )) : <EmptyState icon={Map} title="No matching places." message="Try a different name, kind, or breadcrumb." />}
             </div>
-            {normalizedSearch ? (
-              <div
-                data-place-search-results="true"
-                className="grid gap-[1px] p-[10px]"
-              >
-                {visiblePlaces.length ? (
-                  visiblePlaces.map((place) => (
-                    <Link
-                      data-place-search-result="true"
-                      className="flex items-center justify-between gap-[12px] min-w-0 p-[11px_10px] border border-transparent bg-[rgba(255,255,255,.018)] text-[var(--ink)] text-left cursor-pointer hover:border-[rgba(98,232,255,.3)] hover:bg-[rgba(98,232,255,.06)]"
-                      href={campaignEntityPath(campaignId, "places", place.id)}
-                      key={place.id}
-                    >
-                      <span className="min-w-0 grid gap-[4px]">
-                        <strong className="overflow-hidden text-[11px] font-[550] text-ellipsis whitespace-nowrap [overflow-wrap:anywhere]">
-                          {place.name}
-                        </strong>
-                        <small className="overflow-hidden text-[var(--dim)] font-mono text-[8px] text-ellipsis whitespace-nowrap">
-                          {getPlaceBreadcrumb(places, place.id)}
-                        </small>
-                      </span>
-                      <ArrowUpRight
-                        className="flex-[0_0_auto] text-[var(--cyan)]"
-                        size={14}
-                      />
-                    </Link>
-                  ))
-                ) : (
-                  <EmptyState
-                    icon={Map}
-                    title="No matching places."
-                    message="Try a different name, kind, or breadcrumb."
-                  />
-                )}
-              </div>
-            ) : (
-              <div
-                data-place-tree="true"
-                className="p-[9px_10px_12px] max-[420px]:px-[6px]"
-              >
-                {placeTree.map((node) => (
-                  <PlaceCard
-                    key={node.id}
-                    campaignId={campaignId}
-                    node={node}
-                    expandedIds={expandedIds}
-                    onToggle={toggleExpanded}
-                    onAddChild={(parentId) =>
-                      openEditor(undefined, parentId)
-                    }
-                    isGM={isGM}
-                    visiblePlaceIds={visiblePlaceIds}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-          <section
-            data-places-detail-panel="true"
-            className={`${panelClassName} min-w-0 overflow-hidden min-h-[430px] shadow-[0_12px_30px_rgba(0,0,0,.12)] max-[760px]:min-h-0 max-[760px]:order-[-1]`}
-          >
-            <div
-              data-places-detail="true"
-              className="min-w-0 p-[21px] max-[760px]:p-[17px]"
-            >
-              <Map className={accentIconCyanClassName} size={24} />
-              <p className={eyebrowClassName}>ROUTE-OWNED PLACE FILES</p>
-              <h2>Choose a place from the atlas.</h2>
-              <p>
-                Open a record to inspect its public brief, notes, breadcrumb,
-                and GM-only context where available.
-              </p>
+          ) : (
+            <div data-place-tree="true" className="p-[9px_10px_12px] max-[420px]:px-[6px]">
+              {placeTree.map((node) => <PlaceCard key={node.id} campaignId={campaignId} node={node} expandedIds={expandedIds} onToggle={toggleExpanded} onAddChild={(parentId) => openEditor(undefined, parentId)} isGM={isGM} visiblePlaceIds={visiblePlaceIds} selected={selectedPlaceId === node.id} selectedPlaceId={selectedPlaceId} onSelect={setSelectedPlaceId} />)}
             </div>
-          </section>
-        </div>
+          )}
+          preview={selectedPlace ? <PlacePreview campaignId={campaignId} place={selectedPlace} places={places} isGM={isGM} /> : null}
+          emptyPreview={<div data-places-detail="true" className="min-w-0 p-[21px] max-[760px]:p-[17px]"><Map className={accentIconCyanClassName} size={24} /><p className={eyebrowClassName}>ROUTE-OWNED PLACE FILES</p><h2>Choose a place from the atlas.</h2><p>Open a record to inspect its public brief, notes, breadcrumb, and GM-only context where available.</p></div>}
+        />
       ) : (
         <EmptyState
           icon={Map}

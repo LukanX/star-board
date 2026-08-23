@@ -6,6 +6,7 @@ import EpisodeCard from "@/components/episodes/EpisodeCard";
 import MemberCard from "@/components/members/MemberCard";
 import MembersRouteView from "@/components/members/MembersRouteView";
 import NpcCard from "@/components/npcs/NpcCard";
+import FactionCard from "@/components/factions/FactionCard";
 import PlaceCard from "@/components/places/PlaceCard";
 import CampaignToastHost from "@/components/campaign-shell/CampaignToastHost";
 import AppStatus from "@/components/ui/AppStatus";
@@ -217,7 +218,9 @@ describe("PlaceCard", () => {
           }],
         }}
         onAddChild={() => undefined}
+        onSelect={() => undefined}
         onToggle={() => undefined}
+        selected
         visiblePlaceIds={new Set(["place-id", "child-place-id"])}
       />,
     );
@@ -236,6 +239,10 @@ describe("PlaceCard", () => {
     expect(markup).toContain("flex-[0_0_18px]");
     expect(markup).toContain("text-[var(--cyan)]");
     expect(markup).toContain('data-place-tree-select="true"');
+    expect(markup).toContain('<button');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain('aria-controls="archive-preview-panel"');
+    expect(markup).toContain("Select North Station");
     expect(markup).toContain("min-w-0 flex-1");
     expect(markup).toContain("gap-[7px]");
     expect(markup).toContain("min-h-[43px]");
@@ -377,6 +384,7 @@ describe("NpcCard", () => {
     const markup = renderToStaticMarkup(
       <NpcCard
         campaignId="campaign-id"
+        onSelect={() => undefined}
         npc={{
           id: "npc-id",
           author_id: "author-id",
@@ -393,15 +401,21 @@ describe("NpcCard", () => {
           art_provider: null,
           color: "pink",
         }}
+        selected
       />,
     );
 
     expect(markup).toContain("grid h-[62px] w-[62px]");
+    expect(markup).toContain('<button');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain('aria-controls="archive-preview-panel"');
     expect(markup).toContain("text-[var(--pink)]");
+    expect(markup).toContain("Keeps the signal alive.");
+    expect(markup).not.toContain("Android");
+    expect(markup).not.toContain("CONTACT");
+    expect(markup).not.toContain("PLAYER NOTES");
     expect(markup).toContain("min-h-[86px]");
     expect(markup).toContain("last:border-b-0");
-    expect(markup).toContain("[&amp;&gt;h3]:m-0");
-    expect(markup).toContain("[&amp;&gt;span]:inline-flex");
     expect(markup).not.toContain("record-row");
     expect(markup).not.toContain("record-main");
     expect(markup).not.toContain("record-title-row");
@@ -409,6 +423,46 @@ describe("NpcCard", () => {
     expect(markup).not.toContain("record-visibility");
     expect(markup).not.toContain("record-icon");
     expect(markup).not.toContain("record-portrait");
+  });
+});
+
+describe("FactionCard", () => {
+  it("renders a selected faction as an archive selection button", () => {
+    const markup = renderToStaticMarkup(
+      <FactionCard
+        faction={{
+          id: "faction-id",
+          author_id: "author-id",
+          name: "The Accord",
+          description: "Independent brokers.",
+          status: "active",
+          place_id: null,
+          art_subject: null,
+          art_path: null,
+          art_url: null,
+          art_prompt: null,
+          art_provider: null,
+          color: "cyan",
+        }}
+        onSelect={() => undefined}
+        selected
+      />,
+    );
+
+    expect(markup).toContain('<button');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain('aria-controls="archive-preview-panel"');
+    expect(markup).toContain("Select The Accord");
+    expect(markup).toContain("flex min-h-[92px]");
+    expect(markup).toContain("items-center");
+    expect(markup).toContain("min-h-[92px]");
+    expect(markup).toContain("gap-[14px]");
+    expect(markup).toContain("p-[14px_16px]");
+    expect(markup).not.toContain("Independent brokers.");
+    expect(markup).not.toContain("ACTIVE");
+    expect(markup).not.toContain("CAMPAIGN");
+    expect(markup).not.toContain("data-faction-top");
+    expect(markup).not.toContain("data-faction-footer");
   });
 });
 

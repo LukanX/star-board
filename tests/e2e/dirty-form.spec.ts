@@ -210,7 +210,7 @@ test("keeps place artwork frames in route-owned utilities", async ({ page, campa
     const savePayload = (await saveResponse.json()) as { place?: { id?: string } };
     createdPlaceId = savePayload.place?.id ?? null;
 
-    const treeArt = page.locator(`[aria-label="${placeName} artwork"]`);
+    const treeArt = page.locator(`[data-place-tree] [aria-label="${placeName} artwork"]`);
     await expect(treeArt).toHaveCount(1);
     await expect(treeArt).toBeVisible();
     await expect(treeArt).toHaveClass(/overflow-hidden/);
@@ -257,7 +257,8 @@ test("keeps place artwork frames in route-owned utilities", async ({ page, campa
     await expect(tree).toHaveClass(/max-\[420px\]:px-\[6px\]/);
     await expect(tree).not.toHaveClass(/place-tree/);
 
-    await page.getByRole("link", { name: `Open public file for ${placeName}` }).click();
+    await page.getByRole("button", { name: `Select ${placeName}`, exact: true }).click();
+    await page.locator("[data-place-preview]").getByRole("link", { name: "OPEN FULL RECORD", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/campaigns/${campaign.campaignId}/places/[^/]+$`));
     const detailPanel = page.locator("[data-place-detail-panel]");
     await expect(detailPanel).toHaveCount(1);
@@ -382,13 +383,11 @@ test("keeps place search results in route-owned utilities", async ({ page, campa
     await expect(result).toHaveClass(/min-w-0/);
     await expect(result).toHaveClass(/p-\[11px_10px\]/);
     await expect(result).toHaveClass(/border/);
-    await expect(result).toHaveClass(/border-transparent/);
-    await expect(result).toHaveClass(/bg-\[rgba\(255,255,255,\.018\)\]/);
+    await expect(result).toHaveClass(/border-\[rgba\(98,232,255,\.45\)\]/);
+    await expect(result).toHaveClass(/bg-\[rgba\(98,232,255,\.095\)\]/);
     await expect(result).toHaveClass(/text-\[var\(--ink\)\]/);
     await expect(result).toHaveClass(/text-left/);
     await expect(result).toHaveClass(/cursor-pointer/);
-    await expect(result).toHaveClass(/hover:border-\[rgba\(98,232,255,\.3\)\]/);
-    await expect(result).toHaveClass(/hover:bg-\[rgba\(98,232,255,\.06\)\]/);
     await expect(result).not.toHaveClass(/place-search-result/);
 
     const resultCopy = result.locator("span");
