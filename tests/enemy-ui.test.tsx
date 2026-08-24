@@ -64,6 +64,8 @@ describe("enemy archive UI secrecy", () => {
     const markup = render(<EnemyPreview campaignId={enemy.campaign_id} enemy={enemy} isGM={false} />);
 
     expect(markup).toContain("A silent shape moving between the stars.");
+    expect(markup).toContain('data-archive-preview-action="true"');
+    expect(markup.indexOf('data-archive-preview-action="true"')).toBeLessThan(markup.indexOf('data-enemy-preview-art="true"'));
     expect(markup).toContain('data-enemy-preview-art="true"');
     expect(markup).toContain("w-[min(100%,320px)]");
     expect(markup).toContain("aspect-square");

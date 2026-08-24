@@ -10,10 +10,13 @@ import type { ApiEnemy } from "@/lib/campaign/types";
 export default function EnemyPreview({ campaignId, enemy, isGM }: { campaignId: string; enemy: ApiEnemy; isGM: boolean }) {
   const artUrl = getAttachedArtUrl(enemy.art_url, enemy.art_path);
   return <div data-enemy-preview="true" className="grid gap-[17px]">
-    <div data-archive-preview-heading="true" tabIndex={-1} className="min-w-0 outline-0">
-      <p className={eyebrowClassName}>{isGM ? "GM CREATURE PREVIEW" : "REVEALED CREATURE PREVIEW"}</p>
-      <h2 className="m-0 text-[22px] [overflow-wrap:anywhere]">{enemy.name}</h2>
-      {isGM ? <p className="mt-[8px] m-0 text-[var(--pink)] font-mono text-[8px] tracking-[.1em]">LEVEL {enemy.level ?? "?"}{" // "}{(enemy.size ?? "unknown").toUpperCase()}{" // "}{(enemy.rarity ?? "unknown").toUpperCase()}</p> : null}
+    <div data-archive-preview-heading="true" tabIndex={-1} className="flex min-w-0 items-start justify-between gap-[15px] max-[420px]:gap-[8px]">
+      <div className="min-w-0">
+        <p className={eyebrowClassName}>{isGM ? "GM CREATURE PREVIEW" : "REVEALED CREATURE PREVIEW"}</p>
+        <h2 className="m-0 text-[22px] [overflow-wrap:anywhere]">{enemy.name}</h2>
+        {isGM ? <p className="mt-[8px] m-0 text-[var(--pink)] font-mono text-[8px] tracking-[.1em]">LEVEL {enemy.level ?? "?"}{" // "}{(enemy.size ?? "unknown").toUpperCase()}{" // "}{(enemy.rarity ?? "unknown").toUpperCase()}</p> : null}
+      </div>
+      <CampaignRouteLink data-archive-preview-action="true" className="ml-auto inline-flex h-[37px] shrink-0 items-center justify-center gap-2 whitespace-nowrap border border-[var(--line)] bg-[rgba(255,92,154,.08)] px-[14px] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] hover:border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)] focus-visible:outline-2 focus-visible:outline-[var(--pink)] focus-visible:outline-offset-2" href={campaignEntityPath(campaignId, "enemies", enemy.id)}><ArrowUpRight aria-hidden="true" size={14} /> OPEN FULL RECORD</CampaignRouteLink>
     </div>
     <div data-enemy-preview-art="true" className={`${archivePreviewArtworkClassName} border border-[rgba(255,92,154,.35)] bg-[rgba(255,92,154,.08)] text-[var(--pink)]`}>
       <RecordPortrait src={artUrl} label={`${enemy.name} artwork`} className="grid w-full h-full place-items-center" fallback={<Skull size={24} />} />
@@ -23,7 +26,6 @@ export default function EnemyPreview({ campaignId, enemy, isGM }: { campaignId: 
     <div className="grid gap-[14px]">
       <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PLAYER-SAFE BRIEF</p><p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">{enemy.player_description || "No revealed description recorded yet."}</p></div>
       {isGM ? <p className="m-0 flex items-center gap-[6px] text-[var(--pink)] font-mono text-[8px] tracking-[.07em]"><LockKeyhole size={13} /> MECHANICS ARE GM-ONLY</p> : null}
-      <CampaignRouteLink className="h-[37px] inline-flex w-fit items-center justify-center gap-2 border border-[var(--line)] bg-[rgba(255,92,154,.08)] px-[14px] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] hover:border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)]" href={campaignEntityPath(campaignId, "enemies", enemy.id)}><ArrowUpRight aria-hidden="true" size={14} /> OPEN FULL RECORD</CampaignRouteLink>
     </div>
   </div>;
 }
