@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { generateImage } from "@/lib/ai/client";
+import { loadPlaceAiContext } from "@/lib/ai/assistance";
 import { buildArtPrompt } from "@/lib/ai/prompts";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
@@ -78,7 +79,15 @@ export async function POST(request: Request) {
       campaign.art_style_suffix,
       input.data.campaignStyle,
     ].filter(Boolean).join(". ");
-    const prompt = buildArtPrompt(input.data.subject, campaignStyle, input.data.refinement, input.data.currentPrompt, input.data.targetKind);
+    const placeContextResult = input.data.targetKind === "place" && input.data.parentPlaceId
+      ? await loadPlaceAiContext(context.supabase, input.data.campaignId, input.data.parentPlaceId)
+      : { context: undefined };
+
+    if ("error" in placeContextResult) {
+      return NextResponse.json({ error: placeContextResult.error }, { status: placeContextResult.invalid ? 400 : 503 });
+    }
+
+    const prompt = buildArtPrompt(input.data.subject, campaignStyle, input.data.refinement, input.data.currentPrompt, input.data.targetKind, placeContextResult.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundImageGeneration(env)) {

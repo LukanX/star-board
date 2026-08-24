@@ -102,6 +102,7 @@ export default function PlaceEditor({
   useCampaignArtEditor({
     campaignId,
     kind: "place",
+    parentPlaceId: draft.parentPlaceId,
     value: draft.artPath,
     trackUnsavedUploads: true,
     url: draft.artUrl,

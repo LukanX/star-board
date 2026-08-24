@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, loadPlaceAiContext, recordAiGeneration } from "@/lib/ai/assistance";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { buildPlacePrompt } from "@/lib/ai/prompts";
-import { getPlaceAncestors } from "@/lib/places";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
@@ -61,26 +60,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: aiContext.error }, { status: aiContext.notFound ? 404 : 503 });
     }
 
-    let hierarchy: Array<{ name: string; kind: string }> = [];
-    if (input.data.parentPlaceId) {
-      const { data: places, error: placesError } = await context.supabase
-        .from("places")
-        .select("id, campaign_id, parent_place_id, name, kind")
-        .eq("campaign_id", input.data.campaignId);
+    const placeContextResult = await loadPlaceAiContext(context.supabase, input.data.campaignId, input.data.parentPlaceId);
 
-      if (placesError) {
-        return NextResponse.json({ error: "Place hierarchy could not be loaded." }, { status: 503 });
-      }
-
-      const parent = (places ?? []).find((place) => place.id === input.data.parentPlaceId);
-      if (!parent) {
-        return NextResponse.json({ error: "Place parent must belong to this campaign." }, { status: 400 });
-      }
-
-      hierarchy = getPlaceAncestors(places ?? [], parent.id).map((place) => ({ name: place.name, kind: place.kind }));
+    if ("error" in placeContextResult) {
+      return NextResponse.json({ error: placeContextResult.error }, { status: placeContextResult.invalid ? 400 : 503 });
     }
 
-    const prompt = buildPlacePrompt(input.data, aiContext.campaign, hierarchy);
+    const prompt = buildPlacePrompt(input.data, aiContext.campaign, placeContextResult.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let rawDraft: unknown;
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;

@@ -1,5 +1,5 @@
 import type { CharacterGenerationInput, EnemyBriefGenerationInput, EnemyGenerationInput, FactionGenerationInput, MissionGenerationInput, NpcGenerationInput, PlaceGenerationInput } from "@/lib/validation/ai";
-import type { CampaignAiContext, MissionAiReferences } from "@/lib/ai/assistance";
+import type { CampaignAiContext, MissionAiReferences, PlaceAiContext } from "@/lib/ai/assistance";
 import type { ImageGenerationInput } from "@/lib/validation/image";
 import { imagePromptMaxLength } from "@/lib/validation/image";
 
@@ -48,6 +48,47 @@ function missionReferenceLines(references?: MissionAiReferences) {
   }
 
   return lines;
+}
+
+function placeContextLines(context?: PlaceAiContext) {
+  if (!context) return [];
+
+  return [
+    `Place hierarchy: ${context.hierarchy.map((place) => `${place.name} (${place.kind})`).join(" > ")}`,
+    `Immediate parent: ${context.parent.name} (${context.parent.kind})`,
+    `Immediate parent description: ${context.parent.description || "No public description recorded."}`,
+    `Immediate parent player notes: ${context.parent.playerNotes || "No public player notes recorded."}`,
+  ];
+}
+
+function truncatePromptPart(value: string, maxLength: number) {
+  if (maxLength <= 0) return "";
+  return value.length > maxLength
+    ? `${value.slice(0, Math.max(0, maxLength - 3))}...`
+    : value;
+}
+
+function boundedPlaceArtContext(context: PlaceAiContext | undefined, maxLength: number) {
+  if (!context || maxLength <= 0) return "";
+
+  const fixedLines = [
+    context.hierarchy.length ? `Place hierarchy: ${context.hierarchy.map((place) => `${place.name} (${place.kind})`).join(" > ")}` : "",
+    `Immediate parent: ${context.parent.name} (${context.parent.kind})`,
+    "Make sure to keep the child place as the focal subject while making it visibly belong within the immediate parent's architecture, materials, atmosphere, and scale.",
+  ].filter(Boolean);
+  const fixedPrompt = fixedLines.join(" ");
+
+  if (fixedPrompt.length >= maxLength) return truncatePromptPart(fixedPrompt, maxLength);
+
+  const descriptionLabel = "Immediate parent description: ";
+  const playerNotesLabel = "Immediate parent player notes: ";
+  const dynamicBudget = Math.max(0, maxLength - fixedPrompt.length - 2);
+  const descriptionBudget = Math.ceil(dynamicBudget / 2);
+  const playerNotesBudget = Math.floor(dynamicBudget / 2);
+  const description = truncatePromptPart(`${descriptionLabel}${context.parent.description || "No public description recorded."}`, descriptionBudget);
+  const playerNotes = truncatePromptPart(`${playerNotesLabel}${context.parent.playerNotes || "No public player notes recorded."}`, playerNotesBudget);
+
+  return [fixedPrompt, description, playerNotes].filter(Boolean).join(" ").slice(0, maxLength);
 }
 
 export function buildMissionPrompt(input: MissionGenerationInput, context?: CampaignAiContext, references?: MissionAiReferences) {
@@ -125,7 +166,7 @@ export function buildFactionPrompt(input: FactionGenerationInput, context?: Camp
   ].filter(Boolean).join("\n");
 }
 
-export function buildPlacePrompt(input: PlaceGenerationInput, context?: CampaignAiContext, hierarchy: Array<{ name: string; kind: string }> = []) {
+export function buildPlacePrompt(input: PlaceGenerationInput, context?: CampaignAiContext, placeContext?: PlaceAiContext) {
   return [
     "You are a campaign writer for a tabletop campaign manager.",
     "Return only valid JSON matching the requested place draft fields.",
@@ -133,12 +174,13 @@ export function buildPlacePrompt(input: PlaceGenerationInput, context?: Campaign
     `Campaign setting: ${input.setting ?? "A richly imagined campaign world shaped by the GM."}`,
     `Campaign style notes: ${input.styleNotes ?? "Distinctive, playable, sensory, and useful at the table."}`,
     `Mode: ${input.mode}`,
-    hierarchy.length ? `Place hierarchy: ${hierarchy.map((place) => `${place.name} (${place.kind})`).join(" > ")}` : "This place is a top-level location in the campaign.",
+    ...(placeContext ? placeContextLines(placeContext) : ["This place is a top-level location in the campaign."]),
     input.name ? `Existing name: ${input.name}` : "",
     input.kind ? `Existing kind label: ${input.kind}` : "",
     input.focus ? `GM focus: ${input.focus}` : "",
     input.currentDraft ? `Current editor draft: ${JSON.stringify(input.currentDraft)}` : "",
-    "The kind field is a campaign-specific label, not a fixed genre category. Write one distinct place that fits its parent context without inventing a whole automatic subtree.",
+    "The kind field is a campaign-specific label, not a fixed genre category. Treat the selected hierarchy and immediate parent's public context as authoritative. Write one distinct child that fits the parent without copying it or inventing a whole automatic subtree.",
+    "Preserve visible continuity with the immediate parent through compatible architecture, materials, atmosphere, and scale while adding child-specific detail.",
     "Write player notes without spoilers and put secrets, threats, and future reveals in gmNotes.",
     "visualPrompt must be a concise, subject-specific description for later image generation. Do not include provider names, image dimensions, logos, or text.",
     "Fields: name, kind, description, playerNotes, gmNotes, visualPrompt.",
@@ -185,7 +227,7 @@ export function buildEnemyBriefPrompt(input: EnemyBriefGenerationInput, context?
   ].filter(Boolean).join("\n");
 }
 
-export function buildArtPrompt(subject: string, campaignStyle?: string, refinement?: string, currentPrompt?: string, targetKind?: ImageGenerationInput["targetKind"]) {
+export function buildArtPrompt(subject: string, campaignStyle?: string, refinement?: string, currentPrompt?: string, targetKind?: ImageGenerationInput["targetKind"], placeContext?: PlaceAiContext) {
   const stylePrefix = targetKind === "faction" ? FACTION_ART_STYLE_PREFIX : ART_STYLE_PREFIX;
   const subjectParts = [
     targetKind === "faction" ? FACTION_ART_INSTRUCTION : "",
@@ -194,9 +236,11 @@ export function buildArtPrompt(subject: string, campaignStyle?: string, refineme
     `Subject: ${subject}`,
   ].filter(Boolean);
   const fixedPrompt = [stylePrefix, ...subjectParts].join(" ");
-  const campaignStyleBudget = Math.max(0, imagePromptMaxLength - fixedPrompt.length - (campaignStyle ? 1 : 0));
+  const placeContextBudget = Math.max(0, imagePromptMaxLength - fixedPrompt.length - 1);
+  const boundedPlaceContext = targetKind === "place" ? boundedPlaceArtContext(placeContext, placeContextBudget) : "";
+  const campaignStyleBudget = Math.max(0, imagePromptMaxLength - fixedPrompt.length - (boundedPlaceContext ? boundedPlaceContext.length + 1 : 0) - (campaignStyle ? 1 : 0));
   const boundedCampaignStyle = campaignStyle ? campaignStyle.slice(0, campaignStyleBudget) : "";
-  const freshParts = [stylePrefix, boundedCampaignStyle, ...subjectParts].filter(Boolean);
+  const freshParts = [stylePrefix, boundedPlaceContext, boundedCampaignStyle, ...subjectParts].filter(Boolean);
   const freshPrompt = freshParts.join(" ");
   const currentPromptLabel = "Refine this existing visual direction: ";
   const currentPromptBudget = Math.max(0, imagePromptMaxLength - freshPrompt.length - (currentPrompt ? currentPromptLabel.length + 1 : 0));

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getPlaceAncestors } from "@/lib/places";
 
 export type CampaignAiContext = {
   system: string;
@@ -33,6 +34,16 @@ export type MissionAiReferences = {
   };
 };
 
+export type PlaceAiContext = {
+  hierarchy: Array<{ name: string; kind: string }>;
+  parent: {
+    name: string;
+    kind: string;
+    description: string;
+    playerNotes: string;
+  };
+};
+
 type MissionAiReferenceInput = {
   giverType?: "npc" | "faction";
   giverId?: string;
@@ -57,6 +68,46 @@ export async function loadCampaignAiContext(supabase: SupabaseClient, campaignId
       system: campaign.system,
       description: campaign.description,
       artStyleSuffix: campaign.art_style_suffix,
+    },
+  };
+}
+
+export async function loadPlaceAiContext(supabase: SupabaseClient, campaignId: string, parentPlaceId: string | null | undefined) {
+  if (!parentPlaceId) return { context: undefined };
+
+  const [parentResult, placeTreeResult] = await Promise.all([
+    supabase
+      .from("places")
+      .select("id, parent_place_id, name, kind, description, player_notes_markdown")
+      .eq("id", parentPlaceId)
+      .eq("campaign_id", campaignId)
+      .maybeSingle(),
+    supabase
+      .from("places")
+      .select("id, parent_place_id, name, kind")
+      .eq("campaign_id", campaignId),
+  ]);
+
+  if (parentResult.error || placeTreeResult.error) {
+    return { error: "Place hierarchy could not be loaded.", unavailable: true as const };
+  }
+
+  if (!parentResult.data) {
+    return { error: "Place parent must belong to this campaign.", invalid: true as const };
+  }
+
+  return {
+    context: {
+      hierarchy: getPlaceAncestors((placeTreeResult.data ?? []).map((place) => ({ ...place, campaign_id: campaignId })), parentResult.data.id).map((place) => ({
+        name: place.name,
+        kind: place.kind,
+      })),
+      parent: {
+        name: parentResult.data.name,
+        kind: parentResult.data.kind,
+        description: parentResult.data.description.slice(0, 4000),
+        playerNotes: parentResult.data.player_notes_markdown.slice(0, 2400),
+      },
     },
   };
 }

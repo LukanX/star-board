@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getServerEnv: vi.fn(),
   requireCampaignGM: vi.fn(),
   loadCampaignAiContext: vi.fn(),
+  loadPlaceAiContext: vi.fn(),
   recordAiGeneration: vi.fn(),
   buildPlacePrompt: vi.fn(() => "place-prompt"),
   loadCampaignAiSettings: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
 vi.mock("@/lib/ai/assistance", () => ({
   loadCampaignAiContext: mocks.loadCampaignAiContext,
+  loadPlaceAiContext: mocks.loadPlaceAiContext,
   recordAiGeneration: mocks.recordAiGeneration,
 }));
 vi.mock("@/lib/ai/prompts", () => ({ buildPlacePrompt: mocks.buildPlacePrompt }));
@@ -60,6 +62,7 @@ describe("AI place assistance route", () => {
     mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: { from: vi.fn().mockReturnValue(createPlacesQuery()) }, user: { id: userId }, role: "gm" });
     mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A frontier campaign", artStyleSuffix: "Cinematic sci-fi realism" } });
+    mocks.loadPlaceAiContext.mockResolvedValue({ context: undefined });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true }] });
     mocks.recordAiGeneration.mockResolvedValue({ error: null });
@@ -85,6 +88,19 @@ describe("AI place assistance route", () => {
       gmNotes: "It opens into a pre-collapse transit line.",
       visualPrompt: "A blue metal door hidden behind a crowded market shrine.",
     };
+    const placeContext = {
+      hierarchy: [
+        { name: "Asterion", kind: "planet" },
+        { name: "Night Market", kind: "district" },
+      ],
+      parent: {
+        name: "Night Market",
+        kind: "district",
+        description: "A crowded district beneath the orbital ring.",
+        playerNotes: "Public parent notes.",
+      },
+    };
+    mocks.loadPlaceAiContext.mockResolvedValue({ context: placeContext });
     mocks.generateJson.mockResolvedValue({ data: draft, model: "openai/gpt-4o-mini", generationId: "place-run-1", usage: { inputTokens: 14, outputTokens: 42, cost: 0.002 } });
 
     const response = await generatePlace(request({ campaignId, mode: "create", parentPlaceId: parentId, name: "The Blue Door", kind: "room" }));
@@ -92,13 +108,11 @@ describe("AI place assistance route", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
+    expect(mocks.loadPlaceAiContext).toHaveBeenCalledWith(expect.anything(), campaignId, parentId);
     expect(mocks.buildPlacePrompt).toHaveBeenCalledWith(
       expect.objectContaining({ campaignId, parentPlaceId: parentId, name: "The Blue Door" }),
       expect.objectContaining({ system: "Starfinder 2e" }),
-      [
-        { name: "Asterion", kind: "planet" },
-        { name: "Night Market", kind: "district" },
-      ],
+      placeContext,
     );
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       campaignId,
@@ -111,5 +125,27 @@ describe("AI place assistance route", () => {
       outputTokens: 42,
       costUsd: 0.002,
     }));
+  });
+
+  it("rejects an invalid Place parent before calling the provider", async () => {
+    mocks.loadPlaceAiContext.mockResolvedValue({ error: "Place parent must belong to this campaign.", invalid: true });
+
+    const response = await generatePlace(request({ campaignId, mode: "create", parentPlaceId: parentId, kind: "room" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe("Place parent must belong to this campaign.");
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+  });
+
+  it("returns an unavailable response when Place context cannot be loaded", async () => {
+    mocks.loadPlaceAiContext.mockResolvedValue({ error: "Place hierarchy could not be loaded.", unavailable: true });
+
+    const response = await generatePlace(request({ campaignId, mode: "create", parentPlaceId: parentId, kind: "room" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(payload.error).toBe("Place hierarchy could not be loaded.");
+    expect(mocks.generateJson).not.toHaveBeenCalled();
   });
 });
