@@ -35,12 +35,13 @@ export default function CharacterDetailRouteView({ campaignId, initialCharacter 
 
   return <>
     <CampaignArtEditorSlot />
-    <CharacterPublicRecord campaignId={campaignId} character={mapApiCharacter(character, 0)} />
-    {character.can_edit ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap">
-      <button className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px bg-[rgba(255,255,255,.035)] text-[var(--muted)] hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]" onClick={() => { setError(null); setEditorOpen(true); }} type="button"><Pencil size={15} /> EDIT CHARACTER</button>
-      <button className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px !border-[rgba(255,92,154,.42)] bg-[rgba(255,92,154,.08)] !text-[var(--pink)] hover:!border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)]" disabled={isDeleting} onClick={() => void deleteCharacter()} type="button"><Trash2 size={15} /> {isDeleting ? "DELETING..." : "DELETE CHARACTER"}</button>
-    </div> : null}
+    {editorOpen ? <CharacterEditor campaignId={campaignId} character={character} onCancel={() => setEditorOpen(false)} onSaved={(savedCharacter) => { setCharacter(savedCharacter); setEditorOpen(false); }} /> : <>
+      <CharacterPublicRecord campaignId={campaignId} character={mapApiCharacter(character, 0)} />
+      {character.can_edit ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap">
+        <button className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px bg-[rgba(255,255,255,.035)] text-[var(--muted)] hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]" onClick={() => { setError(null); setEditorOpen(true); }} type="button"><Pencil size={15} /> EDIT CHARACTER</button>
+        <button className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px !border-[rgba(255,92,154,.42)] bg-[rgba(255,92,154,.08)] !text-[var(--pink)] hover:!border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)]" disabled={isDeleting} onClick={() => void deleteCharacter()} type="button"><Trash2 size={15} /> {isDeleting ? "DELETING..." : "DELETE CHARACTER"}</button>
+      </div> : null}
+    </>}
     {error ? <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}
-    {editorOpen ? <CharacterEditor campaignId={campaignId} character={character} onCancel={() => setEditorOpen(false)} onSaved={(savedCharacter) => { setCharacter(savedCharacter); setEditorOpen(false); }} /> : null}
   </>;
 }

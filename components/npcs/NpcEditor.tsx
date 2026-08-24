@@ -325,7 +325,7 @@ export default function NpcEditor({
             disabled={isSaving}
             type="submit"
           >
-            {isSaving ? "SAVING..." : npc ? "SAVE CHANGES" : "ADD NPC"}
+            {isSaving ? "SAVING..." : "SAVE NPC"}
           </button>
           <button
             className="text-action inline-flex items-center gap-1 whitespace-nowrap border-0 bg-transparent p-0 font-mono text-[8px] tracking-[.1em] text-[var(--cyan)] cursor-pointer hover:text-[#a1f3ff] max-[420px]:w-full max-[420px]:justify-start"

@@ -101,7 +101,7 @@ export default function NotesRouteView({
       eyebrow="CAMPAIGN LOG // SHARED MEMORY"
       title="Campaign notes"
       description="Global context and episode notes, with authorship and visibility kept visible."
-      action="ADD NOTE"
+      action={editorOpen ? undefined : "ADD NOTE"}
       actionIcon={<CirclePlus size={16} />}
       onAction={() => openEditor()}
     >
@@ -122,12 +122,12 @@ export default function NotesRouteView({
           {error}
         </p>
       ) : null}
-      {statusMessage ? (
+      {!editorOpen && statusMessage ? (
         <p className={`${recordDetailMetaClassName} mb-3`} role="status">
           {statusMessage}
         </p>
       ) : null}
-      <div
+      {!editorOpen ? <div
         data-notes-toolbar="true"
         className="flex items-center justify-between gap-[15px] border-b border-[var(--line)] pb-[13px] mb-0 max-[760px]:items-start max-[760px]:flex-col"
       >
@@ -166,8 +166,8 @@ export default function NotesRouteView({
             <LockKeyhole size={14} /> GM ONLY <span>{count("gm")}</span>
           </button>
         ) : null}
-      </div>
-      {filteredNotes.length ? (
+      </div> : null}
+      {!editorOpen && filteredNotes.length ? (
         <div
           data-notes-list="true"
           className="border border-[var(--line)] bg-[var(--panel)]"
@@ -183,7 +183,8 @@ export default function NotesRouteView({
             />
           ))}
         </div>
-      ) : (
+      ) : null}
+      {!editorOpen && !filteredNotes.length ? (
         <EmptyState
           icon={FileText}
           title="No notes in this view yet."
@@ -193,7 +194,7 @@ export default function NotesRouteView({
               : "Record the next piece of campaign memory when it becomes important."
           }
         />
-      )}
+      ) : null}
     </PageLayout>
   );
 }

@@ -161,7 +161,7 @@ export default function JobsRouteView({
       eyebrow={`MISSION CONTROL // ${count("open")} OPEN`}
       title="Job board"
       description="Potential missions, ranked by the crew. Choose the signal that pulls hardest."
-      action={isGM ? "NEW MISSION" : undefined}
+      action={isGM && !editorOpen ? "NEW MISSION" : undefined}
       actionIcon={<CirclePlus size={16} />}
       onAction={() => openEditor()}
     >
@@ -182,12 +182,12 @@ export default function JobsRouteView({
           {error}
         </p>
       ) : null}
-      {statusMessage ? (
+      {!editorOpen && statusMessage ? (
         <p className={`${recordDetailMetaClassName} mb-3`} role="status">
           {statusMessage}
         </p>
       ) : null}
-      <div
+      {!editorOpen ? <div
         data-jobs-toolbar="true"
         className="flex items-center justify-between gap-[15px] border-b border-[var(--line)] pb-[13px] mb-[18px] max-[760px]:items-start max-[760px]:flex-col"
       >
@@ -219,8 +219,8 @@ export default function JobsRouteView({
             </button>
           ) : null}
         </div>
-      </div>
-      {filteredJobs.length ? (
+      </div> : null}
+      {!editorOpen && filteredJobs.length ? (
         <div
           data-jobs-grid="true"
           className="grid grid-cols-2 gap-[15px] max-[760px]:grid-cols-1"
@@ -240,7 +240,8 @@ export default function JobsRouteView({
             />
           ))}
         </div>
-      ) : (
+      ) : null}
+      {!editorOpen && !filteredJobs.length ? (
         <EmptyState
           icon={BriefcaseBusiness}
           title="No missions in this view."
@@ -250,7 +251,7 @@ export default function JobsRouteView({
               : "The campaign board has no missions here yet."
           }
         />
-      )}
+      ) : null}
     </PageLayout>
   );
 }

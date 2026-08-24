@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { CirclePlus, LockKeyhole, Sparkles, Trash2, X } from "lucide-react";
+import { LockKeyhole, Save, Sparkles, Trash2, X } from "lucide-react";
 import AiDraftAssistant, {
   type AiDraftSelectField,
 } from "@/components/archive/AiDraftAssistant";
@@ -474,12 +474,10 @@ export default function JobEditor({
               disabled={isSaving}
               type="submit"
             >
-              <CirclePlus size={15} />{" "}
+              <Save size={15} />{" "}
               {isSaving
                 ? "SAVING..."
-                : job
-                  ? "SAVE CHANGES"
-                  : "ADD TO JOB BOARD"}
+                : "SAVE MISSION"}
             </button>
             {job ? (
               <button

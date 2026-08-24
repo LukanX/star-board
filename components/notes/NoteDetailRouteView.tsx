@@ -44,7 +44,7 @@ export default function NoteDetailRouteView({
   return (
     <>
       <CampaignArtEditorSlot />
-      <NotePublicRecord
+      {!editorOpen ? <NotePublicRecord
         campaignId={campaignId}
         note={note}
         episode={episode}
@@ -57,13 +57,13 @@ export default function NoteDetailRouteView({
               }
             : undefined
         }
-      />
+      /> : null}
       {error ? (
         <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">
           {error}
         </p>
       ) : null}
-      {statusMessage ? (
+      {!editorOpen && statusMessage ? (
         <p className={recordDetailMetaClassName} role="status">
           {statusMessage}
         </p>

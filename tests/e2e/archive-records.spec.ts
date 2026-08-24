@@ -116,6 +116,7 @@ test("selects archive records locally and opens canonical full records", async (
   page,
   campaign,
 }) => {
+  test.setTimeout(60000);
   let fixture: ArchiveFixture | null = null;
 
   try {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { CirclePlus, LockKeyhole, Trash2, X } from "lucide-react";
+import { LockKeyhole, Save, Trash2, X } from "lucide-react";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
@@ -226,8 +226,8 @@ export default function NoteEditor({
             disabled={isSaving}
             type="submit"
           >
-            <CirclePlus size={15} />{" "}
-            {isSaving ? "SAVING..." : note ? "SAVE CHANGES" : "ADD NOTE"}
+            <Save size={15} />{" "}
+            {isSaving ? "SAVING..." : "SAVE NOTE"}
           </button>
           {note?.permissions.canDelete && onDeleted ? (
             <button

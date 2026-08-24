@@ -57,9 +57,8 @@ export default function EnemiesRouteView({ campaignId, role, initialEnemies }: {
     setEditorOpen(false);
   };
 
-  return <PageLayout eyebrow="ARCHIVE // THREAT INDEX" title="Enemies" description="Creature records for the campaign. Players see only revealed names, approved artwork, and the brief you choose to publish." action={isGM ? "ADD ENEMY" : undefined} actionIcon={<CirclePlus size={16} />} onAction={() => setEditorOpen(true)}>
-    {editorOpen ? <EnemyEditor campaignId={campaignId} onCancel={() => setEditorOpen(false)} onSaved={saveNewEnemy} /> : null}
-    {enemies.length ? <ArchiveMasterDetail
+  return <PageLayout eyebrow="ARCHIVE // THREAT INDEX" title="Enemies" description="Creature records for the campaign. Players see only revealed names, approved artwork, and the brief you choose to publish." action={isGM && !editorOpen ? "ADD ENEMY" : undefined} actionIcon={<CirclePlus size={16} />} onAction={() => setEditorOpen(true)}>
+    {editorOpen ? <EnemyEditor campaignId={campaignId} onCancel={() => setEditorOpen(false)} onSaved={saveNewEnemy} /> : enemies.length ? <ArchiveMasterDetail
       selectedId={selectedEnemyId}
       toolbar={<div data-enemies-toolbar="true" className="grid gap-[13px] mb-[18px] p-[15px_17px] border border-[var(--line)] bg-[linear-gradient(105deg,rgba(255,92,154,.06),rgba(98,232,255,.025))]">
         <div className="flex items-end justify-between gap-[20px] max-[760px]:items-stretch max-[760px]:flex-col"><div className="grid gap-[7px]"><p className={`${eyebrowClassName} !m-0`}>{visibleEnemies.length.toString().padStart(2, "0")} OF {enemies.length.toString().padStart(2, "0")} THREATS</p><strong className="text-[var(--ink)] text-[13px] font-[550]">{isGM ? "GM threat index" : "Revealed threats"}</strong></div><label className="grid w-[min(100%,330px)] gap-[7px] text-[var(--dim)] font-mono text-[8px] tracking-[.12em] max-[760px]:w-full">SEARCH ENEMIES<input className="h-[36px] w-full border border-[rgba(139,151,169,.28)] bg-[#0a1118] p-[0_10px] text-[var(--ink)] font-mono text-[10px] outline-0 placeholder:text-[#4d5a6b] focus:border-[var(--cyan)]" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, description, or trait" /></label></div>

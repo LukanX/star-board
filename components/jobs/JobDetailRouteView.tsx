@@ -145,7 +145,7 @@ export default function JobDetailRouteView({
   return (
     <>
       <CampaignArtEditorSlot />
-      <JobPublicRecord
+      {!editorOpen ? <JobPublicRecord
         campaignId={campaignId}
         job={job}
         places={initialPlaces}
@@ -191,8 +191,8 @@ export default function JobDetailRouteView({
             ) : null}
           </>
         }
-      />
-      {isGM ? (
+      /> : null}
+      {!editorOpen && isGM ? (
         <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap">
           <button
             className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px !border-[rgba(255,92,154,.42)] bg-[rgba(255,92,154,.08)] !text-[var(--pink)] hover:!border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)]"
@@ -209,7 +209,7 @@ export default function JobDetailRouteView({
           {error}
         </p>
       ) : null}
-      {statusMessage ? (
+      {!editorOpen && statusMessage ? (
         <p className={recordDetailMetaClassName} role="status">
           {statusMessage}
         </p>

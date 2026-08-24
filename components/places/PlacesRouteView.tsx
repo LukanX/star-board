@@ -99,7 +99,7 @@ export default function PlacesRouteView({
       eyebrow="ARCHIVE // PLACE ATLAS"
       title="Places"
       description="A genre-neutral atlas for worlds, regions, sites, and the spaces between them."
-      action={isGM ? "ADD ROOT PLACE" : undefined}
+      action={isGM && !editorState ? "ADD ROOT PLACE" : undefined}
       actionIcon={<CirclePlus size={16} />}
       onAction={() => openEditor()}
     >
@@ -115,6 +115,8 @@ export default function PlacesRouteView({
           onDeleted={deletePlace}
         />
       ) : null}
+      {!editorState ? (
+        <>
       <div
         data-places-toolbar="true"
         className="flex items-end justify-between gap-[20px] mb-[18px] pb-[13px] p-[15px_17px] border border-[var(--line)] bg-[linear-gradient(105deg,rgba(98,232,255,.055),rgba(255,92,154,.025))] max-[760px]:items-stretch max-[760px]:flex-col max-[760px]:gap-[15px] max-[760px]:p-[14px] max-[420px]:p-[12px]"
@@ -190,6 +192,8 @@ export default function PlacesRouteView({
           }
         />
       )}
+        </>
+      ) : null}
     </PageLayout>
   );
 }

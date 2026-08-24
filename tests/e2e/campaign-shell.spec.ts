@@ -391,7 +391,7 @@ test("keeps faction emblems in route-owned utilities", async ({
     );
     await page
       .locator("form.character-form")
-      .getByRole("button", { name: "ADD FACTION", exact: true })
+      .getByRole("button", { name: "SAVE FACTION", exact: true })
       .click();
     const saveResponse = await saveResponsePromise;
     expect(saveResponse.ok()).toBeTruthy();
@@ -808,26 +808,6 @@ test("keeps note card styling in route-owned utilities", async ({
     await expect(gmToggle).toHaveClass(/cursor-pointer/);
     await expect(gmToggle).not.toHaveClass(/visibility-toggle/);
 
-    await page.getByRole("button", { name: "ADD NOTE", exact: true }).click();
-    const noteVisibilityToggle = page.locator("[data-note-visibility-toggle]");
-    await expect(noteVisibilityToggle).toHaveCount(1);
-    await expect(noteVisibilityToggle).toHaveClass(/inline-flex/);
-    await expect(noteVisibilityToggle).toHaveClass(/items-center/);
-    await expect(noteVisibilityToggle).toHaveClass(/gap-\[8px\]/);
-    await expect(noteVisibilityToggle).toHaveClass(/text-\[var\(--pink\)\]/);
-    await expect(noteVisibilityToggle).toHaveClass(/cursor-pointer/);
-    await expect(noteVisibilityToggle).not.toHaveClass(
-      /note-visibility-toggle/,
-    );
-    const noteVisibilityInput = noteVisibilityToggle.locator("input");
-    await expect(noteVisibilityInput).toHaveClass(/w-\[14px\]/);
-    await expect(noteVisibilityInput).toHaveClass(/h-\[14px\]/);
-    await expect(noteVisibilityInput).toHaveClass(/accent-\[var\(--pink\)\]/);
-    const noteVisibilityLabel = noteVisibilityToggle.locator("span");
-    await expect(noteVisibilityLabel).toHaveClass(/inline-flex/);
-    await expect(noteVisibilityLabel).toHaveClass(/items-center/);
-    await expect(noteVisibilityLabel).toHaveClass(/gap-\[5px\]/);
-
     const notesList = page.locator("[data-notes-list]");
     await expect(notesList).toHaveCount(1);
     await expect(notesList).toHaveClass(/border/);
@@ -878,6 +858,27 @@ test("keeps note card styling in route-owned utilities", async ({
     await expect(noteMain.locator("h3")).toHaveClass(/text-\[14px\]/);
     await expect(noteMain.locator("p")).toHaveClass(/m-0/);
     await expect(noteMain.locator("p")).toHaveClass(/text-\[10px\]/);
+
+    await page.getByRole("button", { name: "ADD NOTE", exact: true }).click();
+    const noteVisibilityToggle = page.locator("[data-note-visibility-toggle]");
+    await expect(noteVisibilityToggle).toHaveCount(1);
+    await expect(noteVisibilityToggle).toHaveClass(/inline-flex/);
+    await expect(noteVisibilityToggle).toHaveClass(/items-center/);
+    await expect(noteVisibilityToggle).toHaveClass(/gap-\[8px\]/);
+    await expect(noteVisibilityToggle).toHaveClass(/text-\[var\(--pink\)\]/);
+    await expect(noteVisibilityToggle).toHaveClass(/cursor-pointer/);
+    await expect(noteVisibilityToggle).not.toHaveClass(
+      /note-visibility-toggle/,
+    );
+    const noteVisibilityInput = noteVisibilityToggle.locator("input");
+    await expect(noteVisibilityInput).toHaveClass(/w-\[14px\]/);
+    await expect(noteVisibilityInput).toHaveClass(/h-\[14px\]/);
+    await expect(noteVisibilityInput).toHaveClass(/accent-\[var\(--pink\)\]/);
+    const noteVisibilityLabel = noteVisibilityToggle.locator("span");
+    await expect(noteVisibilityLabel).toHaveClass(/inline-flex/);
+    await expect(noteVisibilityLabel).toHaveClass(/items-center/);
+    await expect(noteVisibilityLabel).toHaveClass(/gap-\[5px\]/);
+    await expect(page.locator("[data-notes-list]")).toHaveCount(0);
   } finally {
     if (createdNoteId) {
       await page.request.delete(

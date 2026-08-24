@@ -260,7 +260,7 @@ export default function FactionEditor({
             disabled={isSaving}
             type="submit"
           >
-            {isSaving ? "SAVING..." : faction ? "SAVE CHANGES" : "ADD FACTION"}
+            {isSaving ? "SAVING..." : "SAVE FACTION"}
           </button>
           <button
             className="text-action inline-flex items-center gap-1 whitespace-nowrap border-0 bg-transparent p-0 font-mono text-[8px] tracking-[.1em] text-[var(--cyan)] cursor-pointer hover:text-[#a1f3ff] max-[420px]:w-full max-[420px]:justify-start"
