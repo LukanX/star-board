@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   addCampaignArtUrls,
   createCampaignArtSignedUrl,
+  createCampaignArtSignedUrlForCampaign,
   isExternalArtPath,
   removeCampaignArtIfUnreferenced,
   validateCampaignArtPath,
@@ -10,6 +11,7 @@ import {
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const ownerId = "00000000-0000-4000-8000-000000000002";
 const validPath = `${campaignId}/${ownerId}/npc-art.png`;
+const enemyPath = `${campaignId}/${ownerId}/enemy-art.png`;
 
 function createStorageClient(signedUrl = "https://storage.example/signed-art") {
   const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl }, error: null });
@@ -47,6 +49,40 @@ describe("campaign art storage helpers", () => {
     expect(createSignedUrl).toHaveBeenCalledWith(validPath, 900);
   });
 
+  it("caps enemy artwork signed URLs at the short-lived preview lifetime", async () => {
+    const { client, createSignedUrl } = createStorageClient();
+
+    await expect(createCampaignArtSignedUrl(client as never, enemyPath)).resolves.toBe("https://storage.example/signed-art");
+    expect(createSignedUrl).toHaveBeenCalledWith(enemyPath, 600);
+  });
+
+  it("caps enemy artwork with a custom filename when the caller supplies enemy context", async () => {
+    const { client, createSignedUrl } = createStorageClient();
+    const customEnemyPath = `${campaignId}/${ownerId}/custom-hidden-art.png`;
+
+    await expect(createCampaignArtSignedUrl(client as never, customEnemyPath, 3600, true)).resolves.toBe("https://storage.example/signed-art");
+    expect(createSignedUrl).toHaveBeenCalledWith(customEnemyPath, 600);
+  });
+
+  it("detects custom-named enemy artwork before signing a campaign path", async () => {
+    const { client, createSignedUrl } = createStorageClient();
+    const customEnemyPath = `${campaignId}/${ownerId}/custom-hidden-art.png`;
+    const query = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      limit: vi.fn().mockResolvedValue({ data: [{ id: "enemy-id" }], error: null }),
+    };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    (client as { from?: unknown }).from = vi.fn().mockReturnValue(query);
+
+    await expect(createCampaignArtSignedUrlForCampaign(client as never, campaignId, customEnemyPath)).resolves.toEqual({
+      signedUrl: "https://storage.example/signed-art",
+      expiresIn: 600,
+    });
+    expect(createSignedUrl).toHaveBeenCalledWith(customEnemyPath, 600);
+  });
+
   it("returns null URLs when an individual asset cannot be signed", async () => {
     const createSignedUrl = vi.fn()
       .mockResolvedValueOnce({ data: { signedUrl: "https://storage.example/signed-art" }, error: null })
@@ -81,7 +117,7 @@ describe("campaign art storage helpers", () => {
     await expect(removeCampaignArtIfUnreferenced(client as never, campaignId, validPath)).resolves.toBe(true);
     expect(from).toHaveBeenCalledWith("campaign-art");
     expect(remove).toHaveBeenCalledWith([validPath]);
-    expect(query.limit).toHaveBeenCalledTimes(5);
+    expect(query.limit).toHaveBeenCalledTimes(6);
   });
 
   it("keeps an asset when another campaign record still references it", async () => {

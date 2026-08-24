@@ -136,6 +136,35 @@ describe("archive full records", () => {
     expect(markup).toContain('href="/campaigns/campaign-1/jobs/job-1"');
   });
 
+  it("uses common responsive artwork blocks for NPC and faction full records", () => {
+    const npcMarkup = renderArchiveRecord(
+      <NpcPublicRecord
+        campaignId="campaign-1"
+        isGM={false}
+        places={[]}
+        npc={npc}
+      />,
+    );
+    const factionMarkup = renderArchiveRecord(
+      <FactionPublicRecord
+        campaignId="campaign-1"
+        places={[]}
+        faction={faction}
+      />,
+    );
+
+    expect(npcMarkup).toContain('data-npc-detail-portrait="true"');
+    expect(npcMarkup).toContain(" w-[480px] ");
+    expect(npcMarkup).toContain("max-w-full");
+    expect(npcMarkup).toContain("max-[760px]:w-full");
+    expect(factionMarkup).toContain('data-faction-detail-preview="true"');
+    expect(factionMarkup).toContain('data-faction-detail-art="true"');
+    expect(factionMarkup).toContain('data-faction-detail-copy="true"');
+    expect(factionMarkup).toContain(" w-[480px] ");
+    expect(factionMarkup).toContain("max-w-full");
+    expect(factionMarkup).toContain("max-[760px]:w-full");
+  });
+
   it("renders Faction status, location, and giver jobs without notes", () => {
     const markup = renderArchiveRecord(
       <FactionPublicRecord

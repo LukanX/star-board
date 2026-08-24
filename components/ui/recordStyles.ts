@@ -2,6 +2,12 @@ export const recordListClassName = "border border-[var(--line)] bg-[var(--panel)
 export const panelClassName =
   "border border-[var(--line)] bg-[rgba(16,21,30,.84)]";
 
+export const archivePreviewArtworkClassName =
+  "relative min-w-0 w-[min(100%,320px)] aspect-square overflow-hidden";
+
+export const archiveDetailArtworkClassName =
+  "relative min-w-0 w-[480px] max-w-full h-full aspect-square overflow-hidden max-[760px]:w-full max-[760px]:min-w-0 max-[760px]:h-auto max-[760px]:justify-self-start";
+
 export const recordRowClassName =
   "flex min-h-[86px] items-center gap-[15px] border-b border-[var(--line)] px-[18px] py-[15px] last:border-b-0";
 

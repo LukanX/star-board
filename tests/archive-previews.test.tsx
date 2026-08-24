@@ -95,7 +95,7 @@ describe("PlacePreview", () => {
 });
 
 describe("NpcPreview and FactionPreview", () => {
-  it("renders NPC and Faction previews with canonical full-record links", () => {
+  it("renders NPC and Faction previews with common responsive artwork blocks", () => {
     const npcMarkup = renderToStaticMarkup(
       <DirtyFormProvider>
         <NpcPreview
@@ -146,8 +146,14 @@ describe("NpcPreview and FactionPreview", () => {
     );
 
     expect(npcMarkup).toContain('href="/campaigns/campaign-1/npcs/npc-1"');
+    expect(npcMarkup).toContain('data-npc-preview-art="true"');
+    expect(npcMarkup).toContain("w-[min(100%,320px)]");
+    expect(npcMarkup).toContain("aspect-square");
     expect(npcMarkup).toContain("Watch the airlock.");
     expect(factionMarkup).toContain('href="/campaigns/campaign-1/factions/faction-1"');
+    expect(factionMarkup).toContain('data-faction-preview-art="true"');
+    expect(factionMarkup).toContain("w-[min(100%,320px)]");
+    expect(factionMarkup).toContain("aspect-square");
     expect(factionMarkup).toContain("Independent brokers.");
   });
 });

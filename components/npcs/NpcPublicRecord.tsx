@@ -6,7 +6,7 @@ import ArtDownloadButton from "@/components/ui/ArtDownloadButton";
 import ArchiveRecordShell from "@/components/ui/ArchiveRecordShell";
 import ArchiveRelatedList from "@/components/ui/ArchiveRelatedList";
 import RecordPortrait from "@/components/ui/RecordPortrait";
-import { recordDetailMetaClassName, recordMetaClassName } from "@/components/ui/recordStyles";
+import { archiveDetailArtworkClassName, recordDetailMetaClassName, recordMetaClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { getAttachedArtUrl } from "@/lib/campaign/mappers";
 import { campaignEntityPath, campaignSectionPath } from "@/lib/campaign/routes";
@@ -71,7 +71,7 @@ export default function NpcPublicRecord({
         >
           <div
             data-npc-detail-portrait="true"
-            className="relative min-w-[180px] max-w-[260px] h-full aspect-square overflow-hidden border border-[rgba(98,232,255,.28)] bg-[#0a1118] max-[760px]:w-[min(100%,220px)] max-[760px]:min-w-0 max-[760px]:h-auto max-[760px]:justify-self-start"
+            className={`${archiveDetailArtworkClassName} border border-[rgba(98,232,255,.28)] bg-[#0a1118]`}
           >
             <RecordPortrait
               src={artUrl}

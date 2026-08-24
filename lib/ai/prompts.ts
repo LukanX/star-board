@@ -1,4 +1,4 @@
-import type { CharacterGenerationInput, FactionGenerationInput, MissionGenerationInput, NpcGenerationInput, PlaceGenerationInput } from "@/lib/validation/ai";
+import type { CharacterGenerationInput, EnemyBriefGenerationInput, EnemyGenerationInput, FactionGenerationInput, MissionGenerationInput, NpcGenerationInput, PlaceGenerationInput } from "@/lib/validation/ai";
 import type { CampaignAiContext, MissionAiReferences } from "@/lib/ai/assistance";
 import type { ImageGenerationInput } from "@/lib/validation/image";
 import { imagePromptMaxLength } from "@/lib/validation/image";
@@ -9,6 +9,8 @@ const FACTION_ART_STYLE_PREFIX =
   "Original retro-futurist tabletop RPG emblem design, synthwave space opera, crisp ink contours, luminous cyan and magenta signal lights, controlled film grain, dramatic rim lighting, readable silhouette, no written text, no watermark.";
 const FACTION_ART_INSTRUCTION =
   "Faction artwork must be only one standalone faction symbol or logo: a centered emblem or insignia on a clean field. Do not create characters, creatures, headquarters, landscapes, banners, environments, action scenes, or narrative moments.";
+const ENEMY_ART_INSTRUCTION =
+  "Enemy artwork must show one readable creature subject with a clear silhouette and a context-appropriate pose. Do not create a group, encounter scene, stat block, written text, or logos.";
 
 function campaignLines(context?: CampaignAiContext) {
   return context ? [
@@ -143,10 +145,51 @@ export function buildPlacePrompt(input: PlaceGenerationInput, context?: Campaign
   ].filter(Boolean).join("\n");
 }
 
+export function buildEnemyPrompt(input: EnemyGenerationInput, context?: CampaignAiContext) {
+  return [
+    "You are a Starfinder 2e creature stat-block writer for a GM campaign manager.",
+    "Return only valid JSON matching every requested enemy draft field. Do not return markdown, commentary, or a group of creatures.",
+    ...campaignLines(context),
+    `Mode: ${input.mode}`,
+    input.name ? `Creature name: ${input.name}` : "Create a distinctive creature name.",
+    input.level !== undefined ? `Creature level: ${input.level}` : "Choose an appropriate creature level.",
+    input.size ? `Size: ${input.size}` : "Choose a supported creature size.",
+    input.rarity ? `Rarity: ${input.rarity}` : "Choose a rarity.",
+    input.traits?.length ? `Traits: ${input.traits.join(", ")}` : "Choose concise rules-relevant traits.",
+    input.family ? `Creature family: ${input.family}` : "",
+    input.focus ? `GM direction: ${input.focus}` : "",
+    input.currentDraft ? `Current editor draft to refine: ${JSON.stringify(input.currentDraft)}` : "",
+    "Produce one complete, internally consistent creature stat block. Include perception and senses, languages, skills, all six ability modifiers, items, AC, saving throws, HP, immunities, resistances, weaknesses, movement, melee/ranged strikes, spellcasting groups, and passive/defensive/offensive special abilities when appropriate.",
+    "Use empty arrays or null only when a field genuinely does not apply. Never invent a second creature, encounter, family roster, or sidebar.",
+    "Keep gmNotesMarkdown private and spoiler-safe playerDescription brief. artSubject must describe one standalone creature for later artwork and must not include text, logos, stat blocks, or a group.",
+    "Fields: name, playerDescription, level, size, rarity, traits, family, statBlock, gmNotesMarkdown, artSubject.",
+  ].filter(Boolean).join("\n");
+}
+
+export function buildEnemyBriefPrompt(input: EnemyBriefGenerationInput, context?: CampaignAiContext) {
+  return [
+    "You are a spoiler-safe copy editor for a GM campaign manager.",
+    "Return only valid JSON with exactly playerDescription and artSubject.",
+    ...campaignLines(context),
+    `Mode: ${input.mode}`,
+    input.name ? `Creature name: ${input.name}` : "",
+    input.level !== undefined ? `Creature level: ${input.level}` : "",
+    input.size ? `Creature size: ${input.size}` : "",
+    input.rarity ? `Creature rarity: ${input.rarity}` : "",
+    input.traits?.length ? `Creature traits: ${input.traits.join(", ")}` : "",
+    input.currentDraft ? `GM-only draft context: ${JSON.stringify(input.currentDraft)}` : "",
+    input.focus ? `GM direction: ${input.focus}` : "",
+    "playerDescription is the only player-visible prose: describe appearance, broad identity, and an immediately useful impression without revealing tactics, exact numbers, weaknesses, resistances, spells, secret motivations, or GM notes.",
+    "artSubject must describe only one readable creature subject for artwork. Do not include a group, encounter scene, stat block, written text, logos, or provider names.",
+    "Fields: playerDescription, artSubject.",
+  ].filter(Boolean).join("\n");
+}
+
 export function buildArtPrompt(subject: string, campaignStyle?: string, refinement?: string, currentPrompt?: string, targetKind?: ImageGenerationInput["targetKind"]) {
   const stylePrefix = targetKind === "faction" ? FACTION_ART_STYLE_PREFIX : ART_STYLE_PREFIX;
   const subjectParts = [
     targetKind === "faction" ? FACTION_ART_INSTRUCTION : "",
+    targetKind === "enemy" ? ENEMY_ART_INSTRUCTION : "",
     refinement ? `Focused refinement request: ${refinement}` : "",
     `Subject: ${subject}`,
   ].filter(Boolean);

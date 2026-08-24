@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { enemyBriefDraftSchema, enemyAiDraftSchema, enemyRaritySchema, enemySizeSchema, enemyStatBlockSchema } from "@/lib/validation/enemy";
 
 const campaignContextSchema = z.object({
   campaignId: z.string().uuid(),
@@ -49,6 +50,19 @@ const characterCurrentDraftSchema = z.object({
   backstoryMarkdown: z.string().max(20000).optional(),
   physicalDescription: z.string().max(4000).optional(),
   visualPrompt: z.string().max(1600).optional(),
+}).partial().optional();
+
+const enemyCurrentDraftSchema = z.object({
+  name: z.string().max(160).optional(),
+  playerDescription: z.string().max(4000).optional(),
+  level: z.number().int().min(-1).max(25).optional(),
+  size: enemySizeSchema.optional(),
+  rarity: enemyRaritySchema.optional(),
+  traits: z.array(z.string().max(48)).max(32).optional(),
+  family: z.string().max(160).nullable().optional(),
+  statBlock: enemyStatBlockSchema.optional(),
+  gmNotesMarkdown: z.string().max(20000).optional(),
+  artSubject: z.string().max(1600).optional(),
 }).partial().optional();
 
 export const missionGenerationInputSchema = campaignContextSchema.extend({
@@ -113,6 +127,23 @@ export const characterGenerationInputSchema = campaignContextSchema.extend({
   currentDraft: characterCurrentDraftSchema,
 });
 
+export const enemyGenerationInputSchema = campaignContextSchema.extend({
+  mode: z.enum(["create", "refine"]),
+  model: z.string().trim().min(1).max(160).optional(),
+  name: z.string().trim().max(160).optional(),
+  level: z.number().int().min(-1).max(25).optional(),
+  size: enemySizeSchema.optional(),
+  rarity: enemyRaritySchema.optional(),
+  traits: z.array(z.string().trim().min(1).max(48)).max(32).optional(),
+  family: z.string().trim().max(160).nullable().optional(),
+  focus: z.string().trim().max(600).optional(),
+  currentDraft: enemyCurrentDraftSchema,
+});
+
+export const enemyBriefGenerationInputSchema = enemyGenerationInputSchema.extend({
+  currentDraft: enemyCurrentDraftSchema,
+});
+
 export const missionDraftSchema = z.object({
   title: z.string().trim().min(1).max(160),
   summary: z.string().trim().min(1).max(1200),
@@ -160,3 +191,7 @@ export type NpcGenerationInput = z.infer<typeof npcGenerationInputSchema>;
 export type FactionGenerationInput = z.infer<typeof factionGenerationInputSchema>;
 export type PlaceGenerationInput = z.infer<typeof placeGenerationInputSchema>;
 export type CharacterGenerationInput = z.infer<typeof characterGenerationInputSchema>;
+export type EnemyGenerationInput = z.infer<typeof enemyGenerationInputSchema>;
+export type EnemyBriefGenerationInput = z.infer<typeof enemyBriefGenerationInputSchema>;
+export type EnemyAiDraft = z.infer<typeof enemyAiDraftSchema>;
+export type EnemyBriefDraft = z.infer<typeof enemyBriefDraftSchema>;

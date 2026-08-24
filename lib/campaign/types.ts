@@ -1,4 +1,5 @@
 import type { PlaceRecord } from "@/lib/places";
+import type { EnemyOrigin, EnemyRarity, EnemySize, EnemyStatBlockV1 } from "@/lib/enemies/types";
 
 export type CampaignRecord = { id: string; name: string; system: string; description: string; created_by: string };
 export type CampaignMembership = { role: "gm" | "player"; display_name: string; campaign: CampaignRecord | CampaignRecord[] | null };
@@ -32,3 +33,39 @@ export type ApiCampaignNote = { id: string; campaign_id: string; episode_id: str
 export type CampaignNote = ApiCampaignNote & { accent: NoteAccent; age?: string };
 export type CampaignNoteEpisode = { id: string; title: string; status: string };
 export type ApiPlace = PlaceRecord & { author_id: string; description: string; player_notes_markdown: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; created_at: string; updated_at: string; gm_notes_markdown?: string };
+export type ApiEnemy = {
+  id: string;
+  campaign_id: string;
+  author_id: string;
+  name: string;
+  player_description: string;
+  is_revealed: boolean;
+  art_path: string | null;
+  art_url?: string | null;
+  created_at: string;
+  updated_at: string;
+  level?: number;
+  size?: EnemySize;
+  rarity?: EnemyRarity;
+  traits?: string[];
+  family?: string | null;
+  origin?: EnemyOrigin;
+  stat_block?: EnemyStatBlockV1 | null;
+  gm_notes_markdown?: string;
+  art_subject?: string | null;
+  art_prompt?: string | null;
+  art_provider?: string | null;
+  source_provider?: "aon" | null;
+  source_external_id?: number | null;
+  source_content_hash?: string | null;
+  source_snapshot?: Record<string, unknown> | null;
+  source_updated_at?: string | null;
+};
+export type EnemyFilters = {
+  name?: string;
+  level?: number;
+  trait?: string;
+  size?: EnemySize;
+  rarity?: EnemyRarity;
+  sort?: "name" | "level" | "updated";
+};

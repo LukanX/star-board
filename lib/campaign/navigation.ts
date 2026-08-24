@@ -16,6 +16,7 @@ export const campaignNavigation = [
   { id: "npcs", label: "NPCs", group: "Archive" },
   { id: "factions", label: "Factions", group: "Archive" },
   { id: "places", label: "Places", group: "Archive" },
+  { id: "enemies", label: "Enemies", group: "Archive" },
   { id: "notes", label: "Campaign notes", group: "Archive" },
   { id: "members", label: "Crew access", group: "Control" },
   { id: "settings", label: "Campaign settings", group: "Control" },

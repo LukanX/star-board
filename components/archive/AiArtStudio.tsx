@@ -13,7 +13,7 @@ import {
   type ImageSize,
 } from "@/lib/ai/image-options";
 
-type ArtKind = "character" | "npc" | "faction" | "job" | "place";
+type ArtKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
 
 type ImageDraft = {
   generationRunId: string;

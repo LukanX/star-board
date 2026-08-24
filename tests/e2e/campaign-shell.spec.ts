@@ -455,13 +455,19 @@ test("keeps faction emblems in route-owned utilities", async ({
       new RegExp(`/campaigns/${campaign.campaignId}/factions/[^/]+$`),
     );
     const publicFactionTop = page.locator("[data-faction-public-top]");
-    await expect(publicFactionTop).toHaveClass(/flex/);
-    await expect(publicFactionTop).toHaveClass(/items-start/);
-    await expect(publicFactionTop).toHaveClass(/justify-between/);
+    await expect(publicFactionTop).toHaveClass(/grid/);
+    await expect(publicFactionTop).toHaveClass(/grid-cols-\[auto_minmax\(0,1fr\)\]/);
+    await expect(publicFactionTop).toHaveClass(/items-stretch/);
+    await expect(publicFactionTop).toHaveClass(/gap-\[18px\]/);
+    await expect(publicFactionTop).toHaveClass(/max-\[760px\]:grid-cols-1/);
     await expect(publicFactionTop).not.toHaveClass(/faction-top/);
-    await expect(
-      page.locator(`[aria-label="${factionName} emblem"]`),
-    ).toHaveClass(/w-\[64px\]/);
+    const factionDetailArt = page.locator("[data-faction-detail-art]");
+    await expect(factionDetailArt).toHaveClass(/(?:^|\s)w-\[480px\](?:\s|$)/);
+    await expect(factionDetailArt).toHaveClass(/max-w-full/);
+    await expect(factionDetailArt).toHaveClass(/aspect-square/);
+    await expect(factionDetailArt).toHaveClass(/max-\[760px\]:w-full/);
+    await expect(factionDetailArt).toHaveCSS("width", "480px");
+    await expect(factionDetailArt).toHaveCSS("height", "480px");
   } finally {
     if (createdFactionId) {
       await page.request.delete(
@@ -670,19 +676,21 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
     await expect(preview).not.toHaveClass(/npc-detail-preview/);
 
     const portrait = page.locator("[data-npc-detail-portrait]");
-    await expect(portrait).toHaveClass(/min-w-\[180px\]/);
-    await expect(portrait).toHaveClass(/max-w-\[260px\]/);
+    await expect(portrait).toHaveClass(/(?:^|\s)w-\[480px\](?:\s|$)/);
+    await expect(portrait).toHaveClass(/max-w-full/);
     await expect(portrait).toHaveClass(/h-full/);
     await expect(portrait).toHaveClass(/aspect-square/);
     await expect(portrait).toHaveClass(/border/);
     await expect(portrait).toHaveClass(/bg-\[#0a1118\]/);
     await expect(portrait).toHaveClass(
-      /max-\[760px\]:w-\[min\(100\%,220px\)\]/,
+      /max-\[760px\]:w-full/,
     );
     await expect(portrait).toHaveClass(/max-\[760px\]:min-w-0/);
     await expect(portrait).toHaveClass(/max-\[760px\]:h-auto/);
     await expect(portrait).toHaveClass(/max-\[760px\]:justify-self-start/);
     await expect(portrait).not.toHaveClass(/npc-detail-portrait/);
+    await expect(portrait).toHaveCSS("width", "480px");
+    await expect(portrait).toHaveCSS("height", "480px");
 
     const copy = page.locator("[data-npc-detail-copy]");
     await expect(copy).toHaveClass(/min-w-0/);
@@ -703,8 +711,8 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
       mobileColumns.split(/\s+/).length === 1 ||
         /^repeat\(1,\s*minmax\(0px,\s*1fr\)\)$/.test(mobileColumns),
     ).toBe(true);
-    await expect(portrait).toHaveCSS("width", "220px");
-    await expect(portrait).toHaveCSS("height", "220px");
+    await expect(portrait).toHaveCSS("width", "322px");
+    await expect(portrait).toHaveCSS("height", "322px");
     await expect(portrait).toHaveCSS("min-width", "0px");
     await expect(portrait).toHaveCSS("justify-self", "flex-start");
   } finally {

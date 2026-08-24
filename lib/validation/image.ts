@@ -6,7 +6,7 @@ export const imagePromptMaxLength = 3000;
 export const imageGenerationInputSchema = z.object({
   campaignId: z.string().uuid(),
   mode: z.enum(["create", "refine"]),
-  targetKind: z.enum(["character", "npc", "faction", "job", "place"]),
+  targetKind: z.enum(["character", "npc", "faction", "job", "place", "enemy"]),
   model: z.string().trim().min(1).max(160).optional(),
   subject: z.string().trim().min(1).max(1200),
   aspectRatio: z.enum(imageAspectRatioValues).default(defaultImageAspectRatio),
@@ -36,7 +36,7 @@ export type ImageBackgroundJob = z.infer<typeof imageBackgroundJobSchema>;
 
 export const imageDraftSchema = z.object({
   generationRunId: z.string().uuid(),
-  targetKind: z.enum(["character", "npc", "faction", "job", "place"]),
+  targetKind: z.enum(["character", "npc", "faction", "job", "place", "enemy"]),
   mode: z.enum(["create", "refine"]),
   subject: z.string().trim().min(1).max(1200),
   aspectRatio: z.enum(imageAspectRatioValues),

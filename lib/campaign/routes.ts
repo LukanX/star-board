@@ -5,6 +5,7 @@ export type CampaignSection =
   | "npcs"
   | "factions"
   | "places"
+  | "enemies"
   | "episodes"
   | "notes"
   | "members"
@@ -12,7 +13,7 @@ export type CampaignSection =
 
 export type EntitySection = Exclude<CampaignSection, "overview" | "members" | "settings">;
 
-const campaignSections: readonly CampaignSection[] = ["overview", "jobs", "characters", "npcs", "factions", "places", "episodes", "notes", "members", "settings"];
+const campaignSections: readonly CampaignSection[] = ["overview", "jobs", "characters", "npcs", "factions", "places", "enemies", "episodes", "notes", "members", "settings"];
 
 function encodedSegment(value: string): string {
   return encodeURIComponent(value);

@@ -123,6 +123,13 @@ describe("image generation schemas", () => {
     expect(prompt).not.toContain("no logos");
   });
 
+  it("directs enemy artwork toward one readable creature subject", () => {
+    const prompt = buildArtPrompt("A plated void predator", undefined, undefined, undefined, "enemy");
+
+    expect(prompt).toContain("one readable creature");
+    expect(prompt).toContain("Do not create a group");
+  });
+
   it("accepts Places as a campaign artwork target", () => {
     expect(campaignArtKindSchema.parse("place")).toBe("place");
   });

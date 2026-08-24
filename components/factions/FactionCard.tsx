@@ -2,11 +2,16 @@ import { Network } from "lucide-react";
 import { getAttachedArtUrl } from "@/lib/campaign/mappers";
 import type { FactionRecord } from "@/lib/campaign/types";
 
-export function FactionEmblem({ faction, iconSize }: { faction: FactionRecord; iconSize: number }) {
+const factionEmblemSizeClassNames = {
+  compact: "w-[64px] h-[64px] flex-[0_0_64px]",
+  fill: "w-full h-full",
+};
+
+export function FactionEmblem({ faction, iconSize, size = "compact" }: { faction: FactionRecord; iconSize: number; size?: keyof typeof factionEmblemSizeClassNames }) {
   const src = getAttachedArtUrl(faction.art_url, faction.art_path);
   const artClasses = src ? "bg-contain" : "bg-[repeating-linear-gradient(135deg,rgba(98,232,255,.08)_0_1px,transparent_1px_9px)]";
 
-  return <div aria-label={`${faction.name} emblem`} className={`w-[64px] h-[64px] flex-[0_0_64px] grid place-items-center overflow-hidden border border-current bg-[#0a1118] bg-center bg-no-repeat text-current ${artClasses}`} role="img" style={src ? { backgroundImage: `url(${src})` } : undefined}>{src ? null : <Network className="opacity-75" size={iconSize} />}</div>;
+  return <div aria-label={`${faction.name} emblem`} className={`${factionEmblemSizeClassNames[size]} grid place-items-center overflow-hidden border border-current bg-[#0a1118] bg-center bg-no-repeat text-current ${artClasses}`} role="img" style={src ? { backgroundImage: `url(${src})` } : undefined}>{src ? null : <Network className="opacity-75" size={iconSize} />}</div>;
 }
 
 const factionSelectionClassNames = {
