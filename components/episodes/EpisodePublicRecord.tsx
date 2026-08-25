@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Clock3,
@@ -25,11 +26,13 @@ export default function EpisodePublicRecord({
   episode,
   notes,
   places,
+  actions,
 }: {
   campaignId: string;
   episode: EpisodeRecord;
   notes: EpisodeNote[];
   places: ApiPlace[];
+  actions?: ReactNode;
 }) {
   const placeLabel = getPlaceBreadcrumb(places, episode.place_id);
 
@@ -65,9 +68,12 @@ export default function EpisodePublicRecord({
             ) : null}
           </div>
         </div>
-        <span className={recordDetailMetaClassName}>
-          {episode.noteCount} {episode.noteCount === 1 ? "note" : "notes"}
-        </span>
+        <div className="ml-auto flex items-center gap-2 max-[420px]:gap-1">
+          {actions}
+          <span className={recordDetailMetaClassName}>
+            {episode.noteCount} {episode.noteCount === 1 ? "note" : "notes"}
+          </span>
+        </div>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <MarkdownPreview>

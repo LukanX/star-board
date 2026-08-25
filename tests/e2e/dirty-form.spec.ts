@@ -455,7 +455,7 @@ test("renders danger actions with utility styling", async ({ page, campaign }) =
     const savePayload = (await saveResponse.json()) as { note?: { id?: string } };
     createdNoteId = savePayload.note?.id ?? null;
     await page.getByRole("link", { name: `Open note ${title}` }).click();
-    await page.getByRole("button", { name: "EDIT NOTE", exact: true }).click();
+    await page.getByRole("button", { name: `Edit ${title}`, exact: true }).click();
 
     const removeButton = page.getByRole("button", { name: "REMOVE", exact: true });
     await expect(removeButton).toHaveClass(/!border-\[rgba\(255,92,154,\.42\)\]/);

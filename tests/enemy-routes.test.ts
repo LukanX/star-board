@@ -309,6 +309,39 @@ describe("enemy campaign routes", () => {
     expect(query.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
   });
 
+  it("allows an AoN record to detach before saving edited mechanics", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: enemyId, error: null });
+    const supabase = { rpc };
+    const detachedStatBlock = {
+      ...completeStatBlock,
+      defenses: {
+        ...completeStatBlock.defenses,
+        armorClass: 23,
+        hitPoints: [{ label: "HP", value: 110, notes: "Detached revision" }],
+      },
+    };
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignRole.mockResolvedValue("gm");
+    mocks.readCampaignEnemyForRole.mockResolvedValueOnce(aonEnemy).mockResolvedValueOnce({ ...aonEnemy, origin: "manual", source_snapshot: null, stat_block: detachedStatBlock });
+
+    const response = await updateEnemy(request({
+      expectedUpdatedAt: aonEnemy.updated_at,
+      origin: "manual",
+      sourceSnapshot: null,
+      statBlock: detachedStatBlock,
+    }, "PATCH"), enemyParams());
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("update_enemy_with_details", expect.objectContaining({
+      p_expected_source_hash: aonSourceSnapshot.contentHash,
+      p_details: expect.objectContaining({
+        origin: "manual",
+        sourceSnapshot: null,
+        statBlock: detachedStatBlock,
+      }),
+    }));
+  });
+
   it("requires a reviewed source and revision for reimports", async () => {
     mocks.getCampaignRole.mockResolvedValue("gm");
     mocks.readCampaignEnemyForRole.mockResolvedValue(aonEnemy);

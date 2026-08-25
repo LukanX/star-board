@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Pathfinder2eActions";
+  src: url("/Pathfinder2eActions.ttf") format("truetype");
+  font-display: block;
+}
+
 :root {
   --background: #080b11;
   --foreground: #edf3fb;
@@ -22,6 +28,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-actions: "Pathfinder2eActions";
 }
 
 @media (prefers-color-scheme: dark) {

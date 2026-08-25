@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Sparkles, Trash2, Vote } from "lucide-react";
+import { Sparkles, Vote } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { CampaignArtEditorSlot } from "@/components/archive/CampaignArtField";
 import JobEditor from "@/components/jobs/JobEditor";
 import JobPublicRecord from "@/components/jobs/JobPublicRecord";
+import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
 import { recordDetailMetaClassName } from "@/components/ui/recordStyles";
 import { fetchCampaignJobs } from "@/lib/campaign/client/jobs";
 import { mapApiJob } from "@/lib/campaign/mappers";
@@ -37,6 +38,7 @@ export default function JobDetailRouteView({
   );
   const [editorOpen, setEditorOpen] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const isGM = initialResult.role === "gm";
@@ -56,6 +58,7 @@ export default function JobDetailRouteView({
   const handleVote = async () => {
     if (isBusy || job.status !== "open") return;
     setIsBusy(true);
+    setIsDeleting(true);
     setError(null);
     try {
       const response = await fetch(
@@ -139,6 +142,8 @@ export default function JobDetailRouteView({
           : "Job could not be deleted.",
       );
       setIsBusy(false);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -162,21 +167,7 @@ export default function JobDetailRouteView({
                 <Vote size={14} /> {job.voted ? "VOTED" : "VOTE"}
               </button>
             ) : null}
-            {isGM ? (
-              <button
-                aria-label={`Edit ${job.title}`}
-                className="w-8 h-8 inline-grid place-items-center border border-transparent bg-transparent text-[var(--muted)] cursor-pointer p-0 hover:text-[var(--ink)] hover:border-[var(--line)] hover:bg-[rgba(255,255,255,.035)]"
-                disabled={isBusy}
-                onClick={() => {
-                  setError(null);
-                  setEditorOpen(true);
-                }}
-                title={`Edit ${job.title}`}
-                type="button"
-              >
-                <Pencil size={15} />
-              </button>
-            ) : null}
+            {isGM ? <RecordEditAction recordName={job.title} disabled={isBusy} onClick={() => { setError(null); setEditorOpen(true); }} /> : null}
             {isGM && job.status === "open" ? (
               <button
                 aria-label={`Promote ${job.title} to an episode`}
@@ -194,14 +185,7 @@ export default function JobDetailRouteView({
       /> : null}
       {!editorOpen && isGM ? (
         <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap">
-          <button
-            className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px !border-[rgba(255,92,154,.42)] bg-[rgba(255,92,154,.08)] !text-[var(--pink)] hover:!border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)]"
-            disabled={isBusy}
-            onClick={() => void deleteJob()}
-            type="button"
-          >
-            <Trash2 size={14} /> {isBusy ? "WORKING..." : "DELETE JOB"}
-          </button>
+          <RecordDeleteAction recordName={job.title} disabled={isBusy} pending={isDeleting} onClick={() => void deleteJob()} />
         </div>
       ) : null}
       {error ? (

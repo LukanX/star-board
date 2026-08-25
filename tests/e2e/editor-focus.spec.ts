@@ -10,6 +10,9 @@ type EditorFixture = {
   factionName: string;
   jobId: string;
   jobTitle: string;
+  episodeJobId: string;
+  episodeJobTitle: string;
+  episodeId: string;
   noteId: string;
   noteTitle: string;
   npcId: string;
@@ -33,6 +36,7 @@ async function createEditorFixture(
     noteTitle: `Editor Focus Note ${timestamp}`,
     npcName: `Editor Focus NPC ${timestamp}`,
     placeName: `Editor Focus Place ${timestamp}`,
+    episodeJobTitle: `Editor Focus Episode Source ${timestamp}`,
   };
 
   const post = async (path: string, data: Record<string, unknown>) => {
@@ -141,6 +145,32 @@ async function createEditorFixture(
   const jobId = jobPayload.job?.id;
   expect(jobId).toBeTruthy();
 
+  const episodeJobPayload = await post(`/api/campaigns/${campaignId}/jobs`, {
+    title: names.episodeJobTitle,
+    summary: `An episode source for editor focus coverage ${timestamp}.`,
+    playerNotesMarkdown: `Public episode source notes ${timestamp}.`,
+    gmNotesMarkdown: `Private episode source notes ${timestamp}.`,
+    hook: `Episode source hook ${timestamp}.`,
+    giverType: "npc",
+    giverId: npcId,
+    placeId,
+    status: "open",
+    artSubject: "",
+    artPath: null,
+    artPrompt: null,
+    artProvider: null,
+  });
+  const episodeJobId = episodeJobPayload.job?.id;
+  expect(episodeJobId).toBeTruthy();
+
+  const episodeResponse = await page.request.post(
+    new URL(`/api/campaigns/${campaignId}/jobs/${episodeJobId}/promote`, page.url()).toString(),
+  );
+  expect(episodeResponse.ok()).toBeTruthy();
+  const episodePayload = (await episodeResponse.json()) as ApiEntityPayload;
+  const episodeId = episodePayload.episode?.id;
+  expect(episodeId).toBeTruthy();
+
   const notePayload = await post(`/api/campaigns/${campaignId}/notes`, {
     title: names.noteTitle,
     bodyMarkdown: `Note body for editor focus coverage ${timestamp}.`,
@@ -156,6 +186,8 @@ async function createEditorFixture(
     enemyId: enemyId!,
     factionId: factionId!,
     jobId: jobId!,
+    episodeJobId: episodeJobId!,
+    episodeId: episodeId!,
     noteId: noteId!,
     npcId: npcId!,
     placeId: placeId!,
@@ -168,6 +200,8 @@ async function deleteEditorFixture(
   fixture: EditorFixture,
 ) {
   const deletions = [
+    [`/api/campaigns/${campaignId}/episodes/${fixture.episodeId}`, "delete"],
+    [`/api/campaigns/${campaignId}/jobs?jobId=${fixture.episodeJobId}`, "delete"],
     [`/api/campaigns/${campaignId}/jobs?jobId=${fixture.jobId}`, "delete"],
     [`/api/campaigns/${campaignId}/notes/${fixture.noteId}`, "delete"],
     [`/api/campaigns/${campaignId}/factions/${fixture.factionId}`, "delete"],
@@ -328,14 +362,14 @@ async function exerciseDetailEditor(
   );
   const record = page.locator(editorCase.record);
   await expect(record).toBeVisible();
-  await page
-    .getByRole("button", { name: editorCase.editButton, exact: true })
-    .click();
+  const editButton = page.getByRole("button", {
+    name: `Edit ${editorCase.name}`,
+    exact: true,
+  });
+  await editButton.click();
 
   await expect(record).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: editorCase.editButton, exact: true }),
-  ).toHaveCount(0);
+  await expect(editButton).toHaveCount(0);
   const form = page.locator("form.character-form").first();
   await expect(
     form.getByRole("textbox", { name: editorCase.field, exact: true }),
@@ -354,6 +388,7 @@ test("replaces every saved detail record with its pre-populated editor", async (
   page,
   campaign,
 }) => {
+  test.setTimeout(60000);
   let fixture: EditorFixture | null = null;
 
   try {
@@ -366,7 +401,7 @@ test("replaces every saved detail record with its pre-populated editor", async (
         id: fixture.characterId,
         name: fixture.characterName,
         record: '[aria-labelledby="character-public-record-title"]',
-        editButton: "EDIT CHARACTER",
+        editButton: "EDIT",
         field: "Name",
         saveLabel: "SAVE CHARACTER",
         saveIcon: false,
@@ -376,7 +411,7 @@ test("replaces every saved detail record with its pre-populated editor", async (
         id: fixture.enemyId,
         name: fixture.enemyName,
         record: "[data-archive-record]",
-        editButton: "EDIT ENEMY",
+        editButton: "EDIT",
         field: "Name",
         saveLabel: "SAVE ENEMY",
         saveIcon: false,
@@ -386,7 +421,7 @@ test("replaces every saved detail record with its pre-populated editor", async (
         id: fixture.factionId,
         name: fixture.factionName,
         record: "[data-archive-record]",
-        editButton: "EDIT FACTION",
+        editButton: "EDIT",
         field: "Name",
         saveLabel: "SAVE FACTION",
         saveIcon: false,
@@ -396,9 +431,19 @@ test("replaces every saved detail record with its pre-populated editor", async (
         id: fixture.jobId,
         name: fixture.jobTitle,
         record: '[aria-labelledby="job-public-record-title"]',
-        editButton: `Edit ${fixture.jobTitle}`,
+        editButton: "EDIT",
         field: "Title",
         saveLabel: "SAVE MISSION",
+        saveIcon: true,
+      },
+      {
+        section: "episodes",
+        id: fixture.episodeId,
+        name: fixture.episodeJobTitle,
+        record: '[aria-labelledby="episode-public-record-title"]',
+        editButton: "EDIT",
+        field: "Title",
+        saveLabel: "SAVE EPISODE",
         saveIcon: true,
       },
       {
@@ -406,7 +451,7 @@ test("replaces every saved detail record with its pre-populated editor", async (
         id: fixture.noteId,
         name: fixture.noteTitle,
         record: '[aria-labelledby="note-public-record-title"]',
-        editButton: "EDIT NOTE",
+        editButton: "EDIT",
         field: "Title",
         saveLabel: "SAVE NOTE",
         saveIcon: true,
@@ -416,7 +461,7 @@ test("replaces every saved detail record with its pre-populated editor", async (
         id: fixture.npcId,
         name: fixture.npcName,
         record: "[data-archive-record]",
-        editButton: "EDIT NPC",
+        editButton: "EDIT",
         field: "Name",
         saveLabel: "SAVE NPC",
         saveIcon: false,
@@ -426,7 +471,7 @@ test("replaces every saved detail record with its pre-populated editor", async (
         id: fixture.placeId,
         name: fixture.placeName,
         record: "[data-archive-record]",
-        editButton: `Edit ${fixture.placeName}`,
+        editButton: "EDIT",
         field: "Name",
         saveLabel: "SAVE PLACE",
         saveIcon: true,

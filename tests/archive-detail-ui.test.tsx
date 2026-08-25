@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import ArchiveMasterDetail from "@/components/ui/ArchiveMasterDetail";
 import ArchiveRecordShell from "@/components/ui/ArchiveRecordShell";
 import ArchiveRelatedList from "@/components/ui/ArchiveRelatedList";
+import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
 
 describe("ArchiveMasterDetail", () => {
   it("renders stable selector and preview panels with the selected preview", () => {
@@ -97,5 +98,27 @@ describe("ArchiveRelatedList", () => {
     expect(populated).toContain('href="/campaigns/campaign-1/jobs/job-1"');
     expect(populated).toContain("The Relay");
     expect(empty).toContain("No jobs assigned.");
+  });
+});
+
+describe("RecordActions", () => {
+  it("renders labeled edit and delete actions with shared icon and danger treatments", () => {
+    const markup = renderToStaticMarkup(
+      <div>
+        <RecordEditAction recordName="North Station" />
+        <RecordDeleteAction recordName="North Station" />
+        <RecordDeleteAction disabled recordName="North Station" />
+      </div>,
+    );
+
+    expect(markup).toContain("EDIT");
+    expect(markup).toContain("DELETE");
+    expect(markup).toContain("DELETING...");
+    expect(markup).toContain('aria-label="Edit North Station"');
+    expect(markup).toContain('aria-label="Delete North Station"');
+    expect(markup).toContain("text-[var(--pink)]");
+    expect(markup).toContain("disabled");
+    expect(markup).toContain("lucide-pencil");
+    expect(markup).toContain("lucide-trash-2");
   });
 });

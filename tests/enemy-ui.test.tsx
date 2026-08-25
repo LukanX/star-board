@@ -24,7 +24,17 @@ const enemy: ApiEnemy = {
   traits: ["aberration", "occult"],
   family: null,
   origin: "manual",
-  stat_block: enemyStatBlockSchema.parse({ schemaVersion: 1 }),
+  stat_block: enemyStatBlockSchema.parse({
+    schemaVersion: 1,
+    spellcasting: [{
+      tradition: "arcane",
+      method: "innate",
+      dc: 25,
+      attackModifier: null,
+      entries: [{ rank: "Cantrips", spells: ["daze"], uses: null, frequency: null, notes: "" }],
+      notes: "",
+    }],
+  }),
   gm_notes_markdown: "It is vulnerable to the sealed frequency.",
   art_subject: "A single void stalker in a starship corridor.",
   art_prompt: null,
@@ -55,9 +65,24 @@ describe("enemy archive UI secrecy", () => {
     const markup = render(<EnemyPublicRecord campaignId={enemy.campaign_id} enemy={enemy} isGM />);
 
     expect(markup).toContain("STRUCTURED STAT BLOCK");
+    expect(markup).toContain("Cantrip");
+    expect(markup).toContain("Cast as 4th-level");
     expect(markup).toContain("It is vulnerable to the sealed frequency.");
     expect(markup).toContain("Private GM source");
     expect(markup).toContain("LEVEL 7");
+  });
+
+  it("orders the GM body mechanics before the player brief and private context", () => {
+    const markup = render(<EnemyPublicRecord campaignId={enemy.campaign_id} enemy={enemy} isGM />);
+    const mechanicsIndex = markup.indexOf('data-enemy-stat-block="true"');
+    const playerBriefIndex = markup.indexOf('data-enemy-player-notes="true"');
+    const gmNotesIndex = markup.indexOf('data-enemy-gm-notes="true"');
+    const provenanceIndex = markup.indexOf("SOURCE PROVENANCE");
+
+    expect(mechanicsIndex).toBeGreaterThanOrEqual(0);
+    expect(mechanicsIndex).toBeLessThan(playerBriefIndex);
+    expect(playerBriefIndex).toBeLessThan(gmNotesIndex);
+    expect(gmNotesIndex).toBeLessThan(provenanceIndex);
   });
 
   it("keeps player previews free of GM classification and mechanics", () => {

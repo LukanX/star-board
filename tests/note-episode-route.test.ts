@@ -11,7 +11,7 @@ vi.mock("@/lib/auth/permissions", () => ({
 }));
 
 import { GET as listEpisodes } from "@/app/api/campaigns/[campaignId]/episodes/route";
-import { GET as getEpisode } from "@/app/api/campaigns/[campaignId]/episodes/[episodeId]/route";
+import { DELETE as deleteEpisode, GET as getEpisode, PATCH as updateEpisode } from "@/app/api/campaigns/[campaignId]/episodes/[episodeId]/route";
 import { GET as listNotes } from "@/app/api/campaigns/[campaignId]/notes/route";
 import { GET as getNote } from "@/app/api/campaigns/[campaignId]/notes/[noteId]/route";
 import { POST as createNote } from "@/app/api/campaigns/[campaignId]/notes/route";
@@ -301,5 +301,84 @@ describe("notes and episode routes", () => {
     expect(payload.notes[0]).toMatchObject({ id: noteId, author: { id: userId, displayName: "Pilot" }, permissions: { canEdit: true, canDelete: true } });
     expect(episodeQuery.eq).toHaveBeenNthCalledWith(1, "campaign_id", campaignId);
     expect(episodeQuery.eq).toHaveBeenNthCalledWith(2, "id", episodeId);
+  });
+
+  it("allows a GM to update episode fields and validates the primary place", async () => {
+    const placeQuery = createQuery({ data: { id: "00000000-0000-4000-8000-000000000005" }, error: null });
+    const updatedEpisode = { id: episodeId, campaign_id: campaignId, source_job_id: null, place_id: "00000000-0000-4000-8000-000000000005", created_by: userId, title: "The Relay Returns", summary: "Recover the signal again.", player_context_markdown: "The tower wakes.", status: "complete", started_at: "2026-08-21T00:00:00.000Z", completed_at: "2026-08-22T00:00:00.000Z", created_at: "2026-08-21T00:00:00.000Z", updated_at: "2026-08-22T00:00:00.000Z" };
+    const episodeQuery = createQuery({ data: updatedEpisode, error: null });
+    const { supabase } = createSupabase({ places: [placeQuery], episodes: [episodeQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "Director" });
+
+    const response = await updateEpisode(request({
+      title: "The Relay Returns",
+      summary: "Recover the signal again.",
+      playerContextMarkdown: "The tower wakes.",
+      status: "complete",
+      startedAt: "2026-08-21",
+      completedAt: "2026-08-22",
+      placeId: "00000000-0000-4000-8000-000000000005",
+    }, "PATCH"), episodeParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.episode).toMatchObject({ id: episodeId, title: "The Relay Returns", status: "complete" });
+    expect(placeQuery.eq).toHaveBeenNthCalledWith(1, "id", "00000000-0000-4000-8000-000000000005");
+    expect(placeQuery.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
+    expect(episodeQuery.update).toHaveBeenCalledWith({
+      title: "The Relay Returns",
+      summary: "Recover the signal again.",
+      player_context_markdown: "The tower wakes.",
+      status: "complete",
+      started_at: "2026-08-21T00:00:00.000Z",
+      completed_at: "2026-08-22T00:00:00.000Z",
+      place_id: "00000000-0000-4000-8000-000000000005",
+      updated_by: userId,
+    });
+  });
+
+  it("rejects players from updating episodes", async () => {
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Pilot" });
+
+    const response = await updateEpisode(request({ title: "Nope" }, "PATCH"), episodeParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("GM access is required.");
+  });
+
+  it("rejects an episode completion date before its start date", async () => {
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "Director" });
+
+    const response = await updateEpisode(request({ startedAt: "2026-08-22", completedAt: "2026-08-21" }, "PATCH"), episodeParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe("Episode details are invalid.");
+  });
+
+  it("allows a GM to delete an episode without reopening its source job", async () => {
+    const episodeQuery = createQuery({ data: { id: episodeId }, error: null });
+    const { supabase } = createSupabase({ episodes: [episodeQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "Director" });
+
+    const response = await deleteEpisode(new Request("http://localhost", { method: "DELETE" }), episodeParams());
+
+    expect(response.status).toBe(204);
+    expect(episodeQuery.delete).toHaveBeenCalled();
+    expect(episodeQuery.eq).toHaveBeenNthCalledWith(1, "id", episodeId);
+    expect(episodeQuery.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
+  });
+
+  it("rejects players from deleting episodes", async () => {
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Pilot" });
+
+    const response = await deleteEpisode(new Request("http://localhost", { method: "DELETE" }), episodeParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("GM access is required.");
   });
 });

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { FileSearch, Pencil, Trash2 } from "lucide-react";
+import { FileSearch } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { CampaignArtEditorSlot } from "@/components/archive/CampaignArtField";
 import EnemyEditor from "@/components/enemies/EnemyEditor";
 import EnemyPublicRecord from "@/components/enemies/EnemyPublicRecord";
+import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import type { ApiEnemy } from "@/lib/campaign/types";
 import type { CampaignEnemyResult } from "@/lib/campaign/enemies-server";
@@ -63,7 +64,7 @@ export default function EnemyDetailRouteView({ campaignId, initialResult }: { ca
     }
   };
 
-  const actions = isGM ? <div className="flex flex-wrap items-center justify-end gap-2"><button className={actionClassName} onClick={() => { setError(null); setReimportPreview(null); setEditorOpen(true); }} type="button"><Pencil size={15} /> EDIT ENEMY</button>{enemy.source_provider === "aon" ? <button className={actionClassName} disabled={isReimporting} onClick={() => void previewReimport()} type="button"><FileSearch size={15} /> {isReimporting ? "PREVIEWING..." : "REVIEW SOURCE UPDATE"}</button> : null}<button className={`${actionClassName} !border-[rgba(255,92,154,.42)] bg-[rgba(255,92,154,.08)] !text-[var(--pink)] hover:!border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)]`} disabled={isDeleting} onClick={() => void deleteEnemy()} type="button"><Trash2 size={15} /> {isDeleting ? "DELETING..." : "DELETE ENEMY"}</button></div> : undefined;
+  const actions = isGM ? <div className="flex flex-wrap items-center justify-end gap-2"><RecordEditAction recordName={enemy.name} disabled={isDeleting} onClick={() => { setError(null); setReimportPreview(null); setEditorOpen(true); }} />{enemy.source_provider === "aon" ? <button className={actionClassName} disabled={isReimporting} onClick={() => void previewReimport()} type="button"><FileSearch aria-hidden="true" size={15} /> {isReimporting ? "PREVIEWING..." : "REVIEW SOURCE UPDATE"}</button> : null}</div> : undefined;
 
-  return <><CampaignArtEditorSlot />{editorOpen ? <EnemyEditor key={`${enemy.id}:${reimportPreview?.sourceSnapshot.contentHash ?? "manual"}`} campaignId={campaignId} enemy={enemy} initialImportPreview={reimportPreview} onCancel={() => { setEditorOpen(false); setReimportPreview(null); }} onSaved={(saved) => { setEnemy(saved); setEditorOpen(false); setReimportPreview(null); }} /> : <EnemyPublicRecord campaignId={campaignId} enemy={enemy} isGM={isGM} actions={actions} />}{error ? <p className="m-0 mt-3 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}</>;
+  return <><CampaignArtEditorSlot />{editorOpen ? <EnemyEditor key={`${enemy.id}:${reimportPreview?.sourceSnapshot.contentHash ?? "manual"}`} campaignId={campaignId} enemy={enemy} initialImportPreview={reimportPreview} onCancel={() => { setEditorOpen(false); setReimportPreview(null); }} onSaved={(saved) => { setEnemy(saved); setEditorOpen(false); setReimportPreview(null); }} /> : <><EnemyPublicRecord campaignId={campaignId} enemy={enemy} isGM={isGM} actions={actions} />{isGM ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap"><RecordDeleteAction recordName={enemy.name} disabled={isDeleting} onClick={() => void deleteEnemy()} /></div> : null}</>}{error ? <p className="m-0 mt-3 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}</>;
 }

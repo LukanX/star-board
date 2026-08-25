@@ -31,3 +31,9 @@ export const recordDetailMetaClassName =
 
 export const recordRowActionsClassName =
   "ml-auto flex items-center gap-[2px]";
+
+export const recordActionButtonClassName =
+  "h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] bg-[rgba(255,255,255,.035)] text-[var(--muted)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0";
+
+export const recordDeleteActionClassName =
+  `${recordActionButtonClassName} !border-[rgba(255,92,154,.42)] bg-[rgba(255,92,154,.08)] !text-[var(--pink)] hover:!border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)]`;

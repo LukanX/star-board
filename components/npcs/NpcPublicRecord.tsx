@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { NpcRelatedRecords } from "@/lib/campaign/detail-types";
 import { BookOpen, LockKeyhole, Map, UserRound } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
@@ -21,12 +22,14 @@ export default function NpcPublicRecord({
   places,
   isGM = false,
   related,
+  actions,
 }: {
   campaignId: string;
   npc: NpcRecord;
   places: ApiPlace[];
   isGM?: boolean;
   related?: NpcRelatedRecords;
+  actions?: ReactNode;
 }) {
   const artUrl = getAttachedArtUrl(npc.art_url, npc.art_path);
   const relatedRecords = related ?? emptyNpcRelatedRecords;
@@ -42,6 +45,7 @@ export default function NpcPublicRecord({
       eyebrow="PUBLIC CONTACT FILE"
       title={npc.name}
       titleId="npc-public-record-title"
+      actions={actions}
       metadata={
         <div className="grid gap-2">
           <p className={recordDetailMetaClassName}>
