@@ -5,11 +5,12 @@ import AiArtStudio from "@/components/archive/AiArtStudio";
 import { ImagePlus, LoaderCircle, Sparkles, X } from "lucide-react";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 
-type ArtKind = "character" | "npc" | "faction" | "job" | "place";
+type ArtKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
 
 export type CampaignArtEditorTarget = {
   campaignId: string | null;
   kind: ArtKind;
+  parentPlaceId?: string | null;
   value: string | null;
   trackUnsavedUploads?: boolean;
   url?: string | null;
@@ -74,6 +75,7 @@ export function CampaignArtEditorSlot() {
 export default function CampaignArtField({
   campaignId,
   kind,
+  parentPlaceId,
   value,
   trackUnsavedUploads = false,
   url,
@@ -289,6 +291,7 @@ export default function CampaignArtField({
           <AiArtStudio
             campaignId={campaignId}
             kind={kind}
+            parentPlaceId={parentPlaceId}
             subject={subject}
             currentPrompt={currentPrompt}
             onSubjectChange={onSubjectChange}

@@ -99,6 +99,22 @@ describe("campaign art routes", () => {
     expect(createSignedUrl).toHaveBeenCalledWith(payload.asset.path, 3600);
   });
 
+  it("rejects enemy artwork uploads from players", async () => {
+    const { upload } = createSupabaseMock();
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase: { storage: { from: vi.fn().mockReturnValue({ upload }) } }, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Pilot" });
+
+    const formData = new FormData();
+    formData.append("kind", "enemy");
+    formData.append("file", new Blob(["fake png bytes"], { type: "image/png" }), "enemy.png");
+    const response = await POST(new Request("http://localhost/api/campaigns/art", { method: "POST", body: formData }), params());
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("GM access is required for enemy artwork.");
+    expect(upload).not.toHaveBeenCalled();
+  });
+
   it("does not remove an asset that is already referenced by a campaign record", async () => {
     const { supabase, remove } = createSupabaseMock();
     const referencedQuery = {

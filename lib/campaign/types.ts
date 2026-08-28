@@ -1,4 +1,5 @@
 import type { PlaceRecord } from "@/lib/places";
+import type { EnemyOrigin, EnemyRarity, EnemySize, EnemyStatBlockV1 } from "@/lib/enemies/types";
 
 export type CampaignRecord = { id: string; name: string; system: string; description: string; created_by: string };
 export type CampaignMembership = { role: "gm" | "player"; display_name: string; campaign: CampaignRecord | CampaignRecord[] | null };
@@ -18,9 +19,9 @@ export type ApiJob = {
 export type ApiCharacter = { id: string; owner_id: string; name: string; species: string; class_name: string; level: number; backstory_markdown: string; physical_description: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; can_edit?: boolean };
 export type Character = { id: string; ownerId: string; name: string; species: string; className: string; level: number; subtitle: string; detail: string; color: "pink" | "cyan" | "purple" | "amber"; image: string | null; status: "ACTIVE" | "RESTING"; backstoryMarkdown: string; physicalDescription: string; artPath?: string | null; artUrl?: string | null; artSubject?: string | null; artPrompt?: string | null; artProvider?: string | null; canEdit: boolean };
 export type CharacterDraft = { name: string; species: string; className: string; level: number; backstoryMarkdown: string; physicalDescription: string; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
-export type ApiNpc = { id: string; author_id: string; name: string; species: string; role: string; description: string; player_notes_markdown: string; place_id: string | null; gm_notes_markdown?: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
+export type ApiNpc = { id: string; author_id: string; name: string; species: string; role: string; description: string; player_notes_markdown: string; place_id: string | null; faction_id: string | null; gm_notes_markdown?: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
 export type NpcRecord = ApiNpc & { color: "pink" | "cyan" | "amber" };
-export type ApiFaction = { id: string; author_id: string; name: string; description: string; status: string; place_id: string | null; art_path: string | null; art_subject: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
+export type ApiFaction = { id: string; author_id: string; name: string; description: string; status: string; player_notes_markdown: string; place_id: string | null; gm_notes_markdown?: string; art_path: string | null; art_subject: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
 export type FactionRecord = ApiFaction & { color: "pink" | "cyan" | "amber" };
 export type ApiEpisode = { id: string; campaign_id: string; source_job_id: string | null; place_id: string | null; created_by: string; title: string; summary: string; player_context_markdown: string; status: "planned" | "active" | "complete" | "archived"; started_at: string | null; completed_at: string | null; created_at: string; updated_at: string; noteCount: number };
 export type EpisodeRecord = ApiEpisode & { accent: "cyan" | "pink" | "amber" };
@@ -32,3 +33,39 @@ export type ApiCampaignNote = { id: string; campaign_id: string; episode_id: str
 export type CampaignNote = ApiCampaignNote & { accent: NoteAccent; age?: string };
 export type CampaignNoteEpisode = { id: string; title: string; status: string };
 export type ApiPlace = PlaceRecord & { author_id: string; description: string; player_notes_markdown: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; created_at: string; updated_at: string; gm_notes_markdown?: string };
+export type ApiEnemy = {
+  id: string;
+  campaign_id: string;
+  author_id: string;
+  name: string;
+  player_description: string;
+  is_revealed: boolean;
+  art_path: string | null;
+  art_url?: string | null;
+  created_at: string;
+  updated_at: string;
+  level?: number;
+  size?: EnemySize;
+  rarity?: EnemyRarity;
+  traits?: string[];
+  family?: string | null;
+  origin?: EnemyOrigin;
+  stat_block?: EnemyStatBlockV1 | null;
+  gm_notes_markdown?: string;
+  art_subject?: string | null;
+  art_prompt?: string | null;
+  art_provider?: string | null;
+  source_provider?: "aon" | null;
+  source_external_id?: number | null;
+  source_content_hash?: string | null;
+  source_snapshot?: Record<string, unknown> | null;
+  source_updated_at?: string | null;
+};
+export type EnemyFilters = {
+  name?: string;
+  level?: number;
+  trait?: string;
+  size?: EnemySize;
+  rarity?: EnemyRarity;
+  sort?: "name" | "level" | "updated";
+};

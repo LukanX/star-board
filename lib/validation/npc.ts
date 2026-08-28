@@ -11,6 +11,7 @@ const npcFields = {
   artPrompt: z.string().trim().max(4000).nullable().optional(),
   artProvider: z.string().trim().max(80).nullable().optional(),
   placeId: z.string().uuid().nullable().optional(),
+  factionId: z.string().uuid().nullable().optional(),
 };
 
 export const createNpcSchema = z.object({
@@ -30,4 +31,5 @@ export const updateNpcSchema = z.object({
   artPrompt: npcFields.artPrompt,
   artProvider: npcFields.artProvider,
   placeId: npcFields.placeId,
+  factionId: npcFields.factionId,
 });

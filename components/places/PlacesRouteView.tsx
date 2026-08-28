@@ -4,16 +4,14 @@ import { useMemo, useState } from "react";
 import { ArrowUpRight, CirclePlus, Map } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
 import ArchiveMasterDetail from "@/components/ui/ArchiveMasterDetail";
+import ArchivePreviewEmptyState from "@/components/ui/ArchivePreviewEmptyState";
 import PageLayout from "@/components/ui/PageLayout";
 import PlaceCard from "@/components/places/PlaceCard";
 import PlaceEditor from "@/components/places/PlaceEditor";
 import PlacePreview from "@/components/places/PlacePreview";
 import type { ApiPlace } from "@/lib/campaign/types";
 import { buildPlaceTree, getPlaceBreadcrumb } from "@/lib/places";
-import {
-  accentIconCyanClassName,
-  eyebrowClassName,
-} from "@/components/ui/terminalStyles";
+import { eyebrowClassName } from "@/components/ui/terminalStyles";
 
 type EditorState = { place?: ApiPlace; parentPlaceId: string | null };
 
@@ -99,7 +97,7 @@ export default function PlacesRouteView({
       eyebrow="ARCHIVE // PLACE ATLAS"
       title="Places"
       description="A genre-neutral atlas for worlds, regions, sites, and the spaces between them."
-      action={isGM ? "ADD ROOT PLACE" : undefined}
+      action={isGM && !editorState ? "ADD ROOT PLACE" : undefined}
       actionIcon={<CirclePlus size={16} />}
       onAction={() => openEditor()}
     >
@@ -115,6 +113,8 @@ export default function PlacesRouteView({
           onDeleted={deletePlace}
         />
       ) : null}
+      {!editorState ? (
+        <>
       <div
         data-places-toolbar="true"
         className="flex items-end justify-between gap-[20px] mb-[18px] pb-[13px] p-[15px_17px] border border-[var(--line)] bg-[linear-gradient(105deg,rgba(98,232,255,.055),rgba(255,92,154,.025))] max-[760px]:items-stretch max-[760px]:flex-col max-[760px]:gap-[15px] max-[760px]:p-[14px] max-[420px]:p-[12px]"
@@ -177,7 +177,7 @@ export default function PlacesRouteView({
             </div>
           )}
           preview={selectedPlace ? <PlacePreview campaignId={campaignId} place={selectedPlace} places={places} isGM={isGM} /> : null}
-          emptyPreview={<div data-places-detail="true" className="min-w-0 p-[21px] max-[760px]:p-[17px]"><Map className={accentIconCyanClassName} size={24} /><p className={eyebrowClassName}>ROUTE-OWNED PLACE FILES</p><h2>Choose a place from the atlas.</h2><p>Open a record to inspect its public brief, notes, breadcrumb, and GM-only context where available.</p></div>}
+          emptyPreview={<ArchivePreviewEmptyState data-places-detail="true" icon={Map} eyebrow="ROUTE-OWNED PLACE FILES" title="Choose a place from the atlas." message="Open a record to inspect its public brief, notes, breadcrumb, and GM-only context where available." />}
         />
       ) : (
         <EmptyState
@@ -190,6 +190,8 @@ export default function PlacesRouteView({
           }
         />
       )}
+        </>
+      ) : null}
     </PageLayout>
   );
 }

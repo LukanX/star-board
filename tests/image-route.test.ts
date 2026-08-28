@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
   dispatchImageBackgroundJob: vi.fn(),
+  loadPlaceAiContext: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
@@ -15,12 +16,27 @@ vi.mock("@/lib/ai/client", () => ({ generateImage: mocks.generateImage }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
 vi.mock("@/lib/ai/image-jobs", () => ({ dispatchImageBackgroundJob: mocks.dispatchImageBackgroundJob }));
+vi.mock("@/lib/ai/assistance", () => ({ loadPlaceAiContext: mocks.loadPlaceAiContext }));
 
 import { POST } from "@/app/api/ai/image/route";
 import { AiProviderError } from "@/lib/ai/errors";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
+const parentId = "00000000-0000-4000-8000-000000000003";
+
+const placeContext = {
+  hierarchy: [
+    { name: "Asterion", kind: "planet" },
+    { name: "Night Market", kind: "district" },
+  ],
+  parent: {
+    name: "Night Market",
+    kind: "district",
+    description: "A crowded district beneath the orbital ring.",
+    playerNotes: "Public parent notes.",
+  },
+};
 
 function createRequest(body: unknown) {
   return new Request("http://localhost/api/ai/image", {
@@ -64,6 +80,7 @@ function createSupabaseMock() {
 describe("POST /api/ai/image", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.loadPlaceAiContext.mockResolvedValue({ context: undefined });
   });
 
   it("rejects malformed input before checking campaign access", async () => {
@@ -130,6 +147,32 @@ describe("POST /api/ai/image", () => {
     }));
   });
 
+  it("uses the campaign-scoped parent context for synchronous Place artwork", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.loadPlaceAiContext.mockResolvedValue({ context: placeContext });
+    mocks.generateImage.mockResolvedValue({ image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" }, model: "openai/gpt-image-1" });
+
+    const response = await POST(createRequest({
+      campaignId,
+      mode: "create",
+      targetKind: "place",
+      parentPlaceId: parentId,
+      subject: "A hidden transit room",
+      model: "openai/gpt-image-1",
+    }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.draft).toBeDefined();
+    expect(mocks.loadPlaceAiContext).toHaveBeenCalledWith(supabase, campaignId, parentId);
+    expect(mocks.generateImage.mock.calls[0][0]).toContain("Immediate parent description: A crowded district beneath the orbital ring.");
+    expect(mocks.generateImage.mock.calls[0][0]).toContain("keep the child place as the focal subject");
+  });
+
   it("queues image generation for the Netlify background worker", async () => {
     const previousSiteUrl = process.env.URL;
     process.env.URL = "https://star-board.netlify.app";
@@ -153,6 +196,67 @@ describe("POST /api/ai/image", () => {
       if (previousSiteUrl === undefined) delete process.env.URL;
       else process.env.URL = previousSiteUrl;
     }
+  });
+
+  it("uses the same parent context when queuing Place artwork", async () => {
+    const previousSiteUrl = process.env.URL;
+    process.env.URL = "https://star-board.netlify.app";
+
+    try {
+      const supabase = createSupabaseMock();
+      mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+      mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+      mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+      mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+      mocks.loadPlaceAiContext.mockResolvedValue({ context: placeContext });
+
+      const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "place", parentPlaceId: parentId, subject: "A hidden transit room", model: "openai/gpt-image-1" }));
+      const payload = await response.json();
+
+      expect(response.status).toBe(202);
+      expect(mocks.loadPlaceAiContext).toHaveBeenCalledWith(supabase, campaignId, parentId);
+      expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith("https://star-board.netlify.app", expect.objectContaining({
+        generationRunId: payload.job.generationRunId,
+        prompt: expect.stringContaining("Immediate parent player notes: Public parent notes."),
+      }), "worker-secret");
+    } finally {
+      if (previousSiteUrl === undefined) delete process.env.URL;
+      else process.env.URL = previousSiteUrl;
+    }
+  });
+
+  it("rejects an invalid Place parent before image generation", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.loadPlaceAiContext.mockResolvedValue({ error: "Place parent must belong to this campaign.", invalid: true });
+
+    const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "place", parentPlaceId: parentId, subject: "A hidden transit room", model: "openai/gpt-image-1" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe("Place parent must belong to this campaign.");
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.dispatchImageBackgroundJob).not.toHaveBeenCalled();
+  });
+
+  it("returns unavailable when Place context cannot be loaded", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.loadPlaceAiContext.mockResolvedValue({ error: "Place hierarchy could not be loaded.", unavailable: true });
+
+    const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "place", parentPlaceId: parentId, subject: "A hidden transit room", model: "openai/gpt-image-1" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(payload.error).toBe("Place hierarchy could not be loaded.");
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.dispatchImageBackgroundJob).not.toHaveBeenCalled();
   });
 
   it("queues on Netlify even when a stale sync mode is configured", async () => {

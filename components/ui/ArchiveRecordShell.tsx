@@ -78,9 +78,9 @@ export default function ArchiveRecordShell({
         <div {...artworkData} data-archive-record-artwork="true" className="relative pt-[18px]">
           {artwork}
         </div>
-        <div {...bodyData} data-archive-record-body="true" className="grid gap-[18px] pt-[19px]">
+        {body !== null && body !== undefined ? <div {...bodyData} data-archive-record-body="true" className="grid gap-[18px] pt-[19px]">
           {body}
-        </div>
+        </div> : null}
         {related ? <div data-archive-record-related="true" className="grid gap-3 pt-[22px]">{related}</div> : null}
       </div>
     </section>

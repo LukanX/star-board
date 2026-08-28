@@ -1,19 +1,20 @@
+import type { ReactNode } from "react";
 import type { NpcRelatedRecords } from "@/lib/campaign/detail-types";
-import { BookOpen, LockKeyhole, Map, UserRound } from "lucide-react";
+import { BookOpen, LockKeyhole, Map, Network, UserRound } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import ArtDownloadButton from "@/components/ui/ArtDownloadButton";
 import ArchiveRecordShell from "@/components/ui/ArchiveRecordShell";
 import ArchiveRelatedList from "@/components/ui/ArchiveRelatedList";
 import RecordPortrait from "@/components/ui/RecordPortrait";
-import { recordDetailMetaClassName, recordMetaClassName } from "@/components/ui/recordStyles";
+import { archiveDetailArtworkClassName, recordDetailMetaClassName, recordMetaClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { getAttachedArtUrl } from "@/lib/campaign/mappers";
 import { campaignEntityPath, campaignSectionPath } from "@/lib/campaign/routes";
 import { getPlaceBreadcrumb } from "@/lib/places";
 import type { ApiPlace, NpcRecord } from "@/lib/campaign/types";
 
-const emptyNpcRelatedRecords: NpcRelatedRecords = { place: null, jobs: [] };
+const emptyNpcRelatedRecords: NpcRelatedRecords = { place: null, faction: null, jobs: [] };
 
 export default function NpcPublicRecord({
   campaignId,
@@ -21,12 +22,14 @@ export default function NpcPublicRecord({
   places,
   isGM = false,
   related,
+  actions,
 }: {
   campaignId: string;
   npc: NpcRecord;
   places: ApiPlace[];
   isGM?: boolean;
   related?: NpcRelatedRecords;
+  actions?: ReactNode;
 }) {
   const artUrl = getAttachedArtUrl(npc.art_url, npc.art_path);
   const relatedRecords = related ?? emptyNpcRelatedRecords;
@@ -42,6 +45,7 @@ export default function NpcPublicRecord({
       eyebrow="PUBLIC CONTACT FILE"
       title={npc.name}
       titleId="npc-public-record-title"
+      actions={actions}
       metadata={
         <div className="grid gap-2">
           <p className={recordDetailMetaClassName}>
@@ -71,7 +75,7 @@ export default function NpcPublicRecord({
         >
           <div
             data-npc-detail-portrait="true"
-            className="relative min-w-[180px] max-w-[260px] h-full aspect-square overflow-hidden border border-[rgba(98,232,255,.28)] bg-[#0a1118] max-[760px]:w-[min(100%,220px)] max-[760px]:min-w-0 max-[760px]:h-auto max-[760px]:justify-self-start"
+            className={`${archiveDetailArtworkClassName} border border-[rgba(98,232,255,.28)] bg-[#0a1118]`}
           >
             <RecordPortrait
               src={artUrl}
@@ -116,17 +120,25 @@ export default function NpcPublicRecord({
         </>
       }
       related={
-        <ArchiveRelatedList
-          eyebrow="CAMPAIGN THREADS"
-          title="Giver jobs"
-          emptyMessage="No jobs are assigned to this contact."
-          items={relatedRecords.jobs.map((job) => ({
-            id: job.id,
-            href: campaignEntityPath(campaignId, "jobs", job.id),
-            label: job.title,
-            meta: job.status.toUpperCase(),
-          }))}
-        />
+        <>
+          <ArchiveRelatedList
+            eyebrow="AFFILIATION"
+            title="Faction"
+            emptyMessage="This contact has no faction affiliation."
+            items={relatedRecords.faction ? [{ id: relatedRecords.faction.id, href: campaignEntityPath(campaignId, "factions", relatedRecords.faction.id), label: relatedRecords.faction.name, meta: relatedRecords.faction.status.toUpperCase(), icon: <Network size={14} /> }] : []}
+          />
+          <ArchiveRelatedList
+            eyebrow="CAMPAIGN THREADS"
+            title="Giver jobs"
+            emptyMessage="No jobs are assigned to this contact."
+            items={relatedRecords.jobs.map((job) => ({
+              id: job.id,
+              href: campaignEntityPath(campaignId, "jobs", job.id),
+              label: job.title,
+              meta: job.status.toUpperCase(),
+            }))}
+          />
+        </>
       }
       className="npc-record-detail"
     />

@@ -24,6 +24,8 @@ describe("campaign route contracts", () => {
     expect(campaignEntityPath("campaign-42", "factions", "faction-7")).toBe("/campaigns/campaign-42/factions/faction-7");
     expect(campaignSectionPath("campaign-42", "places")).toBe("/campaigns/campaign-42/places");
     expect(campaignEntityPath("campaign-42", "places", "place-7")).toBe("/campaigns/campaign-42/places/place-7");
+    expect(campaignSectionPath("campaign-42", "enemies")).toBe("/campaigns/campaign-42/enemies");
+    expect(campaignEntityPath("campaign-42", "enemies", "enemy-7")).toBe("/campaigns/campaign-42/enemies/enemy-7");
     expect(campaignSectionPath("campaign-42", "episodes")).toBe("/campaigns/campaign-42/episodes");
     expect(campaignEntityPath("campaign-42", "episodes", "episode-7")).toBe("/campaigns/campaign-42/episodes/episode-7");
     expect(campaignSectionPath("campaign-42", "notes")).toBe("/campaigns/campaign-42/notes");
@@ -43,6 +45,7 @@ describe("campaign route contracts", () => {
     expect(getCampaignSectionFromPath("/campaigns/campaign-42", "campaign-42")).toBe("overview");
     expect(getCampaignSectionFromPath("/campaigns/campaign-42/npcs", "campaign-42")).toBe("npcs");
     expect(getCampaignSectionFromPath("/campaigns/campaign-42/npcs/npc-7", "campaign-42")).toBe("npcs");
+    expect(getCampaignSectionFromPath("/campaigns/campaign-42/enemies/enemy-7", "campaign-42")).toBe("enemies");
     expect(getCampaignSectionFromPath("/campaigns/another-campaign/npcs", "campaign-42")).toBe("overview");
   });
 
@@ -56,6 +59,11 @@ describe("campaign route contracts", () => {
 });
 
 describe("campaign navigation metadata", () => {
+  it("includes Enemies in the Archive", () => {
+    expect(campaignNavigation).toContainEqual({ id: "enemies", label: "Enemies", group: "Archive" });
+    expect(getCampaignNavigationItem("enemies")).toEqual({ id: "enemies", label: "Enemies", group: "Archive" });
+  });
+
   it("includes Crew access in Control and returns it from lookup", () => {
     expect(campaignNavigation).toContainEqual({ id: "members", label: "Crew access", group: "Control" });
     expect(getCampaignNavigationItem("members")).toEqual({ id: "members", label: "Crew access", group: "Control" });

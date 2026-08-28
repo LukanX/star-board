@@ -51,7 +51,7 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0014_character_profile_and_visual_prompt.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0021_faction_notes_and_npc_membership.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
 
@@ -66,7 +66,7 @@ Set these server-only values in the Netlify site environment:
 
 Netlify provides `NETLIFY=true` and `URL`; deployed requests always use the background path even if a stale `NETLIFY_IMAGE_GENERATION=sync` variable is present, and the worker is dispatched through Netlify's public `URL`. Set `NETLIFY_IMAGE_GENERATION=background` to force the queue mode in another deployment environment; leave it as `sync` for local synchronous testing. Apply migration `0012_async_image_generation.sql` before using the deployed art studio.
 
-The migrations create campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, a private `campaign-art` storage bucket, and the genre-neutral Places archive. Places form an arbitrary-depth tree through `parent_place_id`; sibling names are unique within a campaign, cycles are rejected in PostgreSQL, deleting a parent promotes children to roots, and deleting a Place clears primary-place links on NPCs, factions, jobs, and episodes. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
+The migrations create campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, a private `campaign-art` storage bucket, the genre-neutral Places archive, the campaign-scoped Enemies archive, faction player/GM notes, and optional campaign-scoped NPC faction membership. Places form an arbitrary-depth tree through `parent_place_id`; sibling names are unique within a campaign, cycles are rejected in PostgreSQL, deleting a parent promotes children to roots, and deleting a Place clears primary-place links on NPCs, factions, jobs, and episodes. Enemy mechanics, source provenance, and GM notes remain in GM-only detail rows; unrevealed enemy artwork is blocked from player Storage reads by an exact `enemies.art_path` reference and reveal check rather than a filename convention. Unattached background-generated image objects remain private to their requesting GM and are removed during retention when they are no longer referenced. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
 
 Accounts are open to anyone. Local Auth is configured for email/password signup with email confirmation disabled, so a successful signup immediately creates a session without SMTP setup. A new account can create a campaign and is automatically made its GM; a campaign join link is only required to enter an existing campaign as a player. Display names are stored per campaign membership, so one account can use a different name in each campaign.
 
@@ -84,11 +84,17 @@ Set `OPENROUTER_API_KEY` in the server environment to enable the GM-only routes:
 - `POST /api/ai/npc`
 - `POST /api/ai/faction`
 - `POST /api/ai/place`
+- `POST /api/ai/enemy`
+- `POST /api/ai/enemy/brief`
 - `POST /api/ai/image`
 
 Text and image models can be changed with `OPENROUTER_TEXT_MODEL` and `OPENROUTER_IMAGE_MODEL`. `OPENROUTER_SITE_URL` and `OPENROUTER_APP_NAME` are optional attribution headers. GMs can choose compatible models from the live OpenRouter catalog, and campaign settings enforce the saved model allowlist for every generation request.
 
-Mission, NPC, faction, Place, and image responses are schema-validated. Place generation receives the selected parent hierarchy, but all AI output remains review-before-save. Image drafts are reviewed and approved before the selected asset is saved to a campaign record; generated approvals persist the originating prompt and provider, while manual uploads clear stale generation provenance. Provider failures preserve their HTTP status and safe request ID in the response, while bounded diagnostics are written to server logs without storing raw prompts or generated image data. AI usage is tracked by token and provider metadata, but generation-count quotas are not enforced. Keep the API key server-only.
+Mission, NPC, faction, Place, enemy, and image responses are schema-validated. Enemy records support complete structured stat-block drafts and a separate spoiler-safe player brief draft. All AI output remains review-before-save. Image drafts are reviewed and approved before the selected asset is saved to a campaign record; generated approvals persist the originating prompt and provider, while manual uploads clear stale generation provenance. Provider failures preserve their HTTP status and safe request ID in the response, while bounded diagnostics are written to server logs without storing raw prompts or generated image data. AI usage is tracked by token and provider metadata, but generation-count quotas are not enforced. Keep the API key server-only.
+
+### Enemies archive and Archives of Nethys imports
+
+The Enemies archive is available at `/campaigns/[campaignId]/enemies`. GMs can create or edit campaign-scoped enemy records, review complete AI stat-block drafts, and reveal only the public name, approved artwork, and player-safe description. Players never receive enemy mechanics, tactics, weaknesses, spells, source snapshots, or GM notes. A GM can preview one creature URL from Archives of Nethys before applying it to the editor; supported URLs must use HTTPS, the exact `2e.aonsrd.com` host, and the `/creatures/{numeric-id}-{slug}` path. Fresh server-side fetches verify the final redirect target, embedded creature identity, canonical URL, parsed source hash, and reviewed payload before an AoN record is created or refreshed. Raw HTML and source-hosted images are not persisted, source snapshots must remain internally consistent with the saved record, and source refreshes require an explicit review and save against the currently loaded enemy revision.
 
 ### AI audit retention
 
@@ -116,4 +122,4 @@ The suite creates or signs into two local test accounts, creates a temporary cam
 
 ## Product direction
 
-The interface uses a synthwave starship-terminal visual language. Persistence covers job-board voting, campaign notes, characters/NPCs/factions, the arbitrary-depth Places archive, one primary Place link on NPCs/factions/jobs/episodes, episode promotion, image uploads, and review-before-save AI text and image drafts.
+The interface uses a synthwave starship-terminal visual language. Persistence covers job-board voting, campaign notes, characters/NPCs/factions, faction player/GM notes, optional NPC faction membership, the arbitrary-depth Places archive, the campaign-scoped Enemies archive, one primary Place link on NPCs/factions/jobs/episodes, episode promotion, image uploads, and review-before-save AI text, image, and source-import drafts.

@@ -11,6 +11,7 @@ import {
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import type { RelatedFactionSummary } from "@/lib/campaign/detail-types";
 import type { ApiNpc, ApiPlace } from "@/lib/campaign/types";
 import { flattenPlaceTree } from "@/lib/places";
 
@@ -22,6 +23,7 @@ type NpcDraft = {
   playerNotesMarkdown: string;
   gmNotesMarkdown: string;
   placeId: string | null;
+  factionId: string | null;
   artSubject: string;
   artPath: string | null;
   artUrl: string | null;
@@ -37,6 +39,7 @@ const emptyNpcDraft: NpcDraft = {
   playerNotesMarkdown: "",
   gmNotesMarkdown: "",
   placeId: null,
+  factionId: null,
   artSubject: "",
   artPath: null,
   artUrl: null,
@@ -54,6 +57,7 @@ function toDraft(npc?: ApiNpc): NpcDraft {
         playerNotesMarkdown: npc.player_notes_markdown,
         gmNotesMarkdown: npc.gm_notes_markdown ?? "",
         placeId: npc.place_id,
+        factionId: npc.faction_id,
         artSubject: npc.art_subject ?? "",
         artPath: npc.art_path,
         artUrl: npc.art_url ?? null,
@@ -66,12 +70,14 @@ function toDraft(npc?: ApiNpc): NpcDraft {
 export default function NpcEditor({
   campaignId,
   places,
+  factions = [],
   npc,
   onSaved,
   onCancel: parentOnCancel,
 }: {
   campaignId: string;
   places: ApiPlace[];
+  factions?: RelatedFactionSummary[];
   npc?: ApiNpc;
   onSaved?: (npc: ApiNpc) => void;
   onCancel?: () => void;
@@ -113,6 +119,9 @@ export default function NpcEditor({
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const previousFactionId = npc?.faction_id ?? null;
+    const nextFactionId = draft.factionId ?? null;
+    if (previousFactionId && nextFactionId && previousFactionId !== nextFactionId && !window.confirm("Transfer this NPC to the selected faction?")) return;
     setIsSaving(true);
     setError(null);
     try {
@@ -300,18 +309,16 @@ export default function NpcEditor({
         </label>
         <label className="place-quick-field">
           Primary place
-          <select
-            className={editorSelectClassName}
-            value={draft.placeId ?? ""}
-            onChange={(event) => update("placeId", event.target.value || null)}
-          >
+          <select className={editorSelectClassName} value={draft.placeId ?? ""} onChange={(event) => update("placeId", event.target.value || null)}>
             <option value="">NO PRIMARY PLACE</option>
-            {flattenPlaceTree(places).map(({ place, depth }) => (
-              <option
-                key={place.id}
-                value={place.id}
-              >{`${"  ".repeat(depth)}${depth ? "|- " : ""}${place.name} [${place.kind}]`}</option>
-            ))}
+            {flattenPlaceTree(places).map(({ place, depth }) => <option key={place.id} value={place.id}>{`${"  ".repeat(depth)}${depth ? "|- " : ""}${place.name} [${place.kind}]`}</option>)}
+          </select>
+        </label>
+        <label>
+          Faction
+          <select className={editorSelectClassName} value={draft.factionId ?? ""} onChange={(event) => update("factionId", event.target.value || null)}>
+            <option value="">NO FACTION</option>
+            {factions.map((faction) => <option key={faction.id} value={faction.id}>{`${faction.name} [${faction.status}]`}</option>)}
           </select>
         </label>
         {error ? (
@@ -325,7 +332,7 @@ export default function NpcEditor({
             disabled={isSaving}
             type="submit"
           >
-            {isSaving ? "SAVING..." : npc ? "SAVE CHANGES" : "ADD NPC"}
+            {isSaving ? "SAVING..." : "SAVE NPC"}
           </button>
           <button
             className="text-action inline-flex items-center gap-1 whitespace-nowrap border-0 bg-transparent p-0 font-mono text-[8px] tracking-[.1em] text-[var(--cyan)] cursor-pointer hover:text-[#a1f3ff] max-[420px]:w-full max-[420px]:justify-start"

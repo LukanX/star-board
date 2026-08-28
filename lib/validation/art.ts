@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const campaignArtKindSchema = z.enum(["character", "npc", "faction", "job", "place"]);
+export const campaignArtKindSchema = z.enum(["character", "npc", "faction", "job", "place", "enemy"]);
 
 export const campaignArtPathSchema = z.string().trim().min(1).max(500).refine(
   (value) => value.split("/").length === 3 && !value.includes("..") && !value.includes("\\"),

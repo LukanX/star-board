@@ -96,7 +96,7 @@ describe("campaign NPC and faction server queries", () => {
       role: "player",
       displayName: "Pilot",
       npc: { ...npc, art_url: "signed-url" },
-      related: { place: null, jobs: [] },
+      related: { place: null, faction: null, jobs: [] },
     });
     expect(npcQuery.eq).toHaveBeenCalledWith("id", "npc-1");
     expect(npcQuery.eq).toHaveBeenCalledWith("campaign_id", "campaign-1");
@@ -118,6 +118,7 @@ describe("campaign NPC and faction server queries", () => {
 
     expect(result?.related).toEqual({
       place: { id: "place-1", name: "North Station", kind: "station" },
+      faction: null,
       jobs: [{ id: "job-1", title: "The Relay", status: "open" }],
     });
     expect(jobsQuery.eq).toHaveBeenCalledWith("campaign_id", "campaign-1");
@@ -171,6 +172,7 @@ describe("campaign NPC and faction server queries", () => {
 
     expect(result?.related).toEqual({
       place: { id: "place-1", name: "North Station", kind: "station" },
+      npcs: [],
       jobs: [{ id: "job-1", title: "The Relay", status: "open" }],
     });
     expect(jobsQuery.eq).toHaveBeenCalledWith("campaign_id", "campaign-1");

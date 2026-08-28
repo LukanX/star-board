@@ -39,7 +39,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "The completed image job has no image data." }, { status: 502 });
     }
 
-    const signedUrl = await createCampaignArtSignedUrl(context.supabase, run.image_path);
+    const signedUrl = run.target_kind === "enemy"
+      ? await createCampaignArtSignedUrl(context.supabase, run.image_path, 3600, true)
+      : await createCampaignArtSignedUrl(context.supabase, run.image_path);
 
     return NextResponse.json({
       job: {

@@ -58,6 +58,8 @@ describe("PlacePreview", () => {
     expect(markup).toContain("The door is trapped.");
     expect(markup).toContain('href="/campaigns/campaign-1/places/place-1"');
     expect(markup).toContain("OPEN FULL RECORD");
+    expect(markup).toContain('data-archive-preview-action="true"');
+    expect(markup.indexOf('data-archive-preview-action="true"')).toBeLessThan(markup.indexOf('data-place-preview-copy="true"'));
   });
 
   it("omits private Place notes for players", () => {
@@ -95,7 +97,7 @@ describe("PlacePreview", () => {
 });
 
 describe("NpcPreview and FactionPreview", () => {
-  it("renders NPC and Faction previews with canonical full-record links", () => {
+  it("renders NPC and Faction previews with common responsive artwork blocks", () => {
     const npcMarkup = renderToStaticMarkup(
       <DirtyFormProvider>
         <NpcPreview
@@ -111,6 +113,7 @@ describe("NpcPreview and FactionPreview", () => {
             description: "Keeps the signal alive.",
             player_notes_markdown: "Trusted.",
             place_id: null,
+            faction_id: null,
             gm_notes_markdown: "Watch the airlock.",
             art_subject: null,
             art_path: null,
@@ -133,6 +136,7 @@ describe("NpcPreview and FactionPreview", () => {
             name: "The Accord",
             description: "Independent brokers.",
             status: "active",
+            player_notes_markdown: "",
             place_id: null,
             art_subject: null,
             art_path: null,
@@ -146,8 +150,18 @@ describe("NpcPreview and FactionPreview", () => {
     );
 
     expect(npcMarkup).toContain('href="/campaigns/campaign-1/npcs/npc-1"');
+    expect(npcMarkup).toContain('data-archive-preview-action="true"');
+    expect(npcMarkup.indexOf('data-archive-preview-action="true"')).toBeLessThan(npcMarkup.indexOf('data-npc-preview-art="true"'));
+    expect(npcMarkup).toContain('data-npc-preview-art="true"');
+    expect(npcMarkup).toContain("w-[min(100%,320px)]");
+    expect(npcMarkup).toContain("aspect-square");
     expect(npcMarkup).toContain("Watch the airlock.");
     expect(factionMarkup).toContain('href="/campaigns/campaign-1/factions/faction-1"');
+    expect(factionMarkup).toContain('data-archive-preview-action="true"');
+    expect(factionMarkup.indexOf('data-archive-preview-action="true"')).toBeLessThan(factionMarkup.indexOf('data-faction-preview-art="true"'));
+    expect(factionMarkup).toContain('data-faction-preview-art="true"');
+    expect(factionMarkup).toContain("w-[min(100%,320px)]");
+    expect(factionMarkup).toContain("aspect-square");
     expect(factionMarkup).toContain("Independent brokers.");
   });
 });

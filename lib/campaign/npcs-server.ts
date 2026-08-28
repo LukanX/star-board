@@ -1,5 +1,6 @@
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import type { CampaignAffiliationContext } from "@/lib/campaign/affiliations-server";
 import type { NpcRelatedRecords, RelatedJobSummary, RelatedPlaceSummary } from "@/lib/campaign/detail-types";
 import type { CampaignPlacesContext } from "@/lib/campaign/places-server";
 import type { ApiPlace } from "@/lib/campaign/types";
@@ -19,7 +20,7 @@ export type CampaignNpcResult = {
   related: NpcRelatedRecords;
 };
 
-const npcColumns = "id, author_id, name, species, role, description, player_notes_markdown, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const npcColumns = "id, author_id, name, species, role, description, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 function toPlaceSummary(place: Pick<ApiPlace, "id" | "name" | "kind">): RelatedPlaceSummary {
   return { id: place.id, name: place.name, kind: place.kind };
@@ -31,6 +32,7 @@ async function getNpcRelatedRecords(
   npcId: string,
   places: CampaignPlacesContext["places"],
   placeId: string | null,
+  affiliations: CampaignAffiliationContext | null,
 ): Promise<NpcRelatedRecords> {
   const { data, error } = await supabase
     .from("jobs")
@@ -46,6 +48,7 @@ async function getNpcRelatedRecords(
         ? toPlaceSummary(places.find((place) => place.id === placeId)!)
         : null
       : null,
+    faction: affiliations?.factions.find((faction) => faction.id === (affiliations.npcs.find((npc) => npc.id === npcId)?.factionId ?? null)) ?? null,
     jobs: (data ?? []).map((job): RelatedJobSummary => ({
       id: job.id,
       title: job.title,
@@ -93,6 +96,7 @@ export async function getCampaignNpc(
   campaignId: string,
   npcId: string,
   placesResultPromise: Promise<CampaignPlacesContext | null>,
+  affiliationsResultPromise: Promise<CampaignAffiliationContext | null> = Promise.resolve(null),
 ): Promise<CampaignNpcResult | null> {
   const context = await getAuthenticatedUser();
   if (!context) return null;
@@ -126,11 +130,12 @@ export async function getCampaignNpc(
 
   const placesResult = await placesResultPromise;
   if (!placesResult) return null;
+  const affiliations = await affiliationsResultPromise;
 
   return {
     role: membership.role,
     displayName: membership.displayName,
     npc,
-    related: await getNpcRelatedRecords(context.supabase, campaignId, npcId, placesResult.places, npc.place_id),
+    related: await getNpcRelatedRecords(context.supabase, campaignId, npcId, placesResult.places, npc.place_id, affiliations),
   };
 }

@@ -1,9 +1,50 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { UserRound } from "lucide-react";
 import DirtyFormProvider from "@/components/campaign-shell/DirtyFormProvider";
 import { describe, expect, it } from "vitest";
 import ArchiveMasterDetail from "@/components/ui/ArchiveMasterDetail";
+import ArchivePreviewEmptyState from "@/components/ui/ArchivePreviewEmptyState";
 import ArchiveRecordShell from "@/components/ui/ArchiveRecordShell";
 import ArchiveRelatedList from "@/components/ui/ArchiveRelatedList";
+import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
+
+describe("ArchivePreviewEmptyState", () => {
+  it("renders a spacious centered placeholder with forwarded route hooks", () => {
+    const markup = renderToStaticMarkup(
+      <ArchivePreviewEmptyState
+        data-npc-detail="true"
+        icon={UserRound}
+        eyebrow="ROUTE-OWNED CONTACT FILES"
+        title="Choose a contact from the roster."
+        message="Select a record to inspect its public brief."
+      />,
+    );
+
+    expect(markup).toContain('data-archive-preview-empty="true"');
+    expect(markup).toContain('data-npc-detail="true"');
+    expect(markup).toContain("ROUTE-OWNED CONTACT FILES");
+    expect(markup).toContain("Choose a contact from the roster.");
+    expect(markup).toContain("min-h-[430px]");
+    expect(markup).toContain("place-items-center");
+    expect(markup).toContain("max-[760px]:min-h-[360px]");
+    expect(markup).toContain("max-w-[340px]");
+  });
+
+  it("maps the threat accent to pink", () => {
+    const markup = renderToStaticMarkup(
+      <ArchivePreviewEmptyState
+        accent="pink"
+        icon={UserRound}
+        eyebrow="ROUTE-OWNED THREAT FILES"
+        title="Choose an enemy from the roster."
+        message="Select a record to inspect its revealed brief."
+      />,
+    );
+
+    expect(markup).toContain("text-[var(--pink)]");
+    expect(markup).toContain("border-[rgba(255,92,154,.35)]");
+  });
+});
 
 describe("ArchiveMasterDetail", () => {
   it("renders stable selector and preview panels with the selected preview", () => {
@@ -97,5 +138,27 @@ describe("ArchiveRelatedList", () => {
     expect(populated).toContain('href="/campaigns/campaign-1/jobs/job-1"');
     expect(populated).toContain("The Relay");
     expect(empty).toContain("No jobs assigned.");
+  });
+});
+
+describe("RecordActions", () => {
+  it("renders labeled edit and delete actions with shared icon and danger treatments", () => {
+    const markup = renderToStaticMarkup(
+      <div>
+        <RecordEditAction recordName="North Station" />
+        <RecordDeleteAction recordName="North Station" />
+        <RecordDeleteAction disabled recordName="North Station" />
+      </div>,
+    );
+
+    expect(markup).toContain("EDIT");
+    expect(markup).toContain("DELETE");
+    expect(markup).toContain("DELETING...");
+    expect(markup).toContain('aria-label="Edit North Station"');
+    expect(markup).toContain('aria-label="Delete North Station"');
+    expect(markup).toContain("text-[var(--pink)]");
+    expect(markup).toContain("disabled");
+    expect(markup).toContain("lucide-pencil");
+    expect(markup).toContain("lucide-trash-2");
   });
 });

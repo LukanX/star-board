@@ -9,6 +9,8 @@ type ArchiveFixture = {
   npcName: string;
   factionId: string;
   factionName: string;
+  factionPublicNotes: string;
+  factionPrivateNotes: string;
   placePrivateNotes: string;
   npcPrivateNotes: string;
 };
@@ -18,6 +20,8 @@ async function createArchiveFixture(page: Page, campaignId: string): Promise<Arc
   const placeName = `Archive Route Place ${timestamp}`;
   const npcName = `Archive Route NPC ${timestamp}`;
   const factionName = `Archive Route Faction ${timestamp}`;
+  const factionPublicNotes = `Public faction notes ${timestamp}`;
+  const factionPrivateNotes = `Faction private note ${timestamp}`;
   const placePrivateNotes = `Place private note ${timestamp}`;
   const npcPrivateNotes = `NPC private note ${timestamp}`;
   const baseUrl = page.url();
@@ -87,6 +91,18 @@ async function createArchiveFixture(page: Page, campaignId: string): Promise<Arc
   const factionId = factionPayload.faction?.id;
   expect(factionId).toBeTruthy();
 
+  const factionUpdateResponse = await page.request.patch(
+    new URL(`/api/campaigns/${campaignId}/factions/${factionId}`, baseUrl).toString(),
+    {
+      data: {
+        playerNotesMarkdown: factionPublicNotes,
+        gmNotesMarkdown: factionPrivateNotes,
+        memberNpcIds: [npcId],
+      },
+    },
+  );
+  expect(factionUpdateResponse.ok()).toBeTruthy();
+
   return {
     placeId: placeId!,
     placeName,
@@ -94,6 +110,8 @@ async function createArchiveFixture(page: Page, campaignId: string): Promise<Arc
     npcName,
     factionId: factionId!,
     factionName,
+    factionPublicNotes,
+    factionPrivateNotes,
     placePrivateNotes,
     npcPrivateNotes,
   };
@@ -116,6 +134,7 @@ test("selects archive records locally and opens canonical full records", async (
   page,
   campaign,
 }) => {
+  test.setTimeout(60000);
   let fixture: ArchiveFixture | null = null;
 
   try {
@@ -146,8 +165,10 @@ test("selects archive records locally and opens canonical full records", async (
     for (const record of archiveRoutes) {
       await page.goto(`/campaigns/${campaign.campaignId}/${record.section}`);
       const sectionUrl = page.url();
+      await expect(page.locator("[data-archive-preview-empty]")).toBeVisible();
       await page.getByRole("button", { name: `Select ${record.name}`, exact: true }).click();
       await expect(page).toHaveURL(sectionUrl);
+      await expect(page.locator("[data-archive-preview-empty]")).toHaveCount(0);
       await expect(page.locator(record.preview)).toContainText(record.name);
 
       await page.locator(record.preview).getByRole("link", { name: "OPEN FULL RECORD", exact: true }).click();
@@ -222,6 +243,14 @@ test("hides private Place and NPC notes from players on full records", async ({
     );
     await expect(playerPage.getByText(`Public NPC notes`, { exact: false })).toBeVisible();
     await expect(playerPage.getByText(fixture.npcPrivateNotes, { exact: false })).toHaveCount(0);
+    await expect(playerPage.getByText(fixture.factionName, { exact: false })).toBeVisible();
+
+    await playerPage.goto(
+      `/campaigns/${campaign.campaignId}/factions/${fixture.factionId}`,
+    );
+    await expect(playerPage.getByText(fixture.factionPublicNotes, { exact: false })).toBeVisible();
+    await expect(playerPage.getByText(fixture.factionPrivateNotes, { exact: false })).toHaveCount(0);
+    await expect(playerPage.getByText(fixture.npcName, { exact: false })).toBeVisible();
   } finally {
     await playerContext.close();
     if (fixture) await deleteArchiveFixture(page, campaign.campaignId, fixture);

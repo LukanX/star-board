@@ -1,5 +1,6 @@
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import type { CampaignAffiliationContext } from "@/lib/campaign/affiliations-server";
 import type { FactionRelatedRecords, RelatedJobSummary, RelatedPlaceSummary } from "@/lib/campaign/detail-types";
 import type { CampaignPlacesContext } from "@/lib/campaign/places-server";
 import type { ApiPlace } from "@/lib/campaign/types";
@@ -19,7 +20,7 @@ export type CampaignFactionResult = {
   related: FactionRelatedRecords;
 };
 
-const factionColumns = "id, author_id, name, description, status, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const factionColumns = "id, author_id, name, description, status, player_notes_markdown, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 function toPlaceSummary(place: Pick<ApiPlace, "id" | "name" | "kind">): RelatedPlaceSummary {
   return { id: place.id, name: place.name, kind: place.kind };
@@ -31,6 +32,7 @@ async function getFactionRelatedRecords(
   factionId: string,
   places: CampaignPlacesContext["places"],
   placeId: string | null,
+  affiliations: CampaignAffiliationContext | null,
 ): Promise<FactionRelatedRecords> {
   const { data, error } = await supabase
     .from("jobs")
@@ -46,6 +48,9 @@ async function getFactionRelatedRecords(
         ? toPlaceSummary(places.find((place) => place.id === placeId)!)
         : null
       : null,
+    npcs: (affiliations?.npcs ?? [])
+      .filter((npc) => npc.factionId === factionId)
+      .map(({ id, name, species, role }) => ({ id, name, species, role })),
     jobs: (data ?? []).map((job): RelatedJobSummary => ({
       id: job.id,
       title: job.title,
@@ -69,14 +74,31 @@ export async function getCampaignFactions(campaignId: string): Promise<CampaignF
 
   if (error) throw new Error(`Unable to read campaign factions: ${error.message}`);
 
-  const factions = await addCampaignArtUrls(context.supabase, data ?? []);
-  return { role: membership.role, displayName: membership.displayName, factions };
+  const factionsWithArt = await addCampaignArtUrls(context.supabase, data ?? []);
+  if (membership.role !== "gm") {
+    return { role: membership.role, displayName: membership.displayName, factions: factionsWithArt };
+  }
+
+  const factionIds = (data ?? []).map((faction) => faction.id);
+  const { data: notes, error: notesError } = factionIds.length
+    ? await context.supabase.from("faction_gm_notes").select("faction_id, body_markdown").in("faction_id", factionIds)
+    : { data: [], error: null };
+
+  if (notesError) throw new Error(`Unable to read faction private notes: ${notesError.message}`);
+
+  const notesByFaction = new Map((notes ?? []).map((note) => [note.faction_id, note.body_markdown]));
+  return {
+    role: membership.role,
+    displayName: membership.displayName,
+    factions: factionsWithArt.map((faction) => ({ ...faction, gm_notes_markdown: notesByFaction.get(faction.id) ?? "" })),
+  };
 }
 
 export async function getCampaignFaction(
   campaignId: string,
   factionId: string,
   placesResultPromise: Promise<CampaignPlacesContext | null>,
+  affiliationsResultPromise: Promise<CampaignAffiliationContext | null> = Promise.resolve(null),
 ): Promise<CampaignFactionResult | null> {
   const context = await getAuthenticatedUser();
   if (!context) return null;
@@ -94,14 +116,27 @@ export async function getCampaignFaction(
   if (error) throw new Error(`Unable to read campaign faction: ${error.message}`);
   if (!data) return null;
 
-  const [faction] = await addCampaignArtUrls(context.supabase, [data]);
+  const [factionWithArt] = await addCampaignArtUrls(context.supabase, [data]);
+  let faction: ApiFaction = factionWithArt;
+  if (membership.role === "gm") {
+    const { data: notes, error: notesError } = await context.supabase
+      .from("faction_gm_notes")
+      .select("body_markdown")
+      .eq("faction_id", factionId)
+      .maybeSingle();
+
+    if (notesError) throw new Error(`Unable to read faction private notes: ${notesError.message}`);
+    faction = { ...factionWithArt, gm_notes_markdown: notes?.body_markdown ?? "" };
+  }
+
   const placesResult = await placesResultPromise;
   if (!placesResult) return null;
+  const affiliations = await affiliationsResultPromise;
 
   return {
     role: membership.role,
     displayName: membership.displayName,
     faction,
-    related: await getFactionRelatedRecords(context.supabase, campaignId, factionId, placesResult.places, faction.place_id),
+    related: await getFactionRelatedRecords(context.supabase, campaignId, factionId, placesResult.places, faction.place_id, affiliations),
   };
 }

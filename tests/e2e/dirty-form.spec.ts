@@ -204,7 +204,7 @@ test("keeps place artwork frames in route-owned utilities", async ({ page, campa
     await page.getByRole("button", { name: "ADD ROOT PLACE", exact: true }).click();
     await page.getByLabel("Name").fill(placeName);
     const saveResponsePromise = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith(`/api/campaigns/${campaign.campaignId}/places`));
-    await page.getByRole("button", { name: "ADD PLACE", exact: true }).click();
+    await page.getByRole("button", { name: "SAVE PLACE", exact: true }).click();
     const saveResponse = await saveResponsePromise;
     expect(saveResponse.ok()).toBeTruthy();
     const savePayload = (await saveResponse.json()) as { place?: { id?: string } };
@@ -358,7 +358,7 @@ test("keeps place search results in route-owned utilities", async ({ page, campa
     await page.getByRole("button", { name: "ADD ROOT PLACE", exact: true }).click();
     await page.getByLabel("Name").fill(placeName);
     const saveResponsePromise = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith(`/api/campaigns/${campaign.campaignId}/places`));
-    await page.getByRole("button", { name: "ADD PLACE", exact: true }).click();
+    await page.getByRole("button", { name: "SAVE PLACE", exact: true }).click();
     const saveResponse = await saveResponsePromise;
     expect(saveResponse.ok()).toBeTruthy();
     const savePayload = (await saveResponse.json()) as { place?: { id?: string } };
@@ -429,7 +429,7 @@ test("renders shared form errors with utility styling", async ({ page, campaign 
   await page.goto(`/campaigns/${campaign.campaignId}/places`);
   await page.getByRole("button", { name: "ADD ROOT PLACE" }).click();
   await page.getByLabel("Name").fill("Failed Place");
-  await page.getByRole("button", { name: "ADD PLACE", exact: true }).click();
+  await page.getByRole("button", { name: "SAVE PLACE", exact: true }).click();
 
   const error = page.getByRole("alert").filter({ hasText: "Place could not be saved." });
   await expect(error).toHaveClass(/m-0/);
@@ -450,12 +450,12 @@ test("renders danger actions with utility styling", async ({ page, campaign }) =
     await page.getByRole("button", { name: "ADD NOTE", exact: true }).first().click();
     await page.getByLabel("Title").fill(title);
     const saveResponsePromise = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes(`/api/campaigns/${campaign.campaignId}/notes`));
-    await page.locator("form.character-form").getByRole("button", { name: "ADD NOTE", exact: true }).click();
+    await page.locator("form.character-form").getByRole("button", { name: "SAVE NOTE", exact: true }).click();
     const saveResponse = await saveResponsePromise;
     const savePayload = (await saveResponse.json()) as { note?: { id?: string } };
     createdNoteId = savePayload.note?.id ?? null;
     await page.getByRole("link", { name: `Open note ${title}` }).click();
-    await page.getByRole("button", { name: "EDIT NOTE", exact: true }).click();
+    await page.getByRole("button", { name: `Edit ${title}`, exact: true }).click();
 
     const removeButton = page.getByRole("button", { name: "REMOVE", exact: true });
     await expect(removeButton).toHaveClass(/!border-\[rgba\(255,92,154,\.42\)\]/);

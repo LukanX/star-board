@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import VisualAsset from "@/components/ui/VisualAsset";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
@@ -8,9 +9,11 @@ import { campaignSectionPath } from "@/lib/campaign/routes";
 export default function CharacterPublicRecord({
   campaignId,
   character,
+  actions,
 }: {
   campaignId: string;
   character: Character;
+  actions?: ReactNode;
 }) {
   return (
     <section
@@ -38,6 +41,7 @@ export default function CharacterPublicRecord({
               .join(" ")}
           </p>
         </div>
+        {actions ? <div className="ml-auto flex items-center gap-2 max-[420px]:gap-1">{actions}</div> : null}
       </div>
       <div
         data-character-public-portrait

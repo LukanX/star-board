@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { CirclePlus, LockKeyhole, Sparkles, Trash2, X } from "lucide-react";
+import { LockKeyhole, Save, Sparkles, Trash2, X } from "lucide-react";
 import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
 import {
   markCampaignArtPersisted,
@@ -102,6 +102,7 @@ export default function PlaceEditor({
   useCampaignArtEditor({
     campaignId,
     kind: "place",
+    parentPlaceId: draft.parentPlaceId,
     value: draft.artPath,
     trackUnsavedUploads: true,
     url: draft.artUrl,
@@ -373,8 +374,8 @@ export default function PlaceEditor({
             disabled={isSaving}
             type="submit"
           >
-            <CirclePlus size={15} />{" "}
-            {isSaving ? "SAVING..." : place ? "SAVE CHANGES" : "ADD PLACE"}
+            <Save size={15} />{" "}
+            {isSaving ? "SAVING..." : "SAVE PLACE"}
           </button>
           {place ? (
             <button

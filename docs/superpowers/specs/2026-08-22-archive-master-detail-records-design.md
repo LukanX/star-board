@@ -7,7 +7,7 @@
 
 Restore the earlier fast Place-selection interaction as a shared archive pattern for Places, NPCs, and Factions. Each section list keeps its canonical section URL while a selected record fills a right-hand summary panel. An explicit action opens the existing canonical entity URL, where a structurally consistent full record shows all campaign-facing fields and the related records supported by current database relationships.
 
-The implementation preserves the recent App Router refactor: list previews are intentionally local UI state, while standalone detail routes remain refreshable, shareable, and browser-history-aware. No schema, RLS policy, or dependency change is required.
+The implementation preserves the recent App Router refactor: list previews are intentionally local UI state, while standalone detail routes remain refreshable, shareable, and browser-history-aware. Factions include public and GM-only notes, and NPCs have an optional campaign-scoped faction affiliation backed by RLS and atomic roster RPCs.
 
 ## Goals
 
@@ -25,7 +25,7 @@ The implementation preserves the recent App Router refactor: list previews are i
 - Do not make a preview independently shareable or restore it after refresh.
 - Do not put preview selections in browser history or a query string.
 - Do not replace existing entity detail URLs.
-- Do not add many-to-many relationships, new columns, migrations, or RLS policies.
+- Do not add unrelated many-to-many relationships, migrations, or RLS policies beyond the faction notes and optional NPC affiliation required by this feature.
 - Do not expose record IDs, timestamps, author IDs, AI prompts, AI providers, or other system/provenance metadata.
 - Do not add inline editing or deletion to summary previews.
 - Do not redesign Jobs, Episodes, Characters, Notes, or other archive sections.
@@ -49,7 +49,7 @@ The preview is for rapid scanning, not exhaustive reading or mutation. It contai
 - a clamped role-visible notes excerpt where the domain has notes;
 - the canonical full-record action.
 
-For GM users, a preview may include an explicit private-note excerpt for Places and NPCs, but private content must remain visually distinct and must never be rendered for players. Factions currently have no player-note or GM-note fields, so their preview does not invent a notes section.
+For GM users, a preview may include an explicit private-note excerpt for Places, NPCs, and Factions, but private content must remain visually distinct and must never be rendered for players. Faction previews also show public player notes and the linked NPC roster.
 
 ### Full-record depth
 
@@ -57,7 +57,7 @@ Standalone detail pages contain all campaign-facing data currently stored for th
 
 - **Place:** art, name, kind, full hierarchy, description, player notes, GM-only notes, parent and child Places, and entities assigned to the Place.
 - **NPC:** portrait, name, species, role, primary Place, description, player notes, GM-only notes, and Jobs for which the NPC is the giver.
-- **Faction:** emblem or art, name, status, primary Place, description, and Jobs for which the Faction is the giver.
+- **Faction:** emblem or art, name, status, primary Place, description, player notes, GM-only notes, linked NPC roster, and Jobs for which the Faction is the giver.
 
 Empty fields use intentional record-specific copy rather than disappearing in a way that makes the record look incomplete. Empty related sections use concise empty messages.
 
@@ -142,7 +142,7 @@ The existing `PlacePublicRecord`, `NpcPublicRecord`, and `FactionPublicRecord` b
 
 List-page previews do not fetch after selection. All preview fields come from the section's initial server result.
 
-The NPC and Faction list and detail Server Component pages load Places in parallel with their own primary results and pass them into their route views. This replaces their current client-side `fetchCampaignPlaces` effect, prevents a location label from changing after first paint, supplies complete breadcrumbs, and gives their editors immediate Place options. Places already receive the complete Place collection needed for tree rendering, preview content, and breadcrumbs.
+The NPC and Faction list and detail Server Component pages load Places and campaign affiliation summaries in parallel with their own primary results and pass them into their route views. This replaces their current client-side `fetchCampaignPlaces` effect, prevents a location label from changing after first paint, supplies complete breadcrumbs, and gives their editors immediate Place and affiliation options. Places already receive the complete Place collection needed for tree rendering, preview content, and breadcrumbs. Affiliation summaries contain only campaign-scoped NPC and Faction identity fields and never include private notes or AI data.
 
 Each route view owns:
 
@@ -168,8 +168,10 @@ The supported relationships are:
 | Place | `jobs.place_id` | Jobs assigned to the Place |
 | Place | `episodes.place_id` | Episodes assigned to the Place |
 | NPC | `npcs.place_id` | Primary Place |
+| NPC | `npcs.faction_id` | Affiliated Faction |
 | NPC | `jobs.giver_npc_id` | Jobs given by the NPC |
 | Faction | `factions.place_id` | Primary Place |
+| Faction | `npcs.faction_id` | Assigned NPCs |
 | Faction | `jobs.giver_faction_id` | Jobs given by the Faction |
 
 Every related query is constrained by `campaign_id`, even where the foreign key already guarantees same-campaign integrity. It selects only the fields needed by the linked summary. The authenticated Supabase client and existing RLS policies remain the final authorization boundary.
@@ -221,8 +223,9 @@ The detailed result types name their relationship groups explicitly instead of r
 
 - All list and detail reads continue to require authenticated campaign membership.
 - All mutations continue to require GM authorization on the server and through RLS.
-- Place and NPC private notes are queried and rendered only for GMs.
-- Factions do not gain a private-notes concept.
+- Place, NPC, and Faction private notes are queried and rendered only for GMs.
+- Faction player notes are campaign-facing; faction GM notes remain in a separate GM-only table.
+- NPC faction assignments are campaign-scoped, and faction roster changes use atomic server-authorized operations.
 - Related records expose only campaign-facing summary fields.
 - Client selection state never becomes an authorization input.
 - Hidden controls do not replace server authorization.
@@ -253,7 +256,7 @@ Add tests for all three route views and shared shells that verify:
 - filtering does not silently clear the current preview;
 - a successfully created record becomes selected;
 - player previews never contain Place or NPC GM notes;
-- Faction preview and full record do not render invented notes sections.
+- Faction preview and full record render public/private notes and assigned NPCs with the same role boundary.
 
 ### Server-helper tests
 
@@ -301,7 +304,7 @@ npm run test:e2e
 git diff --check
 ```
 
-The RLS suite and migration validation are unnecessary because this design changes neither schema nor policy behavior. If implementation later requires either, stop and revise this design before adding database work.
+Because this feature changes schema and policy behavior, validate the forward migration and run the guarded local RLS suite after the application checks. Never point either command at a hosted Supabase project.
 
 ## Rollout Constraints
 
@@ -319,7 +322,7 @@ The RLS suite and migration validation are unnecessary because this design chang
 2. Record selection updates only local preview state and leaves the section URL unchanged.
 3. Every preview has an explicit canonical full-record link.
 4. Full records share the Place-derived visual hierarchy while retaining all domain-specific campaign-facing fields.
-5. Place and NPC private notes remain GM-only in previews and full records.
+5. Place, NPC, and Faction private notes remain GM-only in previews and full records; faction player notes remain visible to campaign members.
 6. Full records show all approved related records from existing foreign keys and no invented relationships.
 7. Empty, loading, not-found, error, pending, and permission states remain explicit.
 8. Keyboard selection, selected-state semantics, mobile focus transfer, reduced-motion behavior, and responsive wrapping are verified.

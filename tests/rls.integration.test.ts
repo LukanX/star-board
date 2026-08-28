@@ -19,6 +19,7 @@ const joinToken = "local-rls-join-token-with-more-than-20-chars";
 let gmClient: SupabaseClient;
 let playerClient: SupabaseClient;
 let campaignId: string;
+let secondaryCampaignId: string;
 let playerId: string;
 
 async function authenticate(email: string) {
@@ -80,6 +81,10 @@ describeLocal("local Supabase RLS boundaries", () => {
   afterAll(async () => {
     if (campaignId) {
       await gmClient.from("campaigns").delete().eq("id", campaignId);
+    }
+
+    if (secondaryCampaignId) {
+      await gmClient.from("campaigns").delete().eq("id", secondaryCampaignId);
     }
 
     await Promise.all([gmClient?.auth.signOut(), playerClient?.auth.signOut()]);
@@ -148,6 +153,103 @@ describeLocal("local Supabase RLS boundaries", () => {
 
     const unchanged = await gmClient.from("campaigns").select("description").eq("id", campaignId).single();
     expect(unchanged.data?.description).toContain("local RLS integration suite");
+  });
+
+  it("keeps unrevealed enemy details private and saves parent/detail rows atomically", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    const sourceHash = "a".repeat(64);
+    const sourceSnapshot = {
+      provider: "aon",
+      system: "Starfinder 2e",
+      externalId: 987654,
+      canonicalUrl: "https://2e.aonsrd.com/creatures/987654-rls-enemy",
+      sourceTitle: "RLS Enemy",
+      sourcePage: "Archives of Nethys",
+      rulesStatus: "current",
+      parserVersion: "aon-v1",
+      schemaVersion: 1,
+      retrievedAt: "2026-08-23T12:00:00.000Z",
+      contentHash: sourceHash,
+      parsedPayload: { name: "RLS Enemy", level: 3, size: "medium", rarity: "common", traits: ["humanoid"], family: null, statBlock: { schemaVersion: 1 } },
+    };
+    const details = {
+      level: 3,
+      size: "medium",
+      rarity: "common",
+      traits: ["humanoid"],
+      family: null,
+      statBlock: { schemaVersion: 1 },
+      gmNotesMarkdown: "The hidden patrol knows the access code.",
+      origin: "aon",
+      artSubject: null,
+      artPrompt: null,
+      artProvider: null,
+      sourceSnapshot,
+    };
+
+    const created = await gmClient.rpc("create_enemy_with_details", {
+      p_campaign_id: campaignId,
+      p_public: { name: "RLS Enemy", playerDescription: "A revealed patrol enemy.", isRevealed: false, artPath: null },
+      p_details: details,
+    });
+    expect(created.error).toBeNull();
+    expect(created.data).toBeTruthy();
+
+    const mismatchedUrlSnapshot = { ...sourceSnapshot, externalId: 987655 };
+    const mismatchedUrlCreate = await gmClient.rpc("create_enemy_with_details", {
+      p_campaign_id: campaignId,
+      p_public: { name: "RLS Enemy", playerDescription: "A mismatched source URL.", isRevealed: false, artPath: null },
+      p_details: { ...details, sourceSnapshot: mismatchedUrlSnapshot },
+    });
+    expect(mismatchedUrlCreate.error).not.toBeNull();
+
+    const hidden = await playerClient.from("enemies").select("id, name").eq("id", created.data);
+    expect(hidden.error).toBeNull();
+    expect(hidden.data).toEqual([]);
+
+    const hiddenDetails = await playerClient.from("enemy_details").select("enemy_id").eq("enemy_id", created.data);
+    expect(hiddenDetails.error).toBeNull();
+    expect(hiddenDetails.data).toEqual([]);
+
+    const blockedMutation = await playerClient.from("enemies").update({ name: "Player Cannot Rename Enemy" }).eq("id", created.data).select("id");
+    expect(blockedMutation.error).toBeNull();
+    expect(blockedMutation.data).toEqual([]);
+
+    const revealed = await gmClient.from("enemies").update({ is_revealed: true }).eq("id", created.data).select("id").single();
+    expect(revealed.error).toBeNull();
+
+    const visible = await playerClient.from("enemies").select("id, name, player_description, is_revealed").eq("id", created.data).single();
+    expect(visible.error).toBeNull();
+    expect(visible.data).toMatchObject({ id: created.data, name: "RLS Enemy", is_revealed: true });
+
+    const privateAfterReveal = await playerClient.from("enemy_details").select("enemy_id, gm_notes_markdown").eq("enemy_id", created.data);
+    expect(privateAfterReveal.error).toBeNull();
+    expect(privateAfterReveal.data).toEqual([]);
+
+    const duplicate = await gmClient.rpc("create_enemy_with_details", {
+      p_campaign_id: campaignId,
+      p_public: { name: "Duplicate RLS Enemy", playerDescription: "", isRevealed: false, artPath: null },
+      p_details: details,
+    });
+    expect(duplicate.error).not.toBeNull();
+
+    const failedAtomicCreate = await gmClient.rpc("create_enemy_with_details", {
+      p_campaign_id: campaignId,
+      p_public: { name: "Should Roll Back", playerDescription: "", isRevealed: false, artPath: null },
+      p_details: { ...details, statBlock: null },
+    });
+    expect(failedAtomicCreate.error).not.toBeNull();
+    const rolledBack = await gmClient.from("enemies").select("id").eq("campaign_id", campaignId).eq("name", "Should Roll Back");
+    expect(rolledBack.error).toBeNull();
+    expect(rolledBack.data).toEqual([]);
+
+    const gmDetail = await gmClient.from("enemy_details").select("gm_notes_markdown, stat_block").eq("enemy_id", created.data).single();
+    expect(gmDetail.error).toBeNull();
+    expect(gmDetail.data?.gm_notes_markdown).toContain("access code");
+    expect(gmDetail.data?.stat_block).toEqual({ schemaVersion: 1 });
+
+    const deleted = await gmClient.from("enemies").delete().eq("id", created.data).select("id").single();
+    expect(deleted.error).toBeNull();
   });
 
   it("allows both GMs and players to vote on open jobs", async () => {
@@ -270,10 +372,174 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(unlinkedNpc.data?.place_id).toBeNull();
   });
 
+  it("enforces faction note privacy, atomic rosters, campaign boundaries, and deletion cleanup", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    if (!gmUser) throw new Error("The local RLS GM session has no user.");
+
+    const firstNpc = await gmClient.from("npcs").insert({
+      campaign_id: campaignId,
+      author_id: gmUser.id,
+      name: "Faction Roster Contact One",
+    }).select("id, faction_id").single();
+    const secondNpc = await gmClient.from("npcs").insert({
+      campaign_id: campaignId,
+      author_id: gmUser.id,
+      name: "Faction Roster Contact Two",
+    }).select("id, faction_id").single();
+    expect(firstNpc.error).toBeNull();
+    expect(secondNpc.error).toBeNull();
+
+    const created = await gmClient.rpc("create_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_public: {
+        name: "RLS Faction One",
+        description: "A public faction record.",
+        status: "active",
+        playerNotesMarkdown: "Members know the public charter.",
+      },
+      p_details: { gmNotesMarkdown: "The faction is secretly compromised." },
+      p_member_npc_ids: [firstNpc.data?.id, secondNpc.data?.id],
+    });
+    expect(created.error).toBeNull();
+    expect(created.data).toBeTruthy();
+
+    const factionId = created.data as string;
+    const playerFaction = await playerClient.from("factions").select("id, player_notes_markdown").eq("id", factionId).single();
+    expect(playerFaction.error).toBeNull();
+    expect(playerFaction.data?.player_notes_markdown).toContain("public charter");
+
+    const playerRoster = await playerClient.from("npcs").select("id, faction_id").in("id", [firstNpc.data?.id, secondNpc.data?.id]);
+    expect(playerRoster.error).toBeNull();
+    expect(playerRoster.data?.every((npc) => npc.faction_id === factionId)).toBe(true);
+
+    const hiddenFactionNotes = await playerClient.from("faction_gm_notes").select("faction_id, body_markdown").eq("faction_id", factionId);
+    expect(hiddenFactionNotes.error).toBeNull();
+    expect(hiddenFactionNotes.data).toEqual([]);
+
+    const blockedFactionMutation = await playerClient.from("factions").update({ name: "Player Cannot Rename Faction" }).eq("id", factionId).select("id");
+    expect(blockedFactionMutation.error).toBeNull();
+    expect(blockedFactionMutation.data).toEqual([]);
+
+    const blockedPrivateNoteInsert = await playerClient.from("faction_gm_notes").insert({
+      faction_id: factionId,
+      body_markdown: "Player private note attempt.",
+      updated_by: playerId,
+    });
+    expect(blockedPrivateNoteInsert.error).not.toBeNull();
+
+    const blockedRpc = await playerClient.rpc("update_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_faction_id: factionId,
+      p_public: { name: "Player RPC Cannot Rename Faction" },
+      p_details: { gmNotesMarkdown: "Player RPC private note attempt." },
+      p_member_npc_ids: [],
+    });
+    expect(blockedRpc.error).not.toBeNull();
+
+    const visibleFactionNote = await gmClient.from("faction_gm_notes").select("body_markdown").eq("faction_id", factionId).single();
+    expect(visibleFactionNote.error).toBeNull();
+    expect(visibleFactionNote.data?.body_markdown).toContain("compromised");
+
+    const invalidNpcId = "00000000-0000-4000-8000-000000009999";
+    const failedAtomicCreate = await gmClient.rpc("create_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_public: { name: "RLS Atomic Rollback Faction" },
+      p_details: { gmNotesMarkdown: "This must roll back." },
+      p_member_npc_ids: [firstNpc.data?.id, invalidNpcId],
+    });
+    expect(failedAtomicCreate.error).not.toBeNull();
+
+    const rolledBackFaction = await gmClient.from("factions").select("id").eq("campaign_id", campaignId).eq("name", "RLS Atomic Rollback Faction");
+    expect(rolledBackFaction.error).toBeNull();
+    expect(rolledBackFaction.data).toEqual([]);
+
+    const secondaryCampaign = await gmClient.rpc("create_campaign", {
+      campaign_name: "RLS Faction Boundary Campaign",
+      campaign_description: "Used to verify faction campaign boundaries.",
+    });
+    expect(secondaryCampaign.error).toBeNull();
+    expect(secondaryCampaign.data).toBeTruthy();
+    secondaryCampaignId = secondaryCampaign.data as string;
+
+    const foreignNpc = await gmClient.from("npcs").insert({
+      campaign_id: secondaryCampaignId,
+      author_id: gmUser.id,
+      name: "Foreign Faction Contact",
+    }).select("id").single();
+    expect(foreignNpc.error).toBeNull();
+
+    const rejectedForeignRoster = await gmClient.rpc("update_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_faction_id: factionId,
+      p_public: {},
+      p_details: {},
+      p_member_npc_ids: [foreignNpc.data?.id],
+    });
+    expect(rejectedForeignRoster.error).not.toBeNull();
+
+    const unchangedRoster = await gmClient.from("npcs").select("id, faction_id").in("id", [firstNpc.data?.id, secondNpc.data?.id]);
+    expect(unchangedRoster.error).toBeNull();
+    expect(unchangedRoster.data?.every((npc) => npc.faction_id === factionId)).toBe(true);
+
+    const transferFaction = await gmClient.rpc("create_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_public: { name: "RLS Faction Two" },
+      p_details: {},
+      p_member_npc_ids: [],
+    });
+    expect(transferFaction.error).toBeNull();
+    expect(transferFaction.data).toBeTruthy();
+
+    const transferFactionId = transferFaction.data as string;
+    const transferred = await gmClient.rpc("update_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_faction_id: transferFactionId,
+      p_public: {},
+      p_details: {},
+      p_member_npc_ids: [firstNpc.data?.id],
+    });
+    expect(transferred.error).toBeNull();
+
+    const afterTransfer = await gmClient.from("npcs").select("id, faction_id").in("id", [firstNpc.data?.id, secondNpc.data?.id]);
+    expect(afterTransfer.error).toBeNull();
+    expect(afterTransfer.data).toEqual(expect.arrayContaining([
+      { id: firstNpc.data?.id, faction_id: transferFactionId },
+      { id: secondNpc.data?.id, faction_id: factionId },
+    ]));
+
+    const removed = await gmClient.rpc("update_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_faction_id: transferFactionId,
+      p_public: {},
+      p_details: {},
+      p_member_npc_ids: [],
+    });
+    expect(removed.error).toBeNull();
+    const afterRemoval = await gmClient.from("npcs").select("faction_id").eq("id", firstNpc.data?.id).single();
+    expect(afterRemoval.error).toBeNull();
+    expect(afterRemoval.data?.faction_id).toBeNull();
+
+    const reassignedBeforeDelete = await gmClient.rpc("update_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_faction_id: transferFactionId,
+      p_public: {},
+      p_details: {},
+      p_member_npc_ids: [firstNpc.data?.id],
+    });
+    expect(reassignedBeforeDelete.error).toBeNull();
+
+    const deletedFaction = await gmClient.from("factions").delete().eq("id", transferFactionId).select("id").single();
+    expect(deletedFaction.error).toBeNull();
+    const unlinkedAfterDelete = await gmClient.from("npcs").select("faction_id").eq("id", firstNpc.data?.id).single();
+    expect(unlinkedAfterDelete.error).toBeNull();
+    expect(unlinkedAfterDelete.data?.faction_id).toBeNull();
+  });
+
   it("enforces authenticated campaign-art ownership in Storage", async () => {
     const gmUser = (await gmClient.auth.getUser()).data.user;
     const blockedPath = `${campaignId}/${gmUser?.id}/player-upload-should-be-blocked.png`;
     const ownedPath = `${campaignId}/${playerId}/player-upload.png`;
+    const enemyPath = `${campaignId}/${playerId}/enemy-player-upload.png`;
     const image = new Blob(["local storage test"], { type: "image/png" });
 
     const blockedUpload = await playerClient.storage.from("campaign-art").upload(blockedPath, image, {
@@ -281,6 +547,12 @@ describeLocal("local Supabase RLS boundaries", () => {
       upsert: false,
     });
     expect(blockedUpload.error).not.toBeNull();
+
+    const blockedEnemyUpload = await playerClient.storage.from("campaign-art").upload(enemyPath, image, {
+      contentType: "image/png",
+      upsert: false,
+    });
+    expect(blockedEnemyUpload.error).not.toBeNull();
 
     try {
       const upload = await playerClient.storage.from("campaign-art").upload(ownedPath, image, {
@@ -295,6 +567,94 @@ describeLocal("local Supabase RLS boundaries", () => {
     } finally {
       const cleanup = await playerClient.storage.from("campaign-art").remove([ownedPath]);
       expect(cleanup.error).toBeNull();
+    }
+  });
+
+  it("keeps hidden enemy art private by exact reference and limits temporary AI art to its requesting GM", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    if (!gmUser) throw new Error("The local RLS GM session has no user.");
+
+    const hiddenPath = `${campaignId}/${gmUser.id}/custom-hidden-art.png`;
+    const temporaryPath = `${campaignId}/${gmUser.id}/image-local-rls-temporary.png`;
+    const image = new Blob(["private enemy art"], { type: "image/png" });
+    let enemyId: string | null = null;
+    let runId: string | null = null;
+
+    try {
+      const hiddenUpload = await gmClient.storage.from("campaign-art").upload(hiddenPath, image, {
+        contentType: "image/png",
+        upsert: false,
+      });
+      expect(hiddenUpload.error).toBeNull();
+
+      const created = await gmClient.rpc("create_enemy_with_details", {
+        p_campaign_id: campaignId,
+        p_public: {
+          name: "Exact Reference Hidden Enemy",
+          playerDescription: "A hidden enemy with private artwork.",
+          isRevealed: false,
+          artPath: hiddenPath,
+        },
+        p_details: {
+          level: 4,
+          size: "medium",
+          rarity: "common",
+          traits: ["aberration"],
+          family: null,
+          statBlock: { schemaVersion: 1 },
+          gmNotesMarkdown: "Keep the custom filename private.",
+          origin: "manual",
+          artSubject: null,
+          artPrompt: null,
+          artProvider: null,
+          sourceSnapshot: null,
+        },
+      });
+      expect(created.error).toBeNull();
+      expect(created.data).toBeTruthy();
+
+      enemyId = created.data;
+
+      const hiddenDownload = await playerClient.storage.from("campaign-art").download(hiddenPath);
+      expect(hiddenDownload.error).not.toBeNull();
+      const hiddenSigned = await playerClient.storage.from("campaign-art").createSignedUrl(hiddenPath, 60);
+      expect(hiddenSigned.error).not.toBeNull();
+
+      const revealed = await gmClient.from("enemies").update({ is_revealed: true }).eq("id", enemyId).select("id").single();
+      expect(revealed.error).toBeNull();
+
+      const visibleDownload = await playerClient.storage.from("campaign-art").download(hiddenPath);
+      expect(visibleDownload.error).toBeNull();
+      expect(await visibleDownload.data?.text()).toBe("private enemy art");
+
+      const temporaryUpload = await gmClient.storage.from("campaign-art").upload(temporaryPath, image, {
+        contentType: "image/png",
+        upsert: false,
+      });
+      expect(temporaryUpload.error).toBeNull();
+
+      const run = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        kind: "image",
+        mode: "create",
+        target_kind: "enemy",
+        status: "complete",
+        image_path: temporaryPath,
+        image_media_type: "image/png",
+      }).select("id").single();
+      expect(run.error).toBeNull();
+      expect(run.data?.id).toBeTruthy();
+      runId = run.data?.id ?? null;
+
+      const temporaryForPlayer = await playerClient.storage.from("campaign-art").download(temporaryPath);
+      expect(temporaryForPlayer.error).not.toBeNull();
+      const temporaryForGm = await gmClient.storage.from("campaign-art").download(temporaryPath);
+      expect(temporaryForGm.error).toBeNull();
+    } finally {
+      if (runId) await gmClient.from("ai_generation_runs").delete().eq("id", runId);
+      if (enemyId) await gmClient.from("enemies").delete().eq("id", enemyId);
+      await gmClient.storage.from("campaign-art").remove([hiddenPath, temporaryPath]);
     }
   });
 

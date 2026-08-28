@@ -13,7 +13,7 @@ import {
   type ImageSize,
 } from "@/lib/ai/image-options";
 
-type ArtKind = "character" | "npc" | "faction" | "job" | "place";
+type ArtKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
 
 type ImageDraft = {
   generationRunId: string;
@@ -57,6 +57,7 @@ type ImageAsset = {
 type AiArtStudioProps = {
   campaignId: string | null;
   kind: ArtKind;
+  parentPlaceId?: string | null;
   subject?: string;
   currentPrompt?: string | null;
   onSubjectChange?: (subject: string) => void;
@@ -171,7 +172,7 @@ async function removeTemporaryArt(
 export default function AiArtStudio(props: AiArtStudioProps) {
   return (
     <AiArtStudioContent
-      key={`${props.campaignId ?? "none"}:${props.kind}`}
+      key={`${props.campaignId ?? "none"}:${props.kind}:${props.parentPlaceId ?? "root"}`}
       {...props}
     />
   );
@@ -180,6 +181,7 @@ export default function AiArtStudio(props: AiArtStudioProps) {
 function AiArtStudioContent({
   campaignId,
   kind,
+  parentPlaceId,
   subject,
   currentPrompt,
   onSubjectChange,
@@ -245,6 +247,7 @@ function AiArtStudioContent({
           campaignId,
           mode,
           targetKind: kind,
+          parentPlaceId: parentPlaceId ?? undefined,
           model: selectedModel ?? undefined,
           subject: subjectDraft,
           aspectRatio,

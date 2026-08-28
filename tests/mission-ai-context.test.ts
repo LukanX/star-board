@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { loadMissionAiReferences } from "@/lib/ai/assistance";
-import { buildMissionPrompt } from "@/lib/ai/prompts";
-import { missionGenerationInputSchema } from "@/lib/validation/ai";
+import { buildFactionPrompt, buildMissionPrompt } from "@/lib/ai/prompts";
+import { factionGenerationInputSchema, missionGenerationInputSchema } from "@/lib/validation/ai";
 
 type QueryResult = { data: unknown; error: unknown };
 
@@ -86,5 +86,25 @@ describe("mission AI references", () => {
     expect(prompt).toContain("Giver GM notes: Venn is covering up a sabotage.");
     expect(prompt).toContain("Location hierarchy: Asterion (planet) > Night Market (district) > The Blue Door (room)");
     expect(prompt).toContain("Use the selected mission giver and location as authoritative campaign context.");
+  });
+
+  it("keeps faction AI drafts on note channels without adding an NPC roster", () => {
+    const input = factionGenerationInputSchema.parse({
+      campaignId,
+      mode: "refine",
+      currentDraft: {
+        name: "The Accord",
+        playerNotes: "The brokers keep the lanes open.",
+        gmNotes: "The relief arm is an intelligence cover.",
+        memberNpcIds: [npcId],
+      },
+    });
+    const prompt = buildFactionPrompt(input, campaign);
+
+    expect(prompt).toContain('"playerNotes":"The brokers keep the lanes open."');
+    expect(prompt).toContain('"gmNotes":"The relief arm is an intelligence cover."');
+    expect(prompt).toContain("Write player notes without spoilers and put secrets, leverage, and future reveals in gmNotes.");
+    expect(prompt).toContain("Fields: name, status, description, playerNotes, gmNotes, visualPrompt.");
+    expect(prompt).not.toContain(npcId);
   });
 });

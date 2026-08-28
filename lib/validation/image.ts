@@ -6,17 +6,21 @@ export const imagePromptMaxLength = 3000;
 export const imageGenerationInputSchema = z.object({
   campaignId: z.string().uuid(),
   mode: z.enum(["create", "refine"]),
-  targetKind: z.enum(["character", "npc", "faction", "job", "place"]),
+  targetKind: z.enum(["character", "npc", "faction", "job", "place", "enemy"]),
   model: z.string().trim().min(1).max(160).optional(),
   subject: z.string().trim().min(1).max(1200),
+  parentPlaceId: z.string().uuid().nullable().optional(),
   aspectRatio: z.enum(imageAspectRatioValues).default(defaultImageAspectRatio),
   size: z.enum(imageSizeValues).default(defaultImageSize),
   campaignStyle: z.string().trim().max(600).optional(),
   refinement: z.string().trim().max(600).optional(),
   currentPrompt: z.string().trim().max(imagePromptMaxLength).optional(),
-}).superRefine(({ aspectRatio, size }, context) => {
+}).superRefine(({ aspectRatio, size, targetKind, parentPlaceId }, context) => {
   if (!imageSizeOptions[aspectRatio].some((option) => option.value === size)) {
     context.addIssue({ code: "custom", path: ["size"], message: `Size ${size} does not match aspect ratio ${aspectRatio}.` });
+  }
+  if (targetKind !== "place" && parentPlaceId) {
+    context.addIssue({ code: "custom", path: ["parentPlaceId"], message: "Parent context is only valid for Place artwork." });
   }
 });
 
@@ -36,7 +40,7 @@ export type ImageBackgroundJob = z.infer<typeof imageBackgroundJobSchema>;
 
 export const imageDraftSchema = z.object({
   generationRunId: z.string().uuid(),
-  targetKind: z.enum(["character", "npc", "faction", "job", "place"]),
+  targetKind: z.enum(["character", "npc", "faction", "job", "place", "enemy"]),
   mode: z.enum(["create", "refine"]),
   subject: z.string().trim().min(1).max(1200),
   aspectRatio: z.enum(imageAspectRatioValues),

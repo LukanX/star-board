@@ -17,6 +17,19 @@ const validDraft = {
   createdAt: "2026-08-03T12:34:56.000Z",
 };
 
+const placeContext = {
+  hierarchy: [
+    { name: "Asterion", kind: "planet" },
+    { name: "Night Market", kind: "district" },
+  ],
+  parent: {
+    name: "Night Market",
+    kind: "district",
+    description: "A crowded district beneath the orbital ring.",
+    playerNotes: "Public parent notes.",
+  },
+};
+
 describe("image generation schemas", () => {
   it("accepts a reviewed draft with a canonical UTC timestamp", () => {
     expect(imageDraftSchema.safeParse(validDraft).success).toBe(true);
@@ -90,6 +103,27 @@ describe("image generation schemas", () => {
     expect(imageDraftSchema.safeParse({ ...validDraft, targetKind: "place" }).success).toBe(true);
   });
 
+  it("accepts a parent reference only for Place artwork", () => {
+    const placeInput = imageGenerationInputSchema.safeParse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      mode: "create",
+      targetKind: "place",
+      parentPlaceId: "00000000-0000-4000-8000-000000000002",
+      subject: "A hidden transit room",
+    });
+    const npcInput = imageGenerationInputSchema.safeParse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      mode: "create",
+      targetKind: "npc",
+      parentPlaceId: "00000000-0000-4000-8000-000000000002",
+      subject: "A masked station broker",
+    });
+
+    expect(placeInput.success).toBe(true);
+    expect(npcInput.success).toBe(false);
+    if (!npcInput.success) expect(npcInput.error.flatten().fieldErrors.parentPlaceId).toContain("Parent context is only valid for Place artwork.");
+  });
+
   it("accepts a full previously generated prompt for refinement", () => {
     const result = imageGenerationInputSchema.safeParse({
       campaignId: "00000000-0000-4000-8000-000000000001",
@@ -115,12 +149,44 @@ describe("image generation schemas", () => {
     expect(prompt).toContain("Subject: A pilot with a cracked visor");
   });
 
+  it("includes bounded parent context while keeping the child subject visible", () => {
+    const prompt = buildArtPrompt(
+      "A hidden transit room",
+      "A broad campaign style brief.",
+      undefined,
+      undefined,
+      "place",
+      {
+        ...placeContext,
+        parent: {
+          ...placeContext.parent,
+          description: "d".repeat(4000),
+          playerNotes: "n".repeat(2400),
+        },
+      },
+    );
+
+    expect(prompt.length).toBeLessThanOrEqual(imagePromptMaxLength);
+    expect(prompt).toContain("Place hierarchy: Asterion (planet) > Night Market (district)");
+    expect(prompt).toContain("Immediate parent description:");
+    expect(prompt).toContain("Immediate parent player notes:");
+    expect(prompt).toContain("keep the child place as the focal subject");
+    expect(prompt).toContain("Subject: A hidden transit room");
+  });
+
   it("directs faction artwork toward a standalone symbol or logo", () => {
     const prompt = buildArtPrompt("The Glass Meridian", undefined, undefined, undefined, "faction");
 
     expect(prompt).toContain("only one standalone faction symbol or logo");
     expect(prompt).toContain("Do not create characters");
     expect(prompt).not.toContain("no logos");
+  });
+
+  it("directs enemy artwork toward one readable creature subject", () => {
+    const prompt = buildArtPrompt("A plated void predator", undefined, undefined, undefined, "enemy");
+
+    expect(prompt).toContain("one readable creature");
+    expect(prompt).toContain("Do not create a group");
   });
 
   it("accepts Places as a campaign artwork target", () => {

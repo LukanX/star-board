@@ -40,10 +40,12 @@ export type PlaceRelatedRecords = {
 
 export type NpcRelatedRecords = {
   place: RelatedPlaceSummary | null;
+  faction: RelatedFactionSummary | null;
   jobs: RelatedJobSummary[];
 };
 
 export type FactionRelatedRecords = {
   place: RelatedPlaceSummary | null;
+  npcs: RelatedNpcSummary[];
   jobs: RelatedJobSummary[];
 };

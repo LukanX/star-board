@@ -1,10 +1,10 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowLeft,
   CalendarClock,
   FileText,
   LockKeyhole,
-  Pencil,
 } from "lucide-react";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
@@ -20,12 +20,12 @@ export default function NotePublicRecord({
   campaignId,
   note,
   episode,
-  onEdit,
+  actions,
 }: {
   campaignId: string;
   note: ApiCampaignNote;
   episode?: CampaignNoteEpisode;
-  onEdit?: () => void;
+  actions?: ReactNode;
 }) {
   const visibilityLabel = note.visibility === "gm" ? "GM NOTE" : "PLAYER NOTE";
 
@@ -66,15 +66,18 @@ export default function NotePublicRecord({
             )}
           </div>
         </div>
-        <span className={recordDetailMetaClassName}>
-          {note.visibility === "gm" ? (
-            <>
-              <LockKeyhole size={12} /> GM ONLY
-            </>
-          ) : (
-            "PLAYER VISIBLE"
-          )}
-        </span>
+        <div className="ml-auto flex items-center gap-2 max-[420px]:gap-1">
+          {actions}
+          <span className={recordDetailMetaClassName}>
+            {note.visibility === "gm" ? (
+              <>
+                <LockKeyhole size={12} /> GM ONLY
+              </>
+            ) : (
+              "PLAYER VISIBLE"
+            )}
+          </span>
+        </div>
       </div>
       <MarkdownPreview>
         <MarkdownPreviewToolbar>
@@ -85,17 +88,6 @@ export default function NotePublicRecord({
           source={note.body_markdown || "No note body recorded yet."}
         />
       </MarkdownPreview>
-      {note.permissions.canEdit && onEdit ? (
-        <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap">
-          <button
-            className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px bg-[rgba(255,255,255,.035)] text-[var(--muted)] hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]"
-            onClick={onEdit}
-            type="button"
-          >
-            <Pencil size={14} /> EDIT NOTE
-          </button>
-        </div>
-      ) : null}
     </section>
   );
 }

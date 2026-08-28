@@ -82,7 +82,7 @@ describe("structured AI assistance routes", () => {
   });
 
   it("returns a validated faction draft and records metadata", async () => {
-    const draft = { name: "The Glass Meridian", status: "active", description: "A trade consortium with a public relief arm.", visualPrompt: "A fractured glass compass over a star chart." };
+    const draft = { name: "The Glass Meridian", status: "active", description: "A trade consortium with a public relief arm.", playerNotes: "They offer safe passage to crews who keep their word.", gmNotes: "The relief arm is a cover for a quiet intelligence network.", visualPrompt: "A fractured glass compass over a star chart." };
     mocks.generateJson.mockResolvedValue({ data: draft, model: "openrouter/fallback", generationId: "text-run-1", usage: { inputTokens: 12, outputTokens: 34, cost: 0.001 } });
 
     const response = await generateFaction(request({ ...baseInput, focus: "Make it useful as a mission giver." }));

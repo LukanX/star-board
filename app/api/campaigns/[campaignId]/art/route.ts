@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
-import { createCampaignArtSignedUrl, campaignArtBucket, removeCampaignArtIfUnreferenced, validateCampaignArtPath } from "@/lib/storage/campaign-art";
+import { campaignArtBucket, createCampaignArtSignedUrl, createCampaignArtSignedUrlForCampaign, removeCampaignArtIfUnreferenced, validateCampaignArtPath } from "@/lib/storage/campaign-art";
 import { campaignArtKindSchema, campaignArtMaxBytes, campaignArtMimeTypes } from "@/lib/validation/art";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
@@ -29,8 +29,8 @@ export async function GET(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Campaign membership is required." }, { status: 403 });
     }
 
-    const signedUrl = await createCampaignArtSignedUrl(context.supabase, path);
-    return NextResponse.json({ path, signedUrl, expiresIn: 3600 });
+    const signed = await createCampaignArtSignedUrlForCampaign(context.supabase, campaignId, path);
+    return NextResponse.json({ path, signedUrl: signed.signedUrl, expiresIn: signed.expiresIn });
   } catch {
     return NextResponse.json({ error: "Campaign art could not be signed." }, { status: 404 });
   }
@@ -64,6 +64,10 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     if (!(file instanceof File) || !kind.success) {
       return NextResponse.json({ error: "An image file and art kind are required." }, { status: 400 });
+    }
+
+    if (kind.data === "enemy" && membership.role !== "gm") {
+      return NextResponse.json({ error: "GM access is required for enemy artwork." }, { status: 403 });
     }
 
     const extension = campaignArtMimeTypes[file.type as keyof typeof campaignArtMimeTypes];
