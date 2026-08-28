@@ -95,8 +95,10 @@ async function fetchDiscovery(capability: AiCapability, sort: AiModelSort) {
 
   if (!env.OPENROUTER_API_KEY) throw new Error("OpenRouter is not configured.");
 
-  const query = new URLSearchParams({ output_modalities: capability === "image" ? "image" : "text", sort });
-  const endpoint = `${openRouterBaseUrl}/models?${query.toString()}`;
+  const query = new URLSearchParams(capability === "image" ? { sort } : { output_modalities: "text", sort });
+  const endpoint = capability === "image"
+    ? `${openRouterBaseUrl}/images/models?${query.toString()}`
+    : `${openRouterBaseUrl}/models?${query.toString()}`;
   const headers: Record<string, string> = { Authorization: `Bearer ${env.OPENROUTER_API_KEY}` };
   if (env.OPENROUTER_SITE_URL) headers["HTTP-Referer"] = env.OPENROUTER_SITE_URL;
   if (env.OPENROUTER_APP_NAME) headers["X-Title"] = env.OPENROUTER_APP_NAME;

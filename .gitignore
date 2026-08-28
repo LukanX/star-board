@@ -51,5 +51,9 @@ next-env.d.ts
 # Local Netlify folder
 /.netlify
 
+# Local Netlify function build artifacts
+/netlify/functions/*.zip
+/netlify/functions/manifest.json
+
 # Superpowers
 /.superpowers

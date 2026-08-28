@@ -1,19 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { enemyStatBlockSchema } from "@/lib/validation/enemy";
 
-const mocks = vi.hoisted(() => ({
-  getAuthenticatedUser: vi.fn(),
-  createCampaignArtSignedUrl: vi.fn(),
-}));
+const mocks = vi.hoisted(() => ({ getAuthenticatedUser: vi.fn() }));
 
 vi.mock("@/lib/auth/permissions", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
-vi.mock("@/lib/storage/campaign-art", () => ({ createCampaignArtSignedUrl: mocks.createCampaignArtSignedUrl }));
 
-import { GET } from "@/app/api/ai/image/[generationRunId]/route";
+import { GET } from "@/app/api/ai/enemy/[generationRunId]/route";
 
 const generationRunId = "00000000-0000-4000-8000-000000000003";
-const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
-const imagePath = `${campaignId}/${userId}/image-${generationRunId}.png`;
+
+const draft = {
+  name: "Void Stalker",
+  playerDescription: "A patient predator that hunts along the hull.",
+  level: 5,
+  size: "medium" as const,
+  rarity: "common" as const,
+  traits: ["aberration"],
+  family: null,
+  statBlock: {
+    ...enemyStatBlockSchema.parse({ schemaVersion: 1 }),
+    defenses: {
+      ...enemyStatBlockSchema.parse({ schemaVersion: 1 }).defenses,
+      armorClass: 22,
+      hitPoints: [{ label: "HP", value: 80, notes: "" }],
+    },
+  },
+  gmNotesMarkdown: "It avoids bright light.",
+  artSubject: "A void stalker on a starship hull.",
+};
 
 function createSupabaseMock(run: Record<string, unknown> | null, error: Error | null = null) {
   const query = {
@@ -30,7 +45,7 @@ function params() {
   return { params: Promise.resolve({ generationRunId }) };
 }
 
-describe("GET /api/ai/image/[generationRunId]", () => {
+describe("GET /api/ai/enemy/[generationRunId]", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("requires authentication", async () => {
@@ -41,9 +56,9 @@ describe("GET /api/ai/image/[generationRunId]", () => {
     expect(response.status).toBe(401);
   });
 
-  it("reports a pending job without signing an image", async () => {
+  it("reports a pending job without returning a draft", async () => {
     const statusUpdatedAt = new Date(Date.now() - 1000).toISOString();
-    const supabase = createSupabaseMock({ id: generationRunId, status: "pending", status_updated_at: statusUpdatedAt });
+    const supabase = createSupabaseMock({ id: generationRunId, status: "pending", status_updated_at: statusUpdatedAt, draft: null });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
 
     const response = await GET(new Request("http://localhost"), params());
@@ -52,22 +67,6 @@ describe("GET /api/ai/image/[generationRunId]", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(payload).toEqual({ job: { generationRunId, status: "pending", statusUpdatedAt } });
-    expect(mocks.createCampaignArtSignedUrl).not.toHaveBeenCalled();
-  });
-
-  it("turns an expired pending job into a terminal failure", async () => {
-    const supabase = createSupabaseMock({ id: generationRunId, status: "pending", status_updated_at: "2020-01-01T00:00:00.000Z" });
-    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
-
-    const response = await GET(new Request("http://localhost"), params());
-    const payload = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(payload).toEqual({
-      job: { generationRunId, status: "failed" },
-      error: expect.stringContaining("background worker did not start"),
-    });
-    expect(mocks.createCampaignArtSignedUrl).not.toHaveBeenCalled();
   });
 
   it("turns an expired running job into a terminal failure", async () => {
@@ -84,7 +83,7 @@ describe("GET /api/ai/image/[generationRunId]", () => {
     });
   });
 
-  it("returns a safe failure status", async () => {
+  it("returns a safe terminal failure", async () => {
     const supabase = createSupabaseMock({ id: generationRunId, status: "failed", error_message: "Provider unavailable" });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
 
@@ -95,32 +94,42 @@ describe("GET /api/ai/image/[generationRunId]", () => {
     expect(payload).toEqual({ job: { generationRunId, status: "failed" }, error: "Provider unavailable" });
   });
 
-  it("signs the private generated image only after completion", async () => {
+  it("returns only a validated draft after completion", async () => {
     const supabase = createSupabaseMock({
       id: generationRunId,
-      campaign_id: campaignId,
-      requested_by: userId,
-      kind: "image",
-      mode: "refine",
-      target_kind: "npc",
-      aspect_ratio: "16:9",
-      size: "3840x2160",
-      model: "openai/gpt-image-1",
-      effective_model: "openai/gpt-image-1",
-      image_path: imagePath,
-      image_media_type: "image/png",
-      created_at: "2026-08-13T12:34:56+00:00",
-      status_updated_at: "2026-08-13T12:34:56+00:00",
+      kind: "enemy",
+      mode: "create",
+      model: "openai/gpt-4o-mini",
+      effective_model: "openrouter/fallback",
+      created_at: "2026-08-27T12:00:00.000Z",
+      status_updated_at: "2026-08-27T12:01:00.000Z",
       status: "complete",
+      draft,
     });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
-    mocks.createCampaignArtSignedUrl.mockResolvedValue("https://storage.example/generated.png");
 
     const response = await GET(new Request("http://localhost"), params());
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mocks.createCampaignArtSignedUrl).toHaveBeenCalledWith(supabase, imagePath);
-    expect(payload.job).toMatchObject({ generationRunId, status: "complete", targetKind: "npc", mode: "refine", temporaryPath: imagePath, image: { base64: null, url: "https://storage.example/generated.png", mediaType: "image/png" } });
+    expect(payload.job).toEqual({
+      generationRunId,
+      status: "complete",
+      mode: "create",
+      model: "openrouter/fallback",
+      createdAt: "2026-08-27T12:00:00.000Z",
+      statusUpdatedAt: "2026-08-27T12:01:00.000Z",
+      draft,
+    });
+  });
+
+  it("rejects a completed run with an invalid persisted draft", async () => {
+    const supabase = createSupabaseMock({ id: generationRunId, status: "complete", draft: { name: "Incomplete" } });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await GET(new Request("http://localhost"), params());
+
+    expect(response.status).toBe(502);
+    expect((await response.json()).error).toContain("no valid draft");
   });
 });

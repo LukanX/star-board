@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Sparkles, UploadCloud, X } from "lucide-react";
 import AiModelPicker from "@/components/archive/AiModelPicker";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import { waitForImageBackgroundJob, type ImageBackgroundJob, type ImageDraft } from "@/lib/ai/image-job-polling";
+import { imageGenerationRequestTimeoutMs } from "@/lib/ai/image-job-lifecycle";
 import {
   defaultImageAspectRatio,
   defaultImageSize,
@@ -14,38 +16,6 @@ import {
 } from "@/lib/ai/image-options";
 
 type ArtKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
-
-type ImageDraft = {
-  generationRunId: string;
-  targetKind: ArtKind;
-  mode: "create" | "refine";
-  subject: string;
-  aspectRatio: ImageAspectRatio;
-  size: ImageSize;
-  prompt: string;
-  provider: "openrouter";
-  model: string;
-  image: {
-    base64: string | null;
-    url: string | null;
-    mediaType: "image/png" | "image/jpeg" | "image/webp";
-  };
-  createdAt: string;
-  temporaryPath?: string;
-};
-
-type ImageBackgroundJob = {
-  generationRunId: string;
-  status: "pending" | "running";
-  targetKind: ArtKind;
-  mode: "create" | "refine";
-  subject: string;
-  aspectRatio: ImageAspectRatio;
-  size: ImageSize;
-  prompt: string;
-  model: string;
-  createdAt: string;
-};
 
 type ImageAsset = {
   path: string;
@@ -92,72 +62,6 @@ function formatImageValidationIssues(
   );
 }
 
-function wait(milliseconds: number) {
-  return new Promise<void>((resolve) =>
-    window.setTimeout(resolve, milliseconds),
-  );
-}
-
-async function waitForImageBackgroundJob(
-  job: ImageBackgroundJob,
-): Promise<ImageDraft> {
-  for (let attempt = 0; attempt < 360; attempt += 1) {
-    await wait(attempt === 0 ? 750 : 2500);
-
-    const response = await fetch(
-      `/api/ai/image/${encodeURIComponent(job.generationRunId)}`,
-    );
-    const result = (await response.json()) as {
-      error?: string;
-      job?: {
-        status: "pending" | "running" | "complete" | "failed";
-        model?: string;
-        createdAt?: string;
-        temporaryPath?: string;
-        image?: ImageDraft["image"];
-      };
-    };
-
-    if (!response.ok) {
-      if (response.status >= 500) continue;
-      throw new Error(
-        result.error ?? "The image generation job could not be read.",
-      );
-    }
-
-    if (result.job?.status === "failed") {
-      throw new Error(
-        result.error ?? "The image draft could not be generated.",
-      );
-    }
-
-    if (
-      result.job?.status === "complete" &&
-      result.job.image?.url &&
-      result.job.createdAt
-    ) {
-      return {
-        generationRunId: job.generationRunId,
-        targetKind: job.targetKind,
-        mode: job.mode,
-        subject: job.subject,
-        aspectRatio: job.aspectRatio,
-        size: job.size,
-        prompt: job.prompt,
-        provider: "openrouter",
-        model: result.job.model ?? job.model,
-        image: result.job.image,
-        createdAt: result.job.createdAt,
-        temporaryPath: result.job.temporaryPath,
-      };
-    }
-  }
-
-  throw new Error(
-    "Image generation is taking longer than expected. Check the art studio again shortly.",
-  );
-}
-
 async function removeTemporaryArt(
   campaignId: string,
   path: string | undefined,
@@ -199,9 +103,14 @@ function AiArtStudioContent({
   const [isApproving, setIsApproving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const activeGenerationRef = useRef<AbortController | null>(null);
 
   const subjectDraft = onSubjectChange ? (subject ?? "") : localSubjectDraft;
   const availableSizes = imageSizeOptions[aspectRatio];
+
+  useEffect(() => {
+    return () => activeGenerationRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (!isPreviewOpen) return;
@@ -239,10 +148,19 @@ function AiArtStudioContent({
 
     setIsGenerating(true);
     setError(null);
+    activeGenerationRef.current?.abort();
+    const generationController = new AbortController();
+    let generationRequestTimedOut = false;
+    const generationRequestTimeoutId = window.setTimeout(() => {
+      generationRequestTimedOut = true;
+      generationController.abort();
+    }, imageGenerationRequestTimeoutMs);
+    activeGenerationRef.current = generationController;
     try {
       const response = await fetch("/api/ai/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: generationController.signal,
         body: JSON.stringify({
           campaignId,
           mode,
@@ -263,9 +181,10 @@ function AiArtStudioContent({
         draft?: ImageDraft;
         job?: ImageBackgroundJob;
       };
+      window.clearTimeout(generationRequestTimeoutId);
 
       if (response.status === 202 && result.job) {
-        const nextDraft = await waitForImageBackgroundJob(result.job);
+        const nextDraft = await waitForImageBackgroundJob(result.job, { signal: generationController.signal });
         if (draft?.temporaryPath)
           void removeTemporaryArt(campaignId, draft.temporaryPath);
         setDraft(nextDraft);
@@ -287,13 +206,20 @@ function AiArtStudioContent({
 
       setDraft(result.draft);
     } catch (generationError: unknown) {
+      if (generationController.signal.aborted && !generationRequestTimedOut) return;
       setError(
-        generationError instanceof Error
+        generationRequestTimedOut
+          ? "The image generation request timed out. Check the art service and try again."
+          : generationError instanceof Error
           ? generationError.message
           : "The art draft could not be generated.",
       );
     } finally {
-      setIsGenerating(false);
+      if (activeGenerationRef.current === generationController) {
+        activeGenerationRef.current = null;
+        if (!generationController.signal.aborted || generationRequestTimedOut) setIsGenerating(false);
+      }
+      window.clearTimeout(generationRequestTimeoutId);
     }
   };
 

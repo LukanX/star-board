@@ -385,6 +385,14 @@ const enemyDraftFields = {
   artSubject: shortText(1600),
 };
 
+export const enemyBackgroundJobSchema = z.object({
+  generationRunId: z.string().uuid(),
+  prompt: z.string().trim().min(1).max(200000),
+  model: z.string().trim().min(1).max(160),
+});
+
+export type EnemyBackgroundJob = z.infer<typeof enemyBackgroundJobSchema>;
+
 export const enemyAiDraftSchema = z.object(enemyDraftFields).superRefine((draft, context) => {
   if (!draft.playerDescription.trim()) {
     context.addIssue({ code: "custom", path: ["playerDescription"], message: "AI drafts need a player-safe description." });
