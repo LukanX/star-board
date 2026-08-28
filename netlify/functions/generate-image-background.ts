@@ -60,20 +60,44 @@ async function failRun(supabase: ReturnType<typeof getSupabaseServiceRoleClient>
 }
 
 export default async function handler(request: Request) {
-  if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  logWorkerEvent("invoked", { method: request.method });
+  if (request.method !== "POST") {
+    logWorkerEvent("rejected", { reason: "method" });
+    return new Response("Method Not Allowed", { status: 405 });
+  }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
+    logWorkerEvent("rejected", { reason: "invalid_json" });
     return Response.json({ error: "Request body must be valid JSON." }, { status: 400 });
   }
 
   const input = parseImageBackgroundJob(body);
-  if (!input.success) return Response.json({ error: "Image background job is invalid." }, { status: 400 });
+  if (!input.success) {
+    logWorkerEvent("rejected", { reason: "invalid_job" });
+    return Response.json({ error: "Image background job is invalid." }, { status: 400 });
+  }
 
-  const env = getServerEnv();
-  if (!env.SUPABASE_SECRET_KEY || !verifyImageBackgroundSignature(input.data, request.headers.get("X-Star-Board-Image-Signature"), env.SUPABASE_SECRET_KEY)) {
+  let env: ReturnType<typeof getServerEnv>;
+  try {
+    env = getServerEnv();
+  } catch (error: unknown) {
+    logWorkerEvent("configuration_error", {
+      generationRunId: input.data.generationRunId,
+      message: error instanceof Error ? error.message : "invalid environment configuration",
+    });
+    return Response.json({ error: "Image background storage is not configured." }, { status: 503 });
+  }
+
+  const signature = request.headers.get("X-Star-Board-Image-Signature");
+  if (!env.SUPABASE_SECRET_KEY || !verifyImageBackgroundSignature(input.data, signature, env.SUPABASE_SECRET_KEY)) {
+    logWorkerEvent("rejected", {
+      generationRunId: input.data.generationRunId,
+      reason: env.SUPABASE_SECRET_KEY ? "invalid_signature" : "missing_secret",
+      hasSignature: Boolean(signature),
+    });
     return Response.json({ error: "Image background job is unauthorized." }, { status: 401 });
   }
 

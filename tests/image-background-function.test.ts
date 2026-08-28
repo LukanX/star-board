@@ -108,6 +108,40 @@ describe("generate-image-background", () => {
     expect(config).toEqual({ background: true });
   });
 
+  it("rejects malformed jobs before accessing provider storage", async () => {
+    const response = await handler(new Request("https://star-board.test/.netlify/functions/generate-image-background", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(mocks.getServerEnv).not.toHaveBeenCalled();
+    expect(mocks.getSupabaseServiceRoleClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects a job with an invalid dispatch signature", async () => {
+    const request = createRequest();
+    request.headers.set("X-Star-Board-Image-Signature", "0".repeat(64));
+
+    const response = await handler(request);
+
+    expect(response.status).toBe(401);
+    expect(mocks.getSupabaseServiceRoleClient).not.toHaveBeenCalled();
+  });
+
+  it("returns a bounded configuration failure when environment parsing fails", async () => {
+    mocks.getServerEnv.mockImplementation(() => {
+      throw new Error("Invalid environment configuration.");
+    });
+
+    const response = await handler(createRequest());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "Image background storage is not configured." });
+    expect(mocks.getSupabaseServiceRoleClient).not.toHaveBeenCalled();
+  });
+
   it("claims, generates, stores, and completes a job", async () => {
     const { supabase, claimQuery, completionQuery, upload } = createSupabaseMock();
     mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
