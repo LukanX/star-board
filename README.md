@@ -51,20 +51,23 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0021_faction_notes_and_npc_membership.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0022_ai_image_job_lifecycle.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
 
 ### Netlify image generation
 
-Netlify standard functions can time out while OpenRouter is rendering an image. The image route automatically queues generation on Netlify's background function and the art studio polls for the review draft. The background function is `generate-image-background` and can run for up to 15 minutes.
+Netlify standard functions can time out while OpenRouter is rendering an image. The image route automatically queues generation on Netlify's background function and the art studio polls for the review draft. The background function is `generate-image-background` and can run for up to 15 minutes. Jobs record `status_updated_at` and have bounded lifecycle deadlines: a worker must claim a pending job within four minutes, provider work has a 12-minute timeout, and running jobs expire after 14 minutes. The browser gives each status request a 10-second timeout and stops after repeated transient failures instead of spinning indefinitely.
 
 Set these server-only values in the Netlify site environment:
 
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: the Supabase project URL and publishable key, available to the Functions scope as well as the build.
 - `SUPABASE_SECRET_KEY`: the Supabase secret key. Never expose this as a `NEXT_PUBLIC_` variable.
 - `OPENROUTER_API_KEY`: the OpenRouter key used by the background worker.
 
-Netlify provides `NETLIFY=true` and `URL`; deployed requests always use the background path even if a stale `NETLIFY_IMAGE_GENERATION=sync` variable is present, and the worker is dispatched through Netlify's public `URL`. Set `NETLIFY_IMAGE_GENERATION=background` to force the queue mode in another deployment environment; leave it as `sync` for local synchronous testing. Apply migration `0012_async_image_generation.sql` before using the deployed art studio.
+These values must be available to the Netlify Functions scope, not only to the build environment. Changing a function variable requires a new deploy. The deploy summary should list exactly one `generate-image-background` function with background invocation mode. Worker logs and the matching `ai_generation_runs` row distinguish a job that was never claimed (`pending`), a provider or storage failure (`failed`), and a completed review draft (`complete`).
+
+Netlify provides `NETLIFY=true` and `URL`; deployed requests always use the background path even if a stale `NETLIFY_IMAGE_GENERATION=sync` variable is present, and the worker is dispatched through Netlify's public `URL`. Set `NETLIFY_IMAGE_GENERATION=background` to force the queue mode in another deployment environment; leave it as `sync` for local synchronous testing. Apply migrations `0012_async_image_generation.sql` and `0022_ai_image_job_lifecycle.sql` before using the deployed art studio.
 
 The migrations create campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, a private `campaign-art` storage bucket, the genre-neutral Places archive, the campaign-scoped Enemies archive, faction player/GM notes, and optional campaign-scoped NPC faction membership. Places form an arbitrary-depth tree through `parent_place_id`; sibling names are unique within a campaign, cycles are rejected in PostgreSQL, deleting a parent promotes children to roots, and deleting a Place clears primary-place links on NPCs, factions, jobs, and episodes. Enemy mechanics, source provenance, and GM notes remain in GM-only detail rows; unrevealed enemy artwork is blocked from player Storage reads by an exact `enemies.art_path` reference and reveal check rather than a filename convention. Unattached background-generated image objects remain private to their requesting GM and are removed during retention when they are no longer referenced. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
 

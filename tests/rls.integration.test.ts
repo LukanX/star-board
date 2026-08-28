@@ -642,9 +642,10 @@ describeLocal("local Supabase RLS boundaries", () => {
         status: "complete",
         image_path: temporaryPath,
         image_media_type: "image/png",
-      }).select("id").single();
+      }).select("id, status_updated_at").single();
       expect(run.error).toBeNull();
       expect(run.data?.id).toBeTruthy();
+      expect(run.data?.status_updated_at).toBeTruthy();
       runId = run.data?.id ?? null;
 
       const temporaryForPlayer = await playerClient.storage.from("campaign-art").download(temporaryPath);

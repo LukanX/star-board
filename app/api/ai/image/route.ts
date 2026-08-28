@@ -111,7 +111,7 @@ export async function POST(request: Request) {
           size: input.data.size,
           status: "pending",
         })
-        .select("id, created_at")
+        .select("id, created_at, status_updated_at")
         .single();
 
       if (generationRunError || !generationRun) {
@@ -129,7 +129,11 @@ export async function POST(request: Request) {
       try {
         await dispatchImageBackgroundJob(process.env.URL ?? env.NEXT_PUBLIC_APP_URL ?? request.url, job, env.SUPABASE_SECRET_KEY);
       } catch {
-        await context.supabase.from("ai_generation_runs").update({ status: "failed", error_message: "The image background worker could not be reached." }).eq("id", generationRun.id);
+        await context.supabase.from("ai_generation_runs").update({
+          status: "failed",
+          status_updated_at: new Date().toISOString(),
+          error_message: "The image background worker could not be reached.",
+        }).eq("id", generationRun.id);
         return NextResponse.json({ error: "Image generation could not be started. Check the Netlify background function deployment." }, { status: 503 });
       }
 
@@ -144,6 +148,7 @@ export async function POST(request: Request) {
           size: input.data.size,
           prompt,
           createdAt: new Date(generationRun.created_at).toISOString(),
+          statusUpdatedAt: new Date(generationRun.status_updated_at ?? generationRun.created_at).toISOString(),
           model: selectedModel.id,
         },
         prompt,

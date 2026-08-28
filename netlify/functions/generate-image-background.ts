@@ -1,5 +1,6 @@
 import { generateImage } from "../../lib/ai/client";
 import { getAiProviderFailure, logAiProviderFailure } from "../../lib/ai/errors";
+import { imageJobPendingTimeoutMs, imageJobProviderTimeoutMs } from "../../lib/ai/image-job-lifecycle";
 import { parseImageBackgroundJob, verifyImageBackgroundSignature } from "../../lib/ai/image-jobs";
 import { getServerEnv } from "../../lib/env";
 import { campaignArtBucket } from "../../lib/storage/campaign-art";
@@ -41,9 +42,21 @@ async function getStoredImage(image: Awaited<ReturnType<typeof generateImage>>["
   return { body: await response.blob(), mediaType };
 }
 
+function logWorkerEvent(event: string, fields: Record<string, unknown> = {}) {
+  console.info(JSON.stringify({ event: `ai_image_worker_${event}`, ...fields }));
+}
+
 async function failRun(supabase: ReturnType<typeof getSupabaseServiceRoleClient>, generationRunId: string, error: unknown) {
   const message = getAiProviderFailure(error, "Art generation is temporarily unavailable.").message;
-  await supabase.from("ai_generation_runs").update({ status: "failed", error_message: truncate(message, 500) }).eq("id", generationRunId);
+  const { error: updateError } = await supabase.from("ai_generation_runs").update({
+    status: "failed",
+    status_updated_at: new Date().toISOString(),
+    error_message: truncate(message, 500),
+  }).eq("id", generationRunId).eq("status", "running");
+
+  if (updateError) {
+    logWorkerEvent("failure_update_error", { generationRunId, message: updateError.message });
+  }
 }
 
 export default async function handler(request: Request) {
@@ -64,26 +77,42 @@ export default async function handler(request: Request) {
     return Response.json({ error: "Image background job is unauthorized." }, { status: 401 });
   }
 
+  logWorkerEvent("received", { generationRunId: input.data.generationRunId, model: input.data.model });
+
   let supabase: ReturnType<typeof getSupabaseServiceRoleClient>;
   try {
     supabase = getSupabaseServiceRoleClient();
-  } catch {
+  } catch (error: unknown) {
+    logWorkerEvent("configuration_error", {
+      generationRunId: input.data.generationRunId,
+      message: error instanceof Error ? error.message : "unknown configuration error",
+    });
     return Response.json({ error: "Image background storage is not configured." }, { status: 503 });
   }
 
   const { data: claimedRun, error: claimError } = await supabase
     .from("ai_generation_runs")
-    .update({ status: "running", error_message: null })
+    .update({ status: "running", status_updated_at: new Date().toISOString(), error_message: null })
     .eq("id", input.data.generationRunId)
     .eq("status", "pending")
+    .gte("status_updated_at", new Date(Date.now() - imageJobPendingTimeoutMs).toISOString())
     .select("id, campaign_id, requested_by")
     .maybeSingle();
 
-  if (claimError) return Response.json({ error: "Image background job could not be claimed." }, { status: 503 });
-  if (!claimedRun) return new Response(null, { status: 202 });
+  if (claimError) {
+    logWorkerEvent("claim_error", { generationRunId: input.data.generationRunId, message: claimError.message });
+    throw new Error("Image background job could not be claimed.");
+  }
+  if (!claimedRun) {
+    logWorkerEvent("skipped", { generationRunId: input.data.generationRunId });
+    return new Response(null, { status: 202 });
+  }
+
+  const startedAt = Date.now();
+  logWorkerEvent("claimed", { generationRunId: claimedRun.id, model: input.data.model });
 
   try {
-    const response = await generateImage(input.data.prompt, input.data.model, { aspectRatio: input.data.aspectRatio, size: input.data.size, timeoutMs: 14 * 60 * 1000 });
+    const response = await generateImage(input.data.prompt, input.data.model, { aspectRatio: input.data.aspectRatio, size: input.data.size, timeoutMs: imageJobProviderTimeoutMs });
     const storedImage = await getStoredImage(response.image);
     const path = `${claimedRun.campaign_id}/${claimedRun.requested_by}/image-${claimedRun.id}.${imageMediaTypes[storedImage.mediaType]}`;
     const { error: uploadError } = await supabase.storage.from(campaignArtBucket).upload(path, storedImage.body, {
@@ -94,8 +123,9 @@ export default async function handler(request: Request) {
 
     if (uploadError) throw new Error("The generated image could not be stored.");
 
-    const { error: completeError } = await supabase.from("ai_generation_runs").update({
+    const { data: completedRun, error: completeError } = await supabase.from("ai_generation_runs").update({
       status: "complete",
+      status_updated_at: new Date().toISOString(),
       effective_model: response.model,
       generation_id: response.generationId,
       input_tokens: response.usage?.inputTokens,
@@ -104,16 +134,26 @@ export default async function handler(request: Request) {
       image_path: path,
       image_media_type: storedImage.mediaType,
       error_message: null,
-    }).eq("id", claimedRun.id);
+    }).eq("id", claimedRun.id).eq("status", "running").select("id").maybeSingle();
 
     if (completeError) {
       await supabase.storage.from(campaignArtBucket).remove([path]);
       throw new Error("Image generation metadata could not be saved.");
     }
+
+    if (!completedRun) {
+      await supabase.storage.from(campaignArtBucket).remove([path]);
+      logWorkerEvent("completion_skipped", { generationRunId: claimedRun.id, durationMs: Date.now() - startedAt });
+    } else {
+      logWorkerEvent("completed", { generationRunId: claimedRun.id, durationMs: Date.now() - startedAt });
+    }
   } catch (error: unknown) {
     logAiProviderFailure(error, { kind: "image", campaignId: claimedRun.campaign_id, userId: claimedRun.requested_by, model: input.data.model });
     await failRun(supabase, claimedRun.id, error);
+    logWorkerEvent("failed", { generationRunId: claimedRun.id, durationMs: Date.now() - startedAt });
   }
 
   return new Response(null, { status: 202 });
 }
+
+export const config = { background: true };

@@ -68,12 +68,19 @@ function createSupabaseMock() {
   };
   generationInsert.insert.mockReturnValue(generationInsert);
   generationInsert.select.mockReturnValue(generationInsert);
+  const generationUpdate = {
+    update: vi.fn(),
+    eq: vi.fn().mockResolvedValue({ error: null }),
+  };
+  generationUpdate.update.mockReturnValue(generationUpdate);
 
   return {
     from: vi.fn()
       .mockReturnValueOnce(campaignQuery)
-      .mockReturnValueOnce(generationInsert),
+      .mockReturnValueOnce(generationInsert)
+      .mockReturnValue(generationUpdate),
     generationInsert,
+    generationUpdate,
   };
 }
 
@@ -192,6 +199,7 @@ describe("POST /api/ai/image", () => {
       expect(payload.prompt).toEqual(expect.any(String));
       expect(mocks.generateImage).not.toHaveBeenCalled();
       expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith("https://star-board.netlify.app", expect.objectContaining({ generationRunId: payload.job.generationRunId, model: "openai/gpt-image-1" }), "worker-secret");
+      expect(payload.job.statusUpdatedAt).toBe("2026-08-03T12:34:56.000Z");
     } finally {
       if (previousSiteUrl === undefined) delete process.env.URL;
       else process.env.URL = previousSiteUrl;
@@ -279,6 +287,26 @@ describe("POST /api/ai/image", () => {
       if (previousNetlifyFlag === undefined) delete process.env.NETLIFY;
       else process.env.NETLIFY = previousNetlifyFlag;
     }
+  });
+
+  it("closes the queued run when the background worker cannot be reached", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.dispatchImageBackgroundJob.mockRejectedValueOnce(new Error("worker unavailable"));
+
+    const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(payload.error).toContain("could not be started");
+    expect(supabase.generationUpdate.update).toHaveBeenCalledWith({
+      status: "failed",
+      status_updated_at: expect.any(String),
+      error_message: "The image background worker could not be reached.",
+    });
   });
 
   it("surfaces provider rate limits instead of masking them as an application failure", async () => {

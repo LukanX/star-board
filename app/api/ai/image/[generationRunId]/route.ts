@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
+import { getImageJobStaleMessage } from "@/lib/ai/image-job-lifecycle";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
 import { createCampaignArtSignedUrl } from "@/lib/storage/campaign-art";
 
 type RouteContext = { params: Promise<{ generationRunId: string }> };
 
 export const runtime = "nodejs";
+
+function noStoreJson(body: unknown, init?: ResponseInit) {
+  const response = NextResponse.json(body, init);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { generationRunId } = await params;
@@ -13,37 +20,43 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const context = await getAuthenticatedUser();
 
     if (!context) {
-      return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
+      return noStoreJson({ error: "Authentication is required." }, { status: 401 });
     }
 
     const { data: run, error } = await context.supabase
       .from("ai_generation_runs")
-      .select("id, campaign_id, requested_by, kind, mode, target_kind, aspect_ratio, size, model, effective_model, image_path, image_media_type, created_at, status, error_message")
+      .select("id, campaign_id, requested_by, kind, mode, target_kind, aspect_ratio, size, model, effective_model, image_path, image_media_type, created_at, status, status_updated_at, error_message")
       .eq("id", generationRunId)
       .eq("kind", "image")
       .maybeSingle();
 
     if (error || !run) {
-      return NextResponse.json({ error: "Image generation job was not found." }, { status: 404 });
+      return noStoreJson({ error: "Image generation job was not found." }, { status: 404 });
     }
 
     if (run.status === "pending" || run.status === "running") {
-      return NextResponse.json({ job: { generationRunId: run.id, status: run.status } });
+      const statusUpdatedAt = run.status_updated_at ?? run.created_at;
+      const staleMessage = getImageJobStaleMessage(run.status, statusUpdatedAt);
+      if (staleMessage) {
+        return noStoreJson({ job: { generationRunId: run.id, status: "failed" }, error: staleMessage });
+      }
+
+      return noStoreJson({ job: { generationRunId: run.id, status: run.status, statusUpdatedAt } });
     }
 
     if (run.status === "failed") {
-      return NextResponse.json({ job: { generationRunId: run.id, status: run.status }, error: run.error_message ?? "Art generation is temporarily unavailable." });
+      return noStoreJson({ job: { generationRunId: run.id, status: run.status }, error: run.error_message ?? "Art generation is temporarily unavailable." });
     }
 
     if (!run.image_path || !run.image_media_type) {
-      return NextResponse.json({ error: "The completed image job has no image data." }, { status: 502 });
+      return noStoreJson({ error: "The completed image job has no image data." }, { status: 502 });
     }
 
     const signedUrl = run.target_kind === "enemy"
       ? await createCampaignArtSignedUrl(context.supabase, run.image_path, 3600, true)
       : await createCampaignArtSignedUrl(context.supabase, run.image_path);
 
-    return NextResponse.json({
+    return noStoreJson({
       job: {
         generationRunId: run.id,
         status: "complete",
@@ -58,6 +71,6 @@ export async function GET(_request: Request, { params }: RouteContext) {
       },
     });
   } catch {
-    return NextResponse.json({ error: "Image generation status is unavailable." }, { status: 503 });
+    return noStoreJson({ error: "Image generation status is unavailable." }, { status: 503 });
   }
 }

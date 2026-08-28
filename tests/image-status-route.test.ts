@@ -42,15 +42,46 @@ describe("GET /api/ai/image/[generationRunId]", () => {
   });
 
   it("reports a pending job without signing an image", async () => {
-    const supabase = createSupabaseMock({ id: generationRunId, status: "pending" });
+    const statusUpdatedAt = new Date(Date.now() - 1000).toISOString();
+    const supabase = createSupabaseMock({ id: generationRunId, status: "pending", status_updated_at: statusUpdatedAt });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
 
     const response = await GET(new Request("http://localhost"), params());
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload).toEqual({ job: { generationRunId, status: "pending" } });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(payload).toEqual({ job: { generationRunId, status: "pending", statusUpdatedAt } });
     expect(mocks.createCampaignArtSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("turns an expired pending job into a terminal failure", async () => {
+    const supabase = createSupabaseMock({ id: generationRunId, status: "pending", status_updated_at: "2020-01-01T00:00:00.000Z" });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await GET(new Request("http://localhost"), params());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      job: { generationRunId, status: "failed" },
+      error: expect.stringContaining("background worker did not start"),
+    });
+    expect(mocks.createCampaignArtSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("turns an expired running job into a terminal failure", async () => {
+    const supabase = createSupabaseMock({ id: generationRunId, status: "running", status_updated_at: "2020-01-01T00:00:00.000Z" });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await GET(new Request("http://localhost"), params());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      job: { generationRunId, status: "failed" },
+      error: expect.stringContaining("worker time limit"),
+    });
   });
 
   it("returns a safe failure status", async () => {
@@ -79,6 +110,7 @@ describe("GET /api/ai/image/[generationRunId]", () => {
       image_path: imagePath,
       image_media_type: "image/png",
       created_at: "2026-08-13T12:34:56+00:00",
+      status_updated_at: "2026-08-13T12:34:56+00:00",
       status: "complete",
     });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
