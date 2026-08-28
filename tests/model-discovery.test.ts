@@ -48,6 +48,7 @@ describe("OpenRouter model discovery", () => {
     const result = await getAiModelCatalog("image");
 
     expect(result.models.map((model) => model.id)).toEqual(["openai/gpt-5-image-mini", "google/gemini-2.5-flash-image"]);
+    expect(mocks.fetch).toHaveBeenCalledWith("https://openrouter.ai/api/v1/images/models?sort=most-popular", expect.anything());
   });
 
   it("returns a usable offline fallback list when discovery is unavailable", async () => {
@@ -58,5 +59,9 @@ describe("OpenRouter model discovery", () => {
     expect(result.status).toBe("unavailable");
     expect(result.models.length).toBeGreaterThan(0);
     expect(result.models.every((model) => model.available === false && model.compatible === true)).toBe(true);
+    expect(result.models.map((model) => model.id)).toEqual(expect.arrayContaining([
+      "bytedance-seed/seedream-5-0-lite",
+      "bytedance-seed/seedream-5-0-pro",
+    ]));
   });
 });

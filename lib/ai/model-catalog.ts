@@ -59,6 +59,20 @@ export const fallbackAiModels = [
     capability: "image",
     description: "A quality-focused alternative for distinctive campaign art.",
   },
+  {
+    id: "bytedance-seed/seedream-5-0-lite",
+    label: "Seedream 5.0 Lite",
+    tier: "balanced",
+    capability: "image",
+    description: "A fast Seedream option for iterative campaign art.",
+  },
+  {
+    id: "bytedance-seed/seedream-5-0-pro",
+    label: "Seedream 5.0 Pro",
+    tier: "quality",
+    capability: "image",
+    description: "A high-quality Seedream option for finished campaign art.",
+  },
 ] as const satisfies readonly CuratedAiModel[];
 
 export const curatedAiModels = fallbackAiModels;

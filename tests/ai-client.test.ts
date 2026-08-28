@@ -63,6 +63,21 @@ describe("OpenRouter AI client", () => {
     expect(request).toMatchObject({ aspect_ratio: "16:9", size: "3840x2160" });
   });
 
+  it.each([
+    ["bytedance-seed/seedream-5-0-lite", "1024x1024", "2K"],
+    ["bytedance-seed/seedream-5-0-lite", "2048x2048", "2K"],
+    ["bytedance-seed/seedream-5-0-pro", "1024x1024", "1K"],
+    ["bytedance-seed/seedream-5-0-pro", "2048x2048", "2K"],
+  ] as const)("uses the supported resolution contract for Seedream %s", async (model, size, resolution) => {
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: model });
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ model, data: [{ b64_json: "aW1hZ2U=", media_type: "image/png" }] }), { status: 200 }));
+
+    await generateImage("a Seedream station", model, { size });
+    const request = JSON.parse(mocks.fetch.mock.calls[0][1].body as string) as Record<string, string>;
+
+    expect(request).toEqual({ model, prompt: "a Seedream station", aspect_ratio: "1:1", resolution });
+  });
+
   it("preserves image provider status and retry metadata", async () => {
     mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ error: { message: "Provider rate limit exceeded" } }), { status: 429, headers: { "x-request-id": "image-request-1", "retry-after": "12" } }));

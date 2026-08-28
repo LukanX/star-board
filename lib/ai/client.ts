@@ -3,7 +3,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z, type ZodType } from "zod";
 import { getServerEnv } from "@/lib/env";
 import { AiProviderError, extractProviderGenerationId, extractProviderMessage, normalizeProviderError, serializeProviderBody } from "@/lib/ai/errors";
-import { defaultImageAspectRatio, defaultImageSize, type ImageAspectRatio, type ImageSize } from "@/lib/ai/image-options";
+import { defaultImageAspectRatio, defaultImageSize, imageSizeOptions, type ImageAspectRatio, type ImageSize } from "@/lib/ai/image-options";
 
 export { AiProviderError } from "@/lib/ai/errors";
 
@@ -105,6 +105,23 @@ export type ImageGenerationOptions = {
   timeoutMs?: number;
 };
 
+const seedreamModelPrefix = "bytedance-seed/seedream-";
+const seedreamLiteModel = "bytedance-seed/seedream-5-0-lite";
+
+function buildImageRequestBody(requestedModel: string, prompt: string, options: ImageGenerationOptions) {
+  const aspectRatio = options.aspectRatio ?? defaultImageAspectRatio;
+  const size = options.size ?? defaultImageSize;
+
+  if (requestedModel.startsWith(seedreamModelPrefix)) {
+    const tier = imageSizeOptions[aspectRatio].find((option) => option.value === size)?.tier ?? "1K";
+    const resolution = requestedModel === seedreamLiteModel && tier === "1K" ? "2K" : tier;
+
+    return { model: requestedModel, prompt, aspect_ratio: aspectRatio, resolution };
+  }
+
+  return { model: requestedModel, prompt, aspect_ratio: aspectRatio, size, output_format: "png" };
+}
+
 export async function generateImage(prompt: string, requestedModel: string, options: ImageGenerationOptions = {}): Promise<ImageGenerationResult> {
   const env = getServerEnv();
 
@@ -125,13 +142,7 @@ export async function generateImage(prompt: string, requestedModel: string, opti
     response = await fetch(`${openRouterBaseUrl}/images`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model: requestedModel,
-        prompt,
-        aspect_ratio: options.aspectRatio ?? defaultImageAspectRatio,
-        size: options.size ?? defaultImageSize,
-        output_format: "png",
-      }),
+      body: JSON.stringify(buildImageRequestBody(requestedModel, prompt, options)),
       signal: AbortSignal.timeout(options.timeoutMs ?? defaultImageGenerationTimeoutMs),
     });
   } catch (error: unknown) {
