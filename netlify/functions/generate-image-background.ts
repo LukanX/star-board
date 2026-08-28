@@ -63,7 +63,7 @@ async function failRun(supabase: ReturnType<typeof getSupabaseServiceRoleClient>
 }
 
 export default async function handler(request: Request) {
-  logWorkerEvent("invoked", { method: request.method });
+  logWorkerEvent("invoked", { method: request.method, runtime: process.version });
   if (request.method !== "POST") {
     logWorkerEvent("rejected", { reason: "method" });
     return new Response("Method Not Allowed", { status: 405 });
