@@ -43,7 +43,10 @@ async function getStoredImage(image: Awaited<ReturnType<typeof generateImage>>["
 }
 
 function logWorkerEvent(event: string, fields: Record<string, unknown> = {}) {
-  console.info(JSON.stringify({ event: `ai_image_worker_${event}`, ...fields }));
+  const eventName = `ai_image_worker_${event}`;
+  const reason = typeof fields.reason === "string" ? `:${fields.reason}` : "";
+  const detail = typeof fields.message === "string" ? fields.message : undefined;
+  console.info(JSON.stringify({ ...fields, detail, event: eventName, message: `${eventName}${reason}` }));
 }
 
 async function failRun(supabase: ReturnType<typeof getSupabaseServiceRoleClient>, generationRunId: string, error: unknown) {
