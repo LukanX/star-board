@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls, removeCampaignArtIfUnreferenced } from "@/lib/storage/campaign-art";
+import { validateCampaignFaction } from "@/lib/factions";
 import { validateCampaignPlace } from "@/lib/places";
 import { updateNpcSchema } from "@/lib/validation/npc";
 
@@ -8,7 +9,7 @@ type RouteContext = { params: Promise<{ campaignId: string; npcId: string }> };
 
 export const runtime = "nodejs";
 
-const npcColumns = "id, author_id, name, species, role, description, player_notes_markdown, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const npcColumns = "id, author_id, name, species, role, description, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId, npcId } = await params;
@@ -102,6 +103,16 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "NPC place must belong to this campaign." }, { status: 400 });
     }
 
+    const factionResult = await validateCampaignFaction(context.supabase, campaignId, input.data.factionId);
+
+    if (factionResult.unavailable) {
+      return NextResponse.json({ error: "Unable to validate NPC faction." }, { status: 503 });
+    }
+
+    if (!factionResult.valid) {
+      return NextResponse.json({ error: "NPC faction must belong to this campaign." }, { status: 400 });
+    }
+
     const { data: previousNpc, error: previousNpcError } = await context.supabase
       .from("npcs")
       .select("art_path")
@@ -120,6 +131,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       ...(input.data.description === undefined ? {} : { description: input.data.description }),
       ...(input.data.playerNotesMarkdown === undefined ? {} : { player_notes_markdown: input.data.playerNotesMarkdown }),
       ...(input.data.placeId === undefined ? {} : { place_id: input.data.placeId }),
+      ...(input.data.factionId === undefined ? {} : { faction_id: input.data.factionId }),
       ...(input.data.artSubject === undefined ? {} : { art_subject: input.data.artSubject }),
       ...(input.data.artPath === undefined ? {} : { art_path: input.data.artPath }),
       ...(input.data.artPrompt === undefined ? {} : { art_prompt: input.data.artPrompt }),

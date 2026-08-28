@@ -30,6 +30,8 @@ const factionCurrentDraftSchema = z.object({
   name: z.string().max(160).optional(),
   status: z.string().max(80).optional(),
   description: z.string().max(4000).optional(),
+  playerNotes: z.string().max(20000).optional(),
+  gmNotes: z.string().max(20000).optional(),
   visualPrompt: z.string().max(1600).optional(),
 }).partial().optional();
 
@@ -170,6 +172,8 @@ export const factionDraftSchema = z.object({
   name: z.string().trim().min(1).max(160),
   status: z.string().trim().min(1).max(80),
   description: z.string().trim().min(1).max(4000),
+  playerNotes: z.string().trim().max(2400),
+  gmNotes: z.string().trim().max(2400),
   visualPrompt: z.string().trim().max(1600),
 });
 

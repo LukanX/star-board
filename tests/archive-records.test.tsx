@@ -61,6 +61,7 @@ const npc: NpcRecord = {
   description: "Keeps the signal alive.",
   player_notes_markdown: "Trusted.",
   place_id: "place-1",
+  faction_id: null,
   gm_notes_markdown: "Hidden NPC context.",
   art_subject: null,
   art_path: null,
@@ -76,6 +77,7 @@ const faction: FactionRecord = {
   name: "The Accord",
   description: "Independent brokers.",
   status: "active",
+  player_notes_markdown: "The Accord keeps the lanes open.",
   place_id: "place-1",
   art_subject: null,
   art_path: null,
@@ -126,6 +128,7 @@ describe("archive full records", () => {
         npc={npc}
         related={{
           place: { id: "place-1", name: "North Station", kind: "station" },
+          faction: null,
           jobs: [{ id: "job-1", title: "The Relay", status: "open" }],
         }}
       />,
@@ -165,7 +168,7 @@ describe("archive full records", () => {
     expect(factionMarkup).toContain("max-[760px]:w-full");
   });
 
-  it("renders Faction status, location, and giver jobs without notes", () => {
+  it("renders Faction status, public notes, location, and giver jobs without private notes for players", () => {
     const markup = renderArchiveRecord(
       <FactionPublicRecord
         campaignId="campaign-1"
@@ -173,6 +176,7 @@ describe("archive full records", () => {
         faction={faction}
         related={{
           place: { id: "place-1", name: "North Station", kind: "station" },
+          npcs: [],
           jobs: [{ id: "job-1", title: "The Relay", status: "open" }],
         }}
       />,
@@ -183,6 +187,6 @@ describe("archive full records", () => {
     expect(markup).toContain("The Relay");
     expect(markup).toContain('href="/campaigns/campaign-1/places/place-1"');
     expect(markup).not.toContain("GM NOTES");
-    expect(markup).not.toContain("PLAYER NOTES");
+    expect(markup).toContain("PLAYER NOTES");
   });
 });

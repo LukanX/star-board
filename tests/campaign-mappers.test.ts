@@ -75,8 +75,8 @@ describe("campaign mappers", () => {
   });
 
   test("cycles NPC and faction colors", () => {
-    const npc = { id: "npc", author_id: "user", name: "N", species: "", role: "", description: "", player_notes_markdown: "", place_id: null, art_subject: null, art_path: null, art_prompt: null } satisfies ApiNpc;
-    const faction = { id: "faction", author_id: "user", name: "F", description: "", status: "active", place_id: null, art_path: null, art_subject: null, art_prompt: null } satisfies ApiFaction;
+    const npc = { id: "npc", author_id: "user", name: "N", species: "", role: "", description: "", player_notes_markdown: "", place_id: null, faction_id: null, art_subject: null, art_path: null, art_prompt: null } satisfies ApiNpc;
+    const faction = { id: "faction", author_id: "user", name: "F", description: "", status: "active", player_notes_markdown: "", place_id: null, art_path: null, art_subject: null, art_prompt: null } satisfies ApiFaction;
     expect([0, 1, 2].map((index) => mapApiNpc(npc, index).color)).toEqual(["cyan", "amber", "pink"]);
     expect([0, 1, 2].map((index) => mapApiFaction(faction, index).color)).toEqual(["pink", "cyan", "amber"]);
   });

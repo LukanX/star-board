@@ -1,14 +1,17 @@
-import { ArrowUpRight, Map } from "lucide-react";
+import { ArrowUpRight, BookOpen, LockKeyhole, Map } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
 import { FactionEmblem } from "@/components/factions/FactionCard";
+import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import ArchiveRelatedList from "@/components/ui/ArchiveRelatedList";
 import { archivePreviewArtworkClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import type { RelatedNpcSummary } from "@/lib/campaign/detail-types";
 import { getAttachedArtUrl } from "@/lib/campaign/mappers";
 import { campaignEntityPath } from "@/lib/campaign/routes";
 import type { ApiPlace, FactionRecord } from "@/lib/campaign/types";
 import { getPlaceBreadcrumb } from "@/lib/places";
 
-export default function FactionPreview({ campaignId, faction, places }: { campaignId: string; faction: FactionRecord; places: ApiPlace[] }) {
+export default function FactionPreview({ campaignId, faction, places, memberNpcs = [], isGM = false }: { campaignId: string; faction: FactionRecord; places: ApiPlace[]; memberNpcs?: RelatedNpcSummary[]; isGM?: boolean }) {
   const artUrl = getAttachedArtUrl(faction.art_url, faction.art_path);
 
   return <div data-faction-preview="true" className="grid gap-[17px]">
@@ -24,6 +27,9 @@ export default function FactionPreview({ campaignId, faction, places }: { campai
     <div className="grid gap-[14px]">
       <p className="m-0 flex flex-wrap items-center gap-[6px] text-[var(--cyan)] font-mono text-[8px] tracking-[.07em] leading-[1.5] [overflow-wrap:anywhere]"><Map size={13} /> {getPlaceBreadcrumb(places, faction.place_id) || "NO PRIMARY PLACE"}</p>
       <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">{faction.description || "No public description recorded yet."}</p></div>
+      <MarkdownPreview data-faction-preview-notes="true"><MarkdownPreviewToolbar><BookOpen size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><p>{faction.player_notes_markdown || "No player notes recorded yet."}</p></MarkdownPreview>
+      {isGM ? <MarkdownPreview data-faction-preview-private="true" className="border-[rgba(255,92,154,.25)]"><MarkdownPreviewToolbar className="text-[var(--pink)]"><LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span></MarkdownPreviewToolbar><p>{faction.gm_notes_markdown || "No private notes recorded yet."}</p></MarkdownPreview> : null}
+      <ArchiveRelatedList eyebrow="FACTION ROSTER" title={`${memberNpcs.length} NPC${memberNpcs.length === 1 ? "" : "S"}`} emptyMessage="No NPCs are assigned to this faction." items={memberNpcs.map((npc) => ({ id: npc.id, href: campaignEntityPath(campaignId, "npcs", npc.id), label: npc.name, meta: [npc.species, npc.role].filter(Boolean).join(" // ") }))} />
     </div>
   </div>;
 }

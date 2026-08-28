@@ -117,5 +117,8 @@ describe("enemy archive UI secrecy", () => {
     expect(playerMarkup).not.toContain("SIZE");
     expect(gmMarkup).toContain("TRAIT / TYPE");
     expect(gmMarkup).toContain("LEVEL");
+    expect(gmMarkup).toContain('data-archive-preview-empty="true"');
+    expect(gmMarkup).toContain('data-enemies-detail="true"');
+    expect(gmMarkup).toContain("border-[rgba(255,92,154,.35)]");
   });
 });

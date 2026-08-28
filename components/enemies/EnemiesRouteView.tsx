@@ -9,6 +9,7 @@ import EnemyCard from "@/components/enemies/EnemyCard";
 import EnemyEditor from "@/components/enemies/EnemyEditor";
 import EnemyPreview from "@/components/enemies/EnemyPreview";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import ArchivePreviewEmptyState from "@/components/ui/ArchivePreviewEmptyState";
 import type { ApiEnemy } from "@/lib/campaign/types";
 import type { EnemyRarity, EnemySize } from "@/lib/validation/enemy";
 
@@ -73,7 +74,7 @@ export default function EnemiesRouteView({ campaignId, role, initialEnemies }: {
       selectorIcon={<Skull size={17} />}
       selector={<div data-enemy-list="true" className="grid grid-cols-1 gap-[1px] p-[10px]">{visibleEnemies.length ? visibleEnemies.map((enemy) => <EnemyCard enemy={enemy} isGM={isGM} key={enemy.id} onSelect={setSelectedEnemyId} selected={selectedEnemyId === enemy.id} />) : <EmptyState icon={Skull} title="No matching enemies." message="Try a different name, level, trait, size, or rarity." />}</div>}
       preview={selectedEnemy ? <EnemyPreview campaignId={campaignId} enemy={selectedEnemy} isGM={isGM} /> : null}
-      emptyPreview={<div data-enemies-detail="true" className="min-w-0 p-[21px] max-[760px]:p-[17px]"><Skull className="text-[var(--pink)]" size={24} /><p className={eyebrowClassName}>ROUTE-OWNED THREAT FILES</p><h2>Choose an enemy from the roster.</h2><p>Select a record to inspect its revealed brief. GM users can open the full private record for mechanics, tactics, and notes.</p></div>}
+      emptyPreview={<ArchivePreviewEmptyState data-enemies-detail="true" accent="pink" icon={Skull} eyebrow="ROUTE-OWNED THREAT FILES" title="Choose an enemy from the roster." message="Select a record to inspect its revealed brief. GM users can open the full private record for mechanics, tactics, and notes." />}
     /> : <EmptyState icon={Skull} title="No enemies recorded yet." message={isGM ? "Add a manual enemy or import one creature from Archives of Nethys." : "The GM has not revealed any enemies yet."} />}
   </PageLayout>;
 }

@@ -1,10 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { FolderKanban, UsersRound } from "lucide-react";
 import { describe, expect, it } from "vitest";
+import DirtyFormProvider from "@/components/campaign-shell/DirtyFormProvider";
 import { authPanelClassName, authShellClassName, authFormClassName, authFooterClassName } from "@/components/auth/authStyles";
 import EpisodeCard from "@/components/episodes/EpisodeCard";
+import FactionEditor from "@/components/factions/FactionEditor";
 import MemberCard from "@/components/members/MemberCard";
 import MembersRouteView from "@/components/members/MembersRouteView";
+import NpcEditor from "@/components/npcs/NpcEditor";
 import NpcCard from "@/components/npcs/NpcCard";
 import FactionCard from "@/components/factions/FactionCard";
 import PlaceCard from "@/components/places/PlaceCard";
@@ -394,6 +397,7 @@ describe("NpcCard", () => {
           description: "Keeps the signal alive.",
           player_notes_markdown: "",
           place_id: null,
+          faction_id: null,
           art_subject: null,
           art_path: null,
           art_url: null,
@@ -436,6 +440,7 @@ describe("FactionCard", () => {
           name: "The Accord",
           description: "Independent brokers.",
           status: "active",
+          player_notes_markdown: "",
           place_id: null,
           art_subject: null,
           art_path: null,
@@ -463,6 +468,85 @@ describe("FactionCard", () => {
     expect(markup).not.toContain("CAMPAIGN");
     expect(markup).not.toContain("data-faction-top");
     expect(markup).not.toContain("data-faction-footer");
+  });
+});
+
+describe("Faction and NPC editors", () => {
+  it("renders faction note channels and the NPC roster with current affiliations", () => {
+    const markup = renderToStaticMarkup(
+      <DirtyFormProvider>
+        <FactionEditor
+          campaignId="campaign-id"
+          places={[]}
+          factions={[
+            { id: "faction-target", name: "The Accord", status: "active" },
+            { id: "faction-source", name: "The Syndicate", status: "watching" },
+          ]}
+          npcs={[
+            { id: "npc-member", name: "Rook", species: "Android", role: "Contact", factionId: "faction-target" },
+            { id: "npc-source", name: "Venn", species: "Human", role: "Broker", factionId: "faction-source" },
+          ]}
+          faction={{
+            id: "faction-target",
+            author_id: "author-id",
+            name: "The Accord",
+            description: "Independent brokers.",
+            status: "active",
+            player_notes_markdown: "Keep the lanes open.",
+            gm_notes_markdown: "The brokers are compromised.",
+            place_id: null,
+            art_subject: null,
+            art_path: null,
+            art_url: null,
+            art_prompt: null,
+            art_provider: null,
+          }}
+        />
+      </DirtyFormProvider>,
+    );
+
+    expect(markup).toContain("Player notes");
+    expect(markup).toContain("GM notes");
+    expect(markup).toContain("PRIVATE");
+    expect(markup).toContain("NPC ROSTER");
+    expect(markup).toContain('aria-label="Assign Rook to this faction"');
+    expect(markup).toContain('aria-label="Assign Venn to this faction"');
+    expect(markup).toContain("CURRENT // The Syndicate");
+    expect(markup).toContain("checked");
+  });
+
+  it("renders the NPC faction selector with its saved assignment", () => {
+    const markup = renderToStaticMarkup(
+      <DirtyFormProvider>
+        <NpcEditor
+          campaignId="campaign-id"
+          places={[]}
+          factions={[{ id: "faction-target", name: "The Accord", status: "active" }]}
+          npc={{
+            id: "npc-id",
+            author_id: "author-id",
+            name: "Rook",
+            species: "Android",
+            role: "Contact",
+            description: "Keeps the signal alive.",
+            player_notes_markdown: "Trusted.",
+            place_id: null,
+            faction_id: "faction-target",
+            gm_notes_markdown: "Watch the airlock.",
+            art_subject: null,
+            art_path: null,
+            art_url: null,
+            art_prompt: null,
+            art_provider: null,
+          }}
+        />
+      </DirtyFormProvider>,
+    );
+
+    expect(markup).toContain("Faction");
+    expect(markup).toContain("NO FACTION");
+    expect(markup).toContain("The Accord [active]");
+    expect(markup).toContain('value="faction-target"');
   });
 });
 

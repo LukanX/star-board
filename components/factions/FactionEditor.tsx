@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Sparkles, X } from "lucide-react";
+import { LockKeyhole, Sparkles, Users, X } from "lucide-react";
 import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
 import {
   markCampaignArtPersisted,
@@ -11,6 +11,8 @@ import {
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import type { CampaignAffiliationNpc } from "@/lib/campaign/affiliations-server";
+import type { RelatedFactionSummary } from "@/lib/campaign/detail-types";
 import type { ApiFaction, ApiPlace } from "@/lib/campaign/types";
 import { flattenPlaceTree } from "@/lib/places";
 
@@ -18,7 +20,10 @@ type FactionDraft = {
   name: string;
   description: string;
   status: string;
+  playerNotesMarkdown: string;
+  gmNotesMarkdown: string;
   placeId: string | null;
+  memberNpcIds: string[];
   artSubject: string;
   artPath: string | null;
   artUrl: string | null;
@@ -30,7 +35,10 @@ const emptyFactionDraft: FactionDraft = {
   name: "",
   description: "",
   status: "active",
+  playerNotesMarkdown: "",
+  gmNotesMarkdown: "",
   placeId: null,
+  memberNpcIds: [],
   artSubject: "",
   artPath: null,
   artUrl: null,
@@ -38,13 +46,16 @@ const emptyFactionDraft: FactionDraft = {
   artProvider: null,
 };
 
-function toDraft(faction?: ApiFaction): FactionDraft {
+function toDraft(faction: ApiFaction | undefined, npcs: CampaignAffiliationNpc[]): FactionDraft {
   return faction
     ? {
         name: faction.name,
         description: faction.description,
         status: faction.status,
+        playerNotesMarkdown: faction.player_notes_markdown,
+        gmNotesMarkdown: faction.gm_notes_markdown ?? "",
         placeId: faction.place_id,
+        memberNpcIds: npcs.filter((npc) => npc.factionId === faction.id).map((npc) => npc.id),
         artSubject: faction.art_subject ?? "",
         artPath: faction.art_path,
         artUrl: faction.art_url ?? null,
@@ -57,17 +68,21 @@ function toDraft(faction?: ApiFaction): FactionDraft {
 export default function FactionEditor({
   campaignId,
   places,
+  npcs = [],
+  factions = [],
   faction,
   onSaved,
   onCancel: parentOnCancel,
 }: {
   campaignId: string;
   places: ApiPlace[];
+  npcs?: CampaignAffiliationNpc[];
+  factions?: RelatedFactionSummary[];
   faction?: ApiFaction;
-  onSaved?: (faction: ApiFaction) => void;
+  onSaved?: (faction: ApiFaction, memberNpcIds: string[]) => void;
   onCancel?: () => void;
 }) {
-  const [draft, setDraftState] = useState<FactionDraft>(() => toDraft(faction));
+  const [draft, setDraftState] = useState<FactionDraft>(() => toDraft(faction, npcs));
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -78,6 +93,21 @@ export default function FactionEditor({
   };
   const update = (field: keyof FactionDraft, value: string | null) =>
     setDraft((current) => ({ ...current, [field]: value }));
+  const toggleMember = (npc: CampaignAffiliationNpc) => {
+    const isMember = draft.memberNpcIds.includes(npc.id);
+    if (!isMember && npc.factionId && npc.factionId !== faction?.id) {
+      const sourceFaction = factions.find((candidate) => candidate.id === npc.factionId);
+      const targetName = draft.name.trim() || faction?.name || "this faction";
+      if (!window.confirm(`Transfer ${npc.name} from ${sourceFaction?.name ?? "its current faction"} to ${targetName}?`)) return;
+    }
+
+    setDraft((current) => ({
+      ...current,
+      memberNpcIds: isMember
+        ? current.memberNpcIds.filter((memberId) => memberId !== npc.id)
+        : [...current.memberNpcIds, npc.id],
+    }));
+  };
   const onCancel = () => {
     clearDirty();
     parentOnCancel?.();
@@ -114,12 +144,13 @@ export default function FactionEditor({
       const result = (await response.json()) as {
         error?: string;
         faction?: ApiFaction;
+        memberNpcIds?: string[];
       };
       if (!response.ok || !result.faction)
         throw new Error(result.error ?? "Faction could not be saved.");
       markCampaignArtPersisted(campaignId, result.faction.art_path);
       clearDirty();
-      onSaved?.(result.faction);
+      onSaved?.(result.faction, result.memberNpcIds ?? draft.memberNpcIds);
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -172,6 +203,8 @@ export default function FactionEditor({
             name: draft.name,
             status: draft.status,
             description: draft.description,
+            playerNotes: draft.playerNotesMarkdown,
+            gmNotes: draft.gmNotesMarkdown,
             visualPrompt: draft.artSubject,
           }}
           fields={[
@@ -181,6 +214,18 @@ export default function FactionEditor({
               key: "description",
               label: "Public description",
               maxLength: 4000,
+              multiline: true,
+            },
+            {
+              key: "playerNotes",
+              label: "Player notes",
+              maxLength: 20000,
+              multiline: true,
+            },
+            {
+              key: "gmNotes",
+              label: "GM notes",
+              maxLength: 20000,
               multiline: true,
             },
             {
@@ -196,6 +241,8 @@ export default function FactionEditor({
               name: candidate.name ?? current.name,
               status: candidate.status ?? current.status,
               description: candidate.description ?? current.description,
+              playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown,
+              gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
               artSubject: candidate.visualPrompt ?? current.artSubject,
             }))
           }
@@ -233,6 +280,27 @@ export default function FactionEditor({
             onChange={(event) => update("description", event.target.value)}
           />
         </label>
+        <label>
+          Player notes
+          <textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => update("playerNotesMarkdown", event.target.value)} />
+        </label>
+        <label>
+          GM notes <span className="inline-flex items-center gap-1 text-[var(--pink)]"><LockKeyhole size={11} /> PRIVATE</span>
+          <textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => update("gmNotesMarkdown", event.target.value)} />
+        </label>
+        <fieldset className="grid gap-[10px] border border-[rgba(98,232,255,.25)] bg-[rgba(98,232,255,.025)] p-[13px]">
+          <legend className="px-1 text-[var(--dim)] font-mono text-[8px] tracking-[.12em]">NPC ROSTER</legend>
+          {npcs.length ? <div className="grid gap-[7px]">{npcs.map((npc) => {
+            const currentFaction = factions.find((candidate) => candidate.id === npc.factionId);
+            const isMember = draft.memberNpcIds.includes(npc.id);
+            return <label key={npc.id} className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,auto)] items-start gap-[9px] border border-[var(--line)] bg-[#0a1118] px-[10px] py-[9px] text-[var(--ink)]">
+              <input aria-label={`Assign ${npc.name} to this faction`} className="mt-[2px] h-4 w-4 accent-[var(--cyan)]" checked={isMember} disabled={isSaving} onChange={() => toggleMember(npc)} type="checkbox" />
+              <span className="min-w-0 [overflow-wrap:anywhere] text-[10px]">{npc.name}<small className="mt-1 block text-[var(--dim)] font-mono text-[8px] tracking-[.06em]">{`${npc.species || "UNCLASSIFIED"} // ${npc.role || "CONTACT"}`}</small></span>
+              <small className={`text-right font-mono text-[7px] tracking-[.08em] ${isMember ? "text-[var(--green)]" : currentFaction ? "text-[var(--amber)]" : "text-[var(--dim)]"}`}>{isMember ? "MEMBER" : currentFaction ? `CURRENT // ${currentFaction.name}` : "UNAFFILIATED"}</small>
+            </label>;
+          })}</div> : <p className="m-0 text-[var(--muted)] text-[10px]">No NPCs are available for this roster yet.</p>}
+          <p className="m-0 flex items-center gap-2 text-[var(--dim)] font-mono text-[8px] tracking-[.06em]"><Users size={12} /> {draft.memberNpcIds.length} SELECTED</p>
+        </fieldset>
         <label className="place-quick-field">
           Primary place
           <select

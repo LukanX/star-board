@@ -8,7 +8,7 @@ type RouteContext = { params: Promise<{ campaignId: string; factionId: string }>
 
 export const runtime = "nodejs";
 
-const factionColumns = "id, author_id, name, description, status, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const factionColumns = "id, author_id, name, description, status, player_notes_markdown, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId, factionId } = await params;
@@ -41,8 +41,33 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Faction not found." }, { status: 404 });
     }
 
-    const [faction] = await addCampaignArtUrls(context.supabase, [data]);
-    return NextResponse.json({ role: membership.role, faction });
+    const { data: memberRows, error: memberError } = await context.supabase
+      .from("npcs")
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("faction_id", factionId);
+
+    if (memberError) {
+      return NextResponse.json({ error: "Unable to load faction roster." }, { status: 503 });
+    }
+
+    let faction: typeof data & { gm_notes_markdown?: string } = data;
+    if (membership.role === "gm") {
+      const { data: notes, error: notesError } = await context.supabase
+        .from("faction_gm_notes")
+        .select("body_markdown")
+        .eq("faction_id", factionId)
+        .maybeSingle();
+
+      if (notesError) {
+        return NextResponse.json({ error: "Unable to load faction private notes." }, { status: 503 });
+      }
+
+      faction = { ...data, gm_notes_markdown: notes?.body_markdown ?? "" };
+    }
+
+    const [factionWithArt] = await addCampaignArtUrls(context.supabase, [faction]);
+    return NextResponse.json({ role: membership.role, faction: factionWithArt, memberNpcIds: (memberRows ?? []).map((member) => member.id) });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
@@ -98,35 +123,67 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unable to load faction art." }, { status: 503 });
     }
 
-    const update = {
-      ...(input.data.name === undefined ? {} : { name: input.data.name }),
-      ...(input.data.description === undefined ? {} : { description: input.data.description }),
-      ...(input.data.status === undefined ? {} : { status: input.data.status }),
-      ...(input.data.placeId === undefined ? {} : { place_id: input.data.placeId }),
-      ...(input.data.artSubject === undefined ? {} : { art_subject: input.data.artSubject }),
-      ...(input.data.artPath === undefined ? {} : { art_path: input.data.artPath }),
-      ...(input.data.artPrompt === undefined ? {} : { art_prompt: input.data.artPrompt }),
-      ...(input.data.artProvider === undefined ? {} : { art_provider: input.data.artProvider }),
-      updated_by: context.user.id,
-    };
-    const { data, error } = await context.supabase
-      .from("factions")
-      .update(update)
-      .eq("id", factionId)
-      .eq("campaign_id", campaignId)
-      .select(factionColumns)
-      .single();
+    const { data: updatedFactionId, error } = await context.supabase.rpc("update_faction_with_details", {
+      p_campaign_id: campaignId,
+      p_faction_id: factionId,
+      p_public: {
+        ...(input.data.name === undefined ? {} : { name: input.data.name }),
+        ...(input.data.description === undefined ? {} : { description: input.data.description }),
+        ...(input.data.status === undefined ? {} : { status: input.data.status }),
+        ...(input.data.playerNotesMarkdown === undefined ? {} : { playerNotesMarkdown: input.data.playerNotesMarkdown }),
+        ...(input.data.placeId === undefined ? {} : { placeId: input.data.placeId }),
+        ...(input.data.artSubject === undefined ? {} : { artSubject: input.data.artSubject }),
+        ...(input.data.artPath === undefined ? {} : { artPath: input.data.artPath }),
+        ...(input.data.artPrompt === undefined ? {} : { artPrompt: input.data.artPrompt }),
+        ...(input.data.artProvider === undefined ? {} : { artProvider: input.data.artProvider }),
+      },
+      p_details: input.data.gmNotesMarkdown === undefined ? {} : { gmNotesMarkdown: input.data.gmNotesMarkdown },
+      p_member_npc_ids: input.data.memberNpcIds ?? null,
+    });
 
-    if (error) {
+    if (error || !updatedFactionId) {
       return NextResponse.json({ error: "Unable to update faction." }, { status: 400 });
     }
 
-    if (previousFaction?.art_path !== data.art_path) {
+    const { data: savedFaction, error: savedFactionError } = await context.supabase
+      .from("factions")
+      .select(factionColumns)
+      .eq("id", updatedFactionId)
+      .eq("campaign_id", campaignId)
+      .single();
+
+    if (savedFactionError || !savedFaction) {
+      return NextResponse.json({ error: "Faction was updated, but could not be read back." }, { status: 503 });
+    }
+
+    const { data: memberRows, error: memberError } = await context.supabase
+      .from("npcs")
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("faction_id", updatedFactionId);
+
+    if (memberError) {
+      return NextResponse.json({ error: "Faction was updated, but its roster could not be read back." }, { status: 503 });
+    }
+
+    const { data: notes, error: notesError } = await context.supabase
+      .from("faction_gm_notes")
+      .select("body_markdown")
+      .eq("faction_id", updatedFactionId)
+      .maybeSingle();
+
+    if (notesError) {
+      return NextResponse.json({ error: "Faction was updated, but its private notes could not be read back." }, { status: 503 });
+    }
+
+    if (previousFaction?.art_path !== savedFaction.art_path) {
       await removeCampaignArtIfUnreferenced(context.supabase, campaignId, previousFaction?.art_path);
     }
 
-    const [faction] = await addCampaignArtUrls(context.supabase, [data]);
-    return NextResponse.json({ faction });
+    const faction: typeof savedFaction & { gm_notes_markdown: string } = { ...savedFaction, gm_notes_markdown: notes?.body_markdown ?? "" };
+
+    const [factionWithArt] = await addCampaignArtUrls(context.supabase, [faction]);
+    return NextResponse.json({ faction: factionWithArt, memberNpcIds: (memberRows ?? []).map((member) => member.id) });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }

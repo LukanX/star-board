@@ -161,8 +161,9 @@ export function buildFactionPrompt(input: FactionGenerationInput, context?: Camp
     input.focus ? `GM focus: ${input.focus}` : "",
     input.currentDraft ? `Current editor draft: ${JSON.stringify(input.currentDraft)}` : "",
     "Write a distinct organization with a clear public identity, operating status, pressure point, and relationship to the campaign. Keep the description suitable for players.",
+    "Write player notes without spoilers and put secrets, leverage, and future reveals in gmNotes. Do not invent or discuss the faction's linked NPC roster.",
     "visualPrompt must be a concise, subject-specific description of one standalone faction symbol or logo for later image generation. Prioritize a centered emblem or insignia on a clean field; do not describe characters, headquarters, landscapes, banners, environments, action scenes, or written text. Do not include provider names or image dimensions.",
-    "Fields: name, status, description, visualPrompt.",
+    "Fields: name, status, description, playerNotes, gmNotes, visualPrompt.",
   ].filter(Boolean).join("\n");
 }
 

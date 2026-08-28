@@ -1,15 +1,16 @@
-import { ArrowUpRight, BookOpen, LockKeyhole, Map, UserRound } from "lucide-react";
+import { ArrowUpRight, BookOpen, LockKeyhole, Map, Network, UserRound } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import RecordPortrait from "@/components/ui/RecordPortrait";
 import { archivePreviewArtworkClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import type { RelatedFactionSummary } from "@/lib/campaign/detail-types";
 import { getAttachedArtUrl } from "@/lib/campaign/mappers";
 import { campaignEntityPath } from "@/lib/campaign/routes";
 import type { ApiPlace, NpcRecord } from "@/lib/campaign/types";
 import { getPlaceBreadcrumb } from "@/lib/places";
 
-export default function NpcPreview({ campaignId, npc, places, isGM }: { campaignId: string; npc: NpcRecord; places: ApiPlace[]; isGM: boolean }) {
+export default function NpcPreview({ campaignId, npc, faction, places, isGM }: { campaignId: string; npc: NpcRecord; faction?: RelatedFactionSummary | null; places: ApiPlace[]; isGM: boolean }) {
   const artUrl = getAttachedArtUrl(npc.art_url, npc.art_path);
 
   return <div data-npc-preview="true" className="grid gap-[17px]">
@@ -23,6 +24,7 @@ export default function NpcPreview({ campaignId, npc, places, isGM }: { campaign
     </div>
     <div data-npc-preview-art="true" className={`${archivePreviewArtworkClassName} border border-[rgba(98,232,255,.28)] bg-[#0a1118]`}><RecordPortrait src={artUrl} label={`${npc.name} portrait`} className="w-full h-full" fallback={<UserRound size={19} />} /> </div>
     <div data-npc-preview-copy="true" className="grid gap-[14px]">
+      {faction ? <CampaignRouteLink data-npc-preview-faction="true" className="m-0 flex w-fit max-w-full items-center gap-[6px] text-[var(--cyan)] font-mono text-[8px] tracking-[.07em] [overflow-wrap:anywhere] hover:text-[var(--ink)]" href={campaignEntityPath(campaignId, "factions", faction.id)}><Network size={13} /> FACTION // {faction.name}</CampaignRouteLink> : null}
       <p className="m-0 flex flex-wrap items-center gap-[6px] text-[var(--cyan)] font-mono text-[8px] tracking-[.07em] leading-[1.5] [overflow-wrap:anywhere]"><Map size={13} /> {getPlaceBreadcrumb(places, npc.place_id) || "NO PRIMARY PLACE"}</p>
       <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">{npc.description || "No public description recorded yet."}</p></div>
       <MarkdownPreview data-npc-preview-notes="true"><MarkdownPreviewToolbar><BookOpen size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><p>{npc.player_notes_markdown || "No player notes recorded yet."}</p></MarkdownPreview>

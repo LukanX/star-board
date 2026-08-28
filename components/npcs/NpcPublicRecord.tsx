@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { NpcRelatedRecords } from "@/lib/campaign/detail-types";
-import { BookOpen, LockKeyhole, Map, UserRound } from "lucide-react";
+import { BookOpen, LockKeyhole, Map, Network, UserRound } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
 import ArtDownloadButton from "@/components/ui/ArtDownloadButton";
@@ -14,7 +14,7 @@ import { campaignEntityPath, campaignSectionPath } from "@/lib/campaign/routes";
 import { getPlaceBreadcrumb } from "@/lib/places";
 import type { ApiPlace, NpcRecord } from "@/lib/campaign/types";
 
-const emptyNpcRelatedRecords: NpcRelatedRecords = { place: null, jobs: [] };
+const emptyNpcRelatedRecords: NpcRelatedRecords = { place: null, faction: null, jobs: [] };
 
 export default function NpcPublicRecord({
   campaignId,
@@ -120,17 +120,25 @@ export default function NpcPublicRecord({
         </>
       }
       related={
-        <ArchiveRelatedList
-          eyebrow="CAMPAIGN THREADS"
-          title="Giver jobs"
-          emptyMessage="No jobs are assigned to this contact."
-          items={relatedRecords.jobs.map((job) => ({
-            id: job.id,
-            href: campaignEntityPath(campaignId, "jobs", job.id),
-            label: job.title,
-            meta: job.status.toUpperCase(),
-          }))}
-        />
+        <>
+          <ArchiveRelatedList
+            eyebrow="AFFILIATION"
+            title="Faction"
+            emptyMessage="This contact has no faction affiliation."
+            items={relatedRecords.faction ? [{ id: relatedRecords.faction.id, href: campaignEntityPath(campaignId, "factions", relatedRecords.faction.id), label: relatedRecords.faction.name, meta: relatedRecords.faction.status.toUpperCase(), icon: <Network size={14} /> }] : []}
+          />
+          <ArchiveRelatedList
+            eyebrow="CAMPAIGN THREADS"
+            title="Giver jobs"
+            emptyMessage="No jobs are assigned to this contact."
+            items={relatedRecords.jobs.map((job) => ({
+              id: job.id,
+              href: campaignEntityPath(campaignId, "jobs", job.id),
+              label: job.title,
+              meta: job.status.toUpperCase(),
+            }))}
+          />
+        </>
       }
       className="npc-record-detail"
     />
