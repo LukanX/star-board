@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Download, FileSearch, LockKeyhole, RefreshCw, Sparkles, X } from "lucide-react";
 import { markCampaignArtPersisted, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
@@ -8,6 +8,7 @@ import { editorPanelClassName, editorSelectClassName } from "@/components/ui/edi
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import EnemyStatBlockEditor, { type EnemyStatBlockIssue } from "@/components/enemies/EnemyStatBlockEditor";
 import EnemyStatBlock from "@/components/enemies/EnemyStatBlock";
+import { EnemyJobCancelledError, waitForEnemyBackgroundJob, type EnemyBackgroundJob } from "@/lib/ai/enemy-job-polling";
 import type { ApiEnemy } from "@/lib/campaign/types";
 import { enemyAiDraftSchema, enemyBriefDraftSchema, enemyImportPreviewSchema, enemySizeSchema, enemyRaritySchema, enemyStatBlockSchema, type EnemyAiDraft, type EnemyBriefDraft, type EnemyImportPreview, type EnemyRarity, type EnemySize, type EnemySourceSnapshot, type EnemyStatBlockV1, createEnemySchema } from "@/lib/validation/enemy";
 
@@ -102,7 +103,10 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statBlockIssues, setStatBlockIssues] = useState<EnemyStatBlockIssue[]>([]);
+  const activeGenerationRef = useRef<AbortController | null>(null);
   const { setDirty, clearDirty } = useDirtyForm();
+
+  useEffect(() => () => activeGenerationRef.current?.abort(), []);
 
   const setDraft = (updater: (current: EnemyDraft) => EnemyDraft) => {
     setDirty();
@@ -138,16 +142,29 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const generateEnemy = async () => {
     if (isSourceLocked) return;
+    activeGenerationRef.current?.abort();
+    const generationController = new AbortController();
+    activeGenerationRef.current = generationController;
     setIsGenerating(true); setError(null);
     try {
-      const response = await fetch("/api/ai/enemy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(generationBody()) });
-      const result = (await response.json()) as { error?: string; draft?: unknown };
+      const response = await fetch("/api/ai/enemy", { method: "POST", headers: { "Content-Type": "application/json" }, signal: generationController.signal, body: JSON.stringify(generationBody()) });
+      const result = (await response.json()) as { error?: string; draft?: unknown; job?: EnemyBackgroundJob };
+      if (response.status === 202 && result.job) {
+        setAiCandidate(await waitForEnemyBackgroundJob(result.job, { signal: generationController.signal }));
+        return;
+      }
       if (!response.ok || !result.draft) throw new Error(result.error ?? "Enemy generation failed.");
       const candidate = enemyAiDraftSchema.parse(result.draft);
       setAiCandidate(candidate);
     } catch (generationError) {
+      if (generationError instanceof EnemyJobCancelledError || generationController.signal.aborted) return;
       setError(generationError instanceof Error ? generationError.message : "Enemy generation failed.");
-    } finally { setIsGenerating(false); }
+    } finally {
+      if (activeGenerationRef.current === generationController) {
+        activeGenerationRef.current = null;
+        setIsGenerating(false);
+      }
+    }
   };
 
   const applyEnemyCandidate = () => {

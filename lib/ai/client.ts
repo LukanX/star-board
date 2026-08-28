@@ -38,7 +38,11 @@ export type JsonGenerationResult = {
   };
 };
 
-export async function generateJson(prompt: string, schema?: ZodType, requestedModel?: string): Promise<JsonGenerationResult> {
+export type JsonGenerationOptions = {
+  timeoutMs?: number;
+};
+
+export async function generateJson(prompt: string, schema?: ZodType, requestedModel?: string, options: JsonGenerationOptions = {}): Promise<JsonGenerationResult> {
   const { client, model } = getOpenRouterClient();
   let completion;
 
@@ -47,8 +51,12 @@ export async function generateJson(prompt: string, schema?: ZodType, requestedMo
       model: requestedModel ?? model,
       messages: [{ role: "user", content: prompt }],
       response_format: schema ? zodResponseFormat(schema, "star_board_draft") : { type: "json_object" },
-    });
+    }, options.timeoutMs === undefined ? undefined : { signal: AbortSignal.timeout(options.timeoutMs) });
   } catch (error: unknown) {
+    if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+      throw new AiProviderError("OpenRouter text generation timed out. Try again shortly.", { status: 504 });
+    }
+
     throw normalizeProviderError(error, "OpenRouter text generation failed.");
   }
 

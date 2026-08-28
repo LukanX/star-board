@@ -51,7 +51,7 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0022_ai_image_job_lifecycle.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0023_async_enemy_generation.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
 
@@ -68,6 +68,10 @@ Set these server-only values in the Netlify site environment:
 These values must be available to the Netlify Functions scope, not only to the build environment. Changing a function variable requires a new deploy. The deploy summary should list exactly one `generate-image-background` function with background invocation mode. Worker logs and the matching `ai_generation_runs` row distinguish a job that was never claimed (`pending`), a provider or storage failure (`failed`), and a completed review draft (`complete`).
 
 Deployed Netlify requests always use the background path even if a stale `NETLIFY_IMAGE_GENERATION=sync` variable is present. Runtime request metadata identifies Netlify when build-only metadata is unavailable, and the worker is dispatched through the incoming deploy origin so Deploy Previews remain isolated from production. Set `NETLIFY_IMAGE_GENERATION=background` to force the queue mode in another deployment environment; leave it as `sync` for local synchronous testing. Apply migrations `0012_async_image_generation.sql` and `0022_ai_image_job_lifecycle.sql` before using the deployed art studio.
+
+### Netlify enemy generation
+
+The GM enemy route keeps local generation synchronous, but queues full structured stat-block generation on Netlify so large responses are not lost to the synchronous request limit. The `generate-enemy-background` function validates the result, stores the private draft in `ai_generation_runs`, and the enemy editor polls `/api/ai/enemy/[generationRunId]` until the review candidate is ready. Apply `0023_async_enemy_generation.sql` and make `SUPABASE_SECRET_KEY` available to the Netlify Functions scope before using this deployed path. Generation never saves or overwrites an enemy until the GM applies the reviewed draft.
 
 The migrations create campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, a private `campaign-art` storage bucket, the genre-neutral Places archive, the campaign-scoped Enemies archive, faction player/GM notes, and optional campaign-scoped NPC faction membership. Places form an arbitrary-depth tree through `parent_place_id`; sibling names are unique within a campaign, cycles are rejected in PostgreSQL, deleting a parent promotes children to roots, and deleting a Place clears primary-place links on NPCs, factions, jobs, and episodes. Enemy mechanics, source provenance, and GM notes remain in GM-only detail rows; unrevealed enemy artwork is blocked from player Storage reads by an exact `enemies.art_path` reference and reveal check rather than a filename convention. Unattached background-generated image objects remain private to their requesting GM and are removed during retention when they are no longer referenced. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
 

@@ -11,8 +11,16 @@ import { enemyGenerationInputSchema } from "@/lib/validation/ai";
 import { enemyAiDraftSchema } from "@/lib/validation/enemy";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
+import { dispatchEnemyBackgroundJob } from "@/lib/ai/enemy-jobs";
 
 export const runtime = "nodejs";
+
+function shouldUseBackgroundEnemyGeneration(request: Request) {
+  const hostname = new URL(request.url).hostname.toLowerCase();
+  return process.env.NETLIFY === "true"
+    || request.headers.has("x-nf-request-id")
+    || hostname.endsWith(".netlify.app");
+}
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -50,6 +58,61 @@ export async function POST(request: Request) {
 
     const prompt = buildEnemyPrompt(input.data, aiContext.campaign);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
+
+    if (shouldUseBackgroundEnemyGeneration(request)) {
+      if (!env.SUPABASE_SECRET_KEY) {
+        return NextResponse.json({ error: "Async enemy generation is not configured. Add SUPABASE_SECRET_KEY to the Netlify environment." }, { status: 503 });
+      }
+
+      const { data: generationRun, error: generationRunError } = await context.supabase
+        .from("ai_generation_runs")
+        .insert({
+          campaign_id: input.data.campaignId,
+          requested_by: context.user.id,
+          kind: "enemy",
+          mode: input.data.mode,
+          model: selectedModel.id,
+          prompt_hash: promptHash,
+          provider: "openrouter",
+          effective_model: selectedModel.id,
+          status: "pending",
+        })
+        .select("id, created_at, status_updated_at")
+        .single();
+
+      if (generationRunError || !generationRun) {
+        return NextResponse.json({ error: "Enemy generation could not be queued." }, { status: 503 });
+      }
+
+      const job = {
+        generationRunId: generationRun.id,
+        prompt,
+        model: selectedModel.id,
+      };
+
+      try {
+        await dispatchEnemyBackgroundJob(request.url, job, env.SUPABASE_SECRET_KEY);
+      } catch {
+        await context.supabase.from("ai_generation_runs").update({
+          status: "failed",
+          status_updated_at: new Date().toISOString(),
+          error_message: "The enemy background worker could not be reached.",
+        }).eq("id", generationRun.id);
+        return NextResponse.json({ error: "Enemy generation could not be started. Check the Netlify background function deployment." }, { status: 503 });
+      }
+
+      return NextResponse.json({
+        job: {
+          generationRunId: generationRun.id,
+          status: "pending",
+          mode: input.data.mode,
+          model: selectedModel.id,
+          createdAt: new Date(generationRun.created_at).toISOString(),
+          statusUpdatedAt: new Date(generationRun.status_updated_at ?? generationRun.created_at).toISOString(),
+        },
+      }, { status: 202 });
+    }
+
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
 
     try {
