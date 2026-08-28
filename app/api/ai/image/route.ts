@@ -14,8 +14,13 @@ import { dispatchImageBackgroundJob } from "@/lib/ai/image-jobs";
 
 export const runtime = "nodejs";
 
-function shouldUseBackgroundImageGeneration(env: ReturnType<typeof getServerEnv>) {
-  return process.env.NETLIFY === "true" || env.NETLIFY_IMAGE_GENERATION === "background";
+function shouldUseBackgroundImageGeneration(request: Request, env: ReturnType<typeof getServerEnv>) {
+  const hostname = new URL(request.url).hostname.toLowerCase();
+  const isNetlifyRequest = process.env.NETLIFY === "true"
+    || request.headers.has("x-nf-request-id")
+    || hostname.endsWith(".netlify.app");
+
+  return isNetlifyRequest || env.NETLIFY_IMAGE_GENERATION === "background";
 }
 
 export async function POST(request: Request) {
@@ -90,7 +95,7 @@ export async function POST(request: Request) {
     const prompt = buildArtPrompt(input.data.subject, campaignStyle, input.data.refinement, input.data.currentPrompt, input.data.targetKind, placeContextResult.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
-    if (shouldUseBackgroundImageGeneration(env)) {
+    if (shouldUseBackgroundImageGeneration(request, env)) {
       if (!env.SUPABASE_SECRET_KEY) {
         return NextResponse.json({ error: "Async image generation is not configured. Add SUPABASE_SECRET_KEY to the Netlify environment." }, { status: 503 });
       }
@@ -127,7 +132,7 @@ export async function POST(request: Request) {
       };
 
       try {
-        await dispatchImageBackgroundJob(process.env.URL ?? env.NEXT_PUBLIC_APP_URL ?? request.url, job, env.SUPABASE_SECRET_KEY);
+        await dispatchImageBackgroundJob(request.url, job, env.SUPABASE_SECRET_KEY);
       } catch {
         await context.supabase.from("ai_generation_runs").update({
           status: "failed",

@@ -38,13 +38,15 @@ const placeContext = {
   },
 };
 
-function createRequest(body: unknown) {
-  return new Request("http://localhost/api/ai/image", {
+function createRequest(body: unknown, url = "http://localhost/api/ai/image") {
+  return new Request(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
 }
+
+const previewImageUrl = "https://deploy-preview-10--starboardsf2e.netlify.app/api/ai/image";
 
 function createSupabaseMock() {
   const campaignQuery = {
@@ -181,56 +183,40 @@ describe("POST /api/ai/image", () => {
   });
 
   it("queues image generation for the Netlify background worker", async () => {
-    const previousSiteUrl = process.env.URL;
-    process.env.URL = "https://star-board.netlify.app";
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
 
-    try {
-      const supabase = createSupabaseMock();
-      mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-      mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
-      mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
-      mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }, previewImageUrl));
+    const payload = await response.json();
 
-      const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
-      const payload = await response.json();
-
-      expect(response.status).toBe(202);
-      expect(payload.job).toMatchObject({ generationRunId: "00000000-0000-4000-8000-000000000003", status: "pending", targetKind: "npc", mode: "create", subject: "A masked station broker" });
-      expect(payload.prompt).toEqual(expect.any(String));
-      expect(mocks.generateImage).not.toHaveBeenCalled();
-      expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith("https://star-board.netlify.app", expect.objectContaining({ generationRunId: payload.job.generationRunId, model: "openai/gpt-image-1" }), "worker-secret");
-      expect(payload.job.statusUpdatedAt).toBe("2026-08-03T12:34:56.000Z");
-    } finally {
-      if (previousSiteUrl === undefined) delete process.env.URL;
-      else process.env.URL = previousSiteUrl;
-    }
+    expect(response.status).toBe(202);
+    expect(payload.job).toMatchObject({ generationRunId: "00000000-0000-4000-8000-000000000003", status: "pending", targetKind: "npc", mode: "create", subject: "A masked station broker" });
+    expect(payload.prompt).toEqual(expect.any(String));
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith(previewImageUrl, expect.objectContaining({ generationRunId: payload.job.generationRunId, model: "openai/gpt-image-1" }), "worker-secret");
+    expect(payload.job.statusUpdatedAt).toBe("2026-08-03T12:34:56.000Z");
   });
 
   it("uses the same parent context when queuing Place artwork", async () => {
-    const previousSiteUrl = process.env.URL;
-    process.env.URL = "https://star-board.netlify.app";
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.loadPlaceAiContext.mockResolvedValue({ context: placeContext });
 
-    try {
-      const supabase = createSupabaseMock();
-      mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-      mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
-      mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
-      mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
-      mocks.loadPlaceAiContext.mockResolvedValue({ context: placeContext });
+    const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "place", parentPlaceId: parentId, subject: "A hidden transit room", model: "openai/gpt-image-1" }));
+    const payload = await response.json();
 
-      const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "place", parentPlaceId: parentId, subject: "A hidden transit room", model: "openai/gpt-image-1" }));
-      const payload = await response.json();
-
-      expect(response.status).toBe(202);
-      expect(mocks.loadPlaceAiContext).toHaveBeenCalledWith(supabase, campaignId, parentId);
-      expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith("https://star-board.netlify.app", expect.objectContaining({
-        generationRunId: payload.job.generationRunId,
-        prompt: expect.stringContaining("Immediate parent player notes: Public parent notes."),
-      }), "worker-secret");
-    } finally {
-      if (previousSiteUrl === undefined) delete process.env.URL;
-      else process.env.URL = previousSiteUrl;
-    }
+    expect(response.status).toBe(202);
+    expect(mocks.loadPlaceAiContext).toHaveBeenCalledWith(supabase, campaignId, parentId);
+    expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith("http://localhost/api/ai/image", expect.objectContaining({
+      generationRunId: payload.job.generationRunId,
+      prompt: expect.stringContaining("Immediate parent player notes: Public parent notes."),
+    }), "worker-secret");
   });
 
   it("rejects an invalid Place parent before image generation", async () => {
@@ -269,7 +255,7 @@ describe("POST /api/ai/image", () => {
 
   it("queues on Netlify even when a stale sync mode is configured", async () => {
     const previousNetlifyFlag = process.env.NETLIFY;
-    process.env.NETLIFY = "true";
+    delete process.env.NETLIFY;
 
     try {
       const supabase = createSupabaseMock();
@@ -278,11 +264,11 @@ describe("POST /api/ai/image", () => {
       mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
       mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
 
-      const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }));
+      const response = await POST(createRequest({ campaignId, mode: "create", targetKind: "npc", subject: "A masked station broker", model: "openai/gpt-image-1" }, previewImageUrl));
 
       expect(response.status).toBe(202);
       expect(mocks.generateImage).not.toHaveBeenCalled();
-      expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalled();
+      expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith(previewImageUrl, expect.anything(), "worker-secret");
     } finally {
       if (previousNetlifyFlag === undefined) delete process.env.NETLIFY;
       else process.env.NETLIFY = previousNetlifyFlag;
