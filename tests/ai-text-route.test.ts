@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   buildFactionPrompt: vi.fn(() => "faction-prompt"),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  resolveCampaignCredential: vi.fn(),
   loadMissionAiReferences: vi.fn(),
 }));
 
@@ -29,6 +30,10 @@ vi.mock("@/lib/ai/prompts", () => ({
 }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
+vi.mock("@/lib/ai/route-support", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/route-support")>();
+  return { ...actual, resolveCampaignCredential: mocks.resolveCampaignCredential };
+});
 
 import { POST as generateFaction } from "@/app/api/ai/faction/route";
 import { POST as generateMission } from "@/app/api/ai/mission/route";
@@ -51,9 +56,10 @@ const baseInput = { campaignId, mode: "create" as const };
 describe("structured AI assistance routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: {}, user: { id: userId }, role: "gm" });
-    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", artStyleSuffix: "Cinematic sci-fi realism" } });
+    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Cinematic sci-fi realism" } });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini", "google/gemini-2.5-flash", "openai/gpt-4o", "openai/gpt-image-1", "google/gemini-2.5-flash-image", "bytedance-seed/seedream-4.5"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [
       { id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true },
@@ -103,7 +109,7 @@ describe("structured AI assistance routes", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
-    expect(mocks.generateJson).toHaveBeenCalledWith("mission-prompt", expect.anything(), "openai/gpt-4o-mini");
+    expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "mission-prompt", expect.anything(), "openai/gpt-4o-mini");
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "mission", status: "complete", model: "openai/gpt-4o-mini", provider: "openrouter", effectiveModel: "openrouter/fallback", generationId: "text-run-2", inputTokens: 12, outputTokens: 34, costUsd: 0.001 }));
   });
 
@@ -146,7 +152,7 @@ describe("structured AI assistance routes", () => {
     const response = await generateMission(request({ ...baseInput, title: "The Relay", model: liveModel }));
 
     expect(response.status).toBe(200);
-    expect(mocks.generateJson).toHaveBeenCalledWith("mission-prompt", expect.anything(), liveModel);
+    expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "mission-prompt", expect.anything(), liveModel);
   });
 
   it("rejects a model outside the live catalog before calling the provider", async () => {

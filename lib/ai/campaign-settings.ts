@@ -7,6 +7,17 @@ export type CampaignAiSettings = {
   enabledModelIds: string[];
 };
 
+export async function loadCampaignVisualStyle(supabase: SupabaseClient, campaignId: string): Promise<{ visualStyle: string } | { error: string }> {
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("visual_style")
+    .eq("id", campaignId)
+    .maybeSingle();
+
+  if (error || !data) return { error: "Campaign visual style could not be loaded." };
+  return { visualStyle: data.visual_style };
+}
+
 export async function loadCampaignAiSettings(supabase: SupabaseClient, campaignId: string, availableModelIds: readonly string[] = defaultEnabledAiModelIds): Promise<{ settings: CampaignAiSettings } | { error: string }> {
   const { data, error } = await supabase
     .from("campaign_ai_settings")

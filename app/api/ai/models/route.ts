@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { aiModelSorts, getAiModelCatalog, type AiModelSort } from "@/lib/ai/model-discovery";
 import { aiCapabilities, type AiCapability } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
-import { requireCampaignGM } from "@/lib/auth/permissions";
+import { getAuthenticatedUser, getCampaignMembership, requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
+import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -22,15 +23,42 @@ export async function GET(request: Request) {
   }
 
   try {
-    const context = await requireCampaignGM(campaignId);
+    const capability = capabilityResult.data as AiCapability;
+    const gmContext = await requireCampaignGM(campaignId);
+    let context = gmContext;
+    let playerAccess = false;
 
     if (!context) {
-      return NextResponse.json({ error: "GM access is required to view AI models." }, { status: 403 });
+      if (capability !== "structured-text") {
+        return NextResponse.json({ error: "GM access is required to view AI models." }, { status: 403 });
+      }
+
+      const memberContext = await getAuthenticatedUser();
+      const membership = memberContext
+        ? await getCampaignMembership(memberContext.supabase, campaignId, memberContext.user.id)
+        : null;
+
+      if (!memberContext || membership?.role !== "player") {
+        return NextResponse.json({ error: "GM access is required to view AI models." }, { status: 403 });
+      }
+
+      context = { ...memberContext, role: membership.role };
+      playerAccess = true;
     }
 
-    const capability = capabilityResult.data as AiCapability;
+    let campaignCredential;
+    try {
+      campaignCredential = await resolveCampaignCredential(campaignId);
+    } catch (error) {
+      return campaignCredentialErrorResponse(error, "AI model catalog is temporarily unavailable.");
+    }
+
+    if (playerAccess && !campaignCredential.status.allowPlayerAi) {
+      return NextResponse.json({ error: "Player AI assistance is not enabled for this campaign." }, { status: 403 });
+    }
+
     const sort = sortResult.data as AiModelSort;
-    const catalog = await getAiModelCatalog(capability, sort);
+    const catalog = await getAiModelCatalog(campaignCredential.apiKey, capability, sort);
     const availableModels = catalog.models.filter((model) => model.compatible);
     const settingsResult = await loadCampaignAiSettings(context.supabase, campaignId, availableModels.map((model) => model.id));
     if ("error" in settingsResult) return NextResponse.json({ error: settingsResult.error }, { status: 503 });

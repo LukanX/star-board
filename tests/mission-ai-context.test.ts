@@ -31,7 +31,7 @@ const roomId = "00000000-0000-4000-8000-000000000003";
 const districtId = "00000000-0000-4000-8000-000000000004";
 const planetId = "00000000-0000-4000-8000-000000000005";
 
-const campaign = { system: "Starfinder 2e", description: "A frontier campaign", artStyleSuffix: "Cinematic sci-fi realism" };
+const campaign = { system: "Starfinder 2e", description: "A frontier campaign", visualStyle: "Cinematic sci-fi realism" };
 
 const references = {
   giver: {

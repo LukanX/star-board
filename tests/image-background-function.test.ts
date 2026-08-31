@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getSupabaseServiceRoleClient: vi.fn(),
   getAiProviderFailure: vi.fn(),
   logAiProviderFailure: vi.fn(),
+  getCampaignCredentialForGeneration: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/client", () => ({ generateImage: mocks.generateImage }));
@@ -20,6 +21,7 @@ vi.mock("@/lib/ai/errors", () => ({
   getAiProviderFailure: mocks.getAiProviderFailure,
   logAiProviderFailure: mocks.logAiProviderFailure,
 }));
+vi.mock("@/lib/ai/campaign-credentials", () => ({ getCampaignCredentialForGeneration: mocks.getCampaignCredentialForGeneration }));
 
 import handler, { config } from "@/netlify/functions/generate-image-background";
 
@@ -92,8 +94,8 @@ describe("generate-image-background", () => {
     mocks.getServerEnv.mockReturnValue({
       SUPABASE_SECRET_KEY: secret,
       NEXT_PUBLIC_SUPABASE_URL: "https://supabase.example",
-      OPENROUTER_API_KEY: "test-key",
     });
+    mocks.getCampaignCredentialForGeneration.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.getAiProviderFailure.mockImplementation((error: unknown, fallback: string) => ({
       message: error instanceof Error ? error.message : fallback,
     }));
@@ -151,7 +153,7 @@ describe("generate-image-background", () => {
     expect(response.status).toBe(202);
     expect(claimQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "running", status_updated_at: expect.any(String) }));
     expect(claimQuery.gte).toHaveBeenCalledWith("status_updated_at", expect.any(String));
-    expect(mocks.generateImage).toHaveBeenCalledWith(job.prompt, job.model, {
+    expect(mocks.generateImage).toHaveBeenCalledWith("campaign-key", job.prompt, job.model, {
       aspectRatio: job.aspectRatio,
       size: job.size,
       timeoutMs: imageJobProviderTimeoutMs,

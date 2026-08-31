@@ -10,6 +10,7 @@ import { getServerEnv } from "@/lib/env";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { placeDraftSchema, placeGenerationInputSchema } from "@/lib/validation/ai";
+import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 
 export const runtime = "nodejs";
 
@@ -35,13 +36,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "GM access is required for AI place assistance." }, { status: 403 });
     }
 
-    const env = getServerEnv();
-
-    if (!env.OPENROUTER_API_KEY) {
-      return NextResponse.json({ error: "OpenRouter text generation is not configured." }, { status: 503 });
+    let campaignCredential;
+    try {
+      campaignCredential = await resolveCampaignCredential(input.data.campaignId);
+    } catch (error) {
+      return campaignCredentialErrorResponse(error, "Place assistance is temporarily unavailable.");
     }
 
-    const catalog = await getAiModelCatalog("structured-text");
+    const env = getServerEnv();
+
+    const catalog = await getAiModelCatalog(campaignCredential.apiKey, "structured-text");
     const availableModels = catalog.models.filter((model) => model.compatible);
     const settingsResult = await loadCampaignAiSettings(context.supabase, input.data.campaignId, availableModels.map((model) => model.id));
     if ("error" in settingsResult) return NextResponse.json({ error: settingsResult.error }, { status: 503 });
@@ -72,7 +76,7 @@ export async function POST(request: Request) {
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
 
     try {
-      providerResult = await generateJson(prompt, placeDraftSchema, selectedModel.id);
+      providerResult = await generateJson(campaignCredential.apiKey, prompt, placeDraftSchema, selectedModel.id);
       rawDraft = providerResult.data;
     } catch (error: unknown) {
       logAiProviderFailure(error, { kind: "place", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });

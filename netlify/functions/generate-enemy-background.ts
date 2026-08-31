@@ -5,6 +5,7 @@ import { parseEnemyBackgroundJob, verifyEnemyBackgroundSignature } from "../../l
 import { getServerEnv } from "../../lib/env";
 import { getSupabaseServiceRoleClient } from "../../lib/supabase/service";
 import { enemyAiDraftSchema } from "../../lib/validation/enemy";
+import { getCampaignCredentialForGeneration } from "../../lib/ai/campaign-credentials";
 
 function truncate(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
@@ -109,7 +110,8 @@ export default async function handler(request: Request) {
   logWorkerEvent("claimed", { generationRunId: claimedRun.id, model: input.data.model });
 
   try {
-    const response = await generateJson(input.data.prompt, enemyAiDraftSchema, input.data.model, { timeoutMs: enemyJobProviderTimeoutMs });
+    const campaignCredential = await getCampaignCredentialForGeneration(claimedRun.campaign_id, supabase);
+    const response = await generateJson(campaignCredential.apiKey, input.data.prompt, enemyAiDraftSchema, input.data.model, { timeoutMs: enemyJobProviderTimeoutMs });
     const draft = enemyAiDraftSchema.safeParse(response.data);
     if (!draft.success) throw new Error("The AI response did not match the enemy draft format.");
 

@@ -12,7 +12,6 @@ export const imageGenerationInputSchema = z.object({
   parentPlaceId: z.string().uuid().nullable().optional(),
   aspectRatio: z.enum(imageAspectRatioValues).default(defaultImageAspectRatio),
   size: z.enum(imageSizeValues).default(defaultImageSize),
-  campaignStyle: z.string().trim().max(600).optional(),
   refinement: z.string().trim().max(600).optional(),
   currentPrompt: z.string().trim().max(imagePromptMaxLength).optional(),
 }).superRefine(({ aspectRatio, size, targetKind, parentPlaceId }, context) => {

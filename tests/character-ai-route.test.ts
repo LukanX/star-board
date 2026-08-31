@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   buildCharacterPrompt: vi.fn(() => "character-prompt"),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  resolveCampaignCredential: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/client", () => ({ generateJson: mocks.generateJson }));
@@ -19,6 +20,7 @@ vi.mock("@/lib/ai/assistance", () => ({ loadCampaignAiContext: mocks.loadCampaig
 vi.mock("@/lib/ai/prompts", () => ({ buildCharacterPrompt: mocks.buildCharacterPrompt }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
+vi.mock("@/lib/ai/route-support", () => ({ campaignCredentialErrorResponse: vi.fn(), resolveCampaignCredential: mocks.resolveCampaignCredential }));
 
 import { POST as generateCharacterPrompt } from "@/app/api/ai/character/route";
 
@@ -36,12 +38,13 @@ function request(body: unknown) {
 describe("character portrait prompt route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase: {}, user: { id: userId } });
     mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Nova" });
-    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", artStyleSuffix: "Retro-futurist" } });
+    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Retro-futurist" } });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true }] });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key", status: { allowPlayerAi: true } });
     mocks.recordAiGeneration.mockResolvedValue({ error: null });
   });
 
@@ -61,6 +64,7 @@ describe("character portrait prompt route", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
+    expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "character-prompt", expect.anything(), "openai/gpt-4o-mini");
     expect(mocks.buildCharacterPrompt).toHaveBeenCalledWith(expect.objectContaining({ backstoryMarkdown: "A survivor of a derelict ship.", physicalDescription: "Tall with silver eyes." }), expect.objectContaining({ system: "Starfinder 2e" }));
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "character", status: "complete", model: "openai/gpt-4o-mini", provider: "openrouter", effectiveModel: "openrouter/fallback", generationId: "character-run-1" }));
   });

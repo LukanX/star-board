@@ -363,7 +363,7 @@ export const updateEnemySchema = z.object({
   artProvider: nullableText(80).optional(),
   sourceSnapshot: enemySourceSnapshotSchema.nullable().optional(),
   expectedSourceHash: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
-  expectedUpdatedAt: z.string().datetime(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
 }).superRefine((value, context) => {
   if (value.origin === "aon" && value.sourceSnapshot === null) {
     context.addIssue({ code: "custom", path: ["sourceSnapshot"], message: "An Archives of Nethys enemy needs source provenance." });

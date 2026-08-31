@@ -4,7 +4,7 @@ import { getPlaceAncestors } from "@/lib/places";
 export type CampaignAiContext = {
   system: string;
   description: string;
-  artStyleSuffix: string;
+  visualStyle: string;
 };
 
 export type MissionAiReferences = {
@@ -56,7 +56,7 @@ type GenerationKind = "mission" | "npc" | "faction" | "place" | "character" | "i
 export async function loadCampaignAiContext(supabase: SupabaseClient, campaignId: string) {
   const { data: campaign, error: campaignError } = await supabase
     .from("campaigns")
-    .select("system, description, art_style_suffix")
+    .select("system, description, visual_style")
     .eq("id", campaignId)
     .maybeSingle();
 
@@ -67,7 +67,7 @@ export async function loadCampaignAiContext(supabase: SupabaseClient, campaignId
     campaign: {
       system: campaign.system,
       description: campaign.description,
-      artStyleSuffix: campaign.art_style_suffix,
+      visualStyle: campaign.visual_style,
     },
   };
 }

@@ -1,7 +1,7 @@
 import type { PlaceRecord } from "@/lib/places";
 import type { EnemyOrigin, EnemyRarity, EnemySize, EnemyStatBlockV1 } from "@/lib/enemies/types";
 
-export type CampaignRecord = { id: string; name: string; system: string; description: string; created_by: string };
+export type CampaignRecord = { id: string; name: string; system: string; description: string; visual_style: string; created_by: string };
 export type CampaignMembership = { role: "gm" | "player"; display_name: string; campaign: CampaignRecord | CampaignRecord[] | null };
 
 export type Mission = {

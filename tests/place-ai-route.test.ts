@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   buildPlacePrompt: vi.fn(() => "place-prompt"),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  resolveCampaignCredential: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/client", () => ({ generateJson: mocks.generateJson }));
@@ -23,6 +24,10 @@ vi.mock("@/lib/ai/assistance", () => ({
 vi.mock("@/lib/ai/prompts", () => ({ buildPlacePrompt: mocks.buildPlacePrompt }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
+vi.mock("@/lib/ai/route-support", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/route-support")>();
+  return { ...actual, resolveCampaignCredential: mocks.resolveCampaignCredential };
+});
 
 import { POST as generatePlace } from "@/app/api/ai/place/route";
 
@@ -59,9 +64,10 @@ function createPlacesQuery() {
 describe("AI place assistance route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: { from: vi.fn().mockReturnValue(createPlacesQuery()) }, user: { id: userId }, role: "gm" });
-    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A frontier campaign", artStyleSuffix: "Cinematic sci-fi realism" } });
+    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A frontier campaign", visualStyle: "Cinematic sci-fi realism" } });
     mocks.loadPlaceAiContext.mockResolvedValue({ context: undefined });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true }] });

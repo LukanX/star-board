@@ -89,7 +89,7 @@ describe("campaign mappers", () => {
   });
 
   test("unwraps campaign arrays and returns null when missing", () => {
-    const campaign = { id: "campaign", name: "Board", system: "", description: "", created_by: "user" };
+    const campaign = { id: "campaign", name: "Board", system: "", description: "", visual_style: "Cinematic", created_by: "user" };
     expect(getCampaignRecord({ role: "gm", display_name: "User", campaign: [campaign] })).toEqual(campaign);
     expect(getCampaignRecord({ role: "gm", display_name: "User", campaign: [] })).toBeNull();
     expect(getCampaignRecord({ role: "gm", display_name: "User", campaign: null })).toBeNull();

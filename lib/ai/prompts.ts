@@ -3,12 +3,10 @@ import type { CampaignAiContext, MissionAiReferences, PlaceAiContext } from "@/l
 import type { ImageGenerationInput } from "@/lib/validation/image";
 import { imagePromptMaxLength } from "@/lib/validation/image";
 
-export const ART_STYLE_PREFIX =
-  "Original retro-futurist tabletop RPG illustration, synthwave space opera, crisp ink contours, luminous cyan and magenta signal lights, controlled film grain, dramatic rim lighting, readable silhouette, no logos, no text, no watermark.";
-const FACTION_ART_STYLE_PREFIX =
-  "Original retro-futurist tabletop RPG emblem design, synthwave space opera, crisp ink contours, luminous cyan and magenta signal lights, controlled film grain, dramatic rim lighting, readable silhouette, no written text, no watermark.";
+export const ART_SAFETY_INSTRUCTION =
+  "Create original artwork without imitating a living artist or copyrighted franchise style. Do not include written text, brand logos, signatures, or watermarks.";
 const FACTION_ART_INSTRUCTION =
-  "Faction artwork must be only one standalone faction symbol or logo: a centered emblem or insignia on a clean field. Do not create characters, creatures, headquarters, landscapes, banners, environments, action scenes, or narrative moments.";
+  "Faction artwork must be only one standalone faction symbol or in-world insignia: a centered emblem on a clean field. Do not create characters, creatures, headquarters, landscapes, banners, environments, action scenes, or narrative moments.";
 const ENEMY_ART_INSTRUCTION =
   "Enemy artwork must show one readable creature subject with a clear silhouette and a context-appropriate pose. Do not create a group, encounter scene, stat block, written text, or logos.";
 
@@ -16,7 +14,7 @@ function campaignLines(context?: CampaignAiContext) {
   return context ? [
     `Campaign system: ${context.system}`,
     `Campaign brief: ${context.description || "No campaign brief recorded."}`,
-    `Campaign visual style: ${context.artStyleSuffix}`,
+    `Campaign visual style: ${context.visualStyle}`,
   ] : [];
 }
 
@@ -162,7 +160,7 @@ export function buildFactionPrompt(input: FactionGenerationInput, context?: Camp
     input.currentDraft ? `Current editor draft: ${JSON.stringify(input.currentDraft)}` : "",
     "Write a distinct organization with a clear public identity, operating status, pressure point, and relationship to the campaign. Keep the description suitable for players.",
     "Write player notes without spoilers and put secrets, leverage, and future reveals in gmNotes. Do not invent or discuss the faction's linked NPC roster.",
-    "visualPrompt must be a concise, subject-specific description of one standalone faction symbol or logo for later image generation. Prioritize a centered emblem or insignia on a clean field; do not describe characters, headquarters, landscapes, banners, environments, action scenes, or written text. Do not include provider names or image dimensions.",
+    "visualPrompt must be a concise, subject-specific description of one standalone faction symbol or insignia for later image generation. Prioritize a centered emblem on a clean field; do not describe characters, headquarters, landscapes, banners, environments, action scenes, or written text. Do not include provider names or image dimensions.",
     "Fields: name, status, description, playerNotes, gmNotes, visualPrompt.",
   ].filter(Boolean).join("\n");
 }
@@ -228,26 +226,24 @@ export function buildEnemyBriefPrompt(input: EnemyBriefGenerationInput, context?
   ].filter(Boolean).join("\n");
 }
 
-export function buildArtPrompt(subject: string, campaignStyle?: string, refinement?: string, currentPrompt?: string, targetKind?: ImageGenerationInput["targetKind"], placeContext?: PlaceAiContext) {
-  const stylePrefix = targetKind === "faction" ? FACTION_ART_STYLE_PREFIX : ART_STYLE_PREFIX;
-  const subjectParts = [
-    targetKind === "faction" ? FACTION_ART_INSTRUCTION : "",
-    targetKind === "enemy" ? ENEMY_ART_INSTRUCTION : "",
-    refinement ? `Focused refinement request: ${refinement}` : "",
-    `Subject: ${subject}`,
-  ].filter(Boolean);
-  const fixedPrompt = [stylePrefix, ...subjectParts].join(" ");
-  const placeContextBudget = Math.max(0, imagePromptMaxLength - fixedPrompt.length - 1);
-  const boundedPlaceContext = targetKind === "place" ? boundedPlaceArtContext(placeContext, placeContextBudget) : "";
-  const campaignStyleBudget = Math.max(0, imagePromptMaxLength - fixedPrompt.length - (boundedPlaceContext ? boundedPlaceContext.length + 1 : 0) - (campaignStyle ? 1 : 0));
-  const boundedCampaignStyle = campaignStyle ? campaignStyle.slice(0, campaignStyleBudget) : "";
-  const freshParts = [stylePrefix, boundedPlaceContext, boundedCampaignStyle, ...subjectParts].filter(Boolean);
-  const freshPrompt = freshParts.join(" ");
+export function buildArtPrompt(subject: string, visualStyle?: string, refinement?: string, currentPrompt?: string, targetKind?: ImageGenerationInput["targetKind"], placeContext?: PlaceAiContext) {
+  const targetInstruction = targetKind === "faction" ? FACTION_ART_INSTRUCTION : targetKind === "enemy" ? ENEMY_ART_INSTRUCTION : "";
+  const fixedPrompt = [ART_SAFETY_INSTRUCTION, targetInstruction, `Subject: ${subject}`].filter(Boolean).join(" ");
+  let remaining = Math.max(0, imagePromptMaxLength - fixedPrompt.length);
+  const styleBudget = Math.min(1200, remaining);
+  const boundedStyle = visualStyle ? truncatePromptPart(`Campaign visual style: ${visualStyle}`, styleBudget) : "";
+  remaining -= boundedStyle.length + (boundedStyle ? 1 : 0);
+  const refinementBudget = Math.min(600, Math.max(0, remaining));
+  const boundedRefinement = refinement ? truncatePromptPart(`Focused refinement request: ${refinement}`, refinementBudget) : "";
+  remaining -= boundedRefinement.length + (boundedRefinement ? 1 : 0);
+  const placeContextBudget = targetKind === "place" ? Math.max(0, remaining) : 0;
+  const boundedPlaceContext = boundedPlaceArtContext(placeContext, placeContextBudget);
+  remaining -= boundedPlaceContext.length + (boundedPlaceContext ? 1 : 0);
   const currentPromptLabel = "Refine this existing visual direction: ";
-  const currentPromptBudget = Math.max(0, imagePromptMaxLength - freshPrompt.length - (currentPrompt ? currentPromptLabel.length + 1 : 0));
+  const currentPromptBudget = Math.max(0, remaining - (currentPrompt ? currentPromptLabel.length + 1 : 0));
   const boundedCurrentPrompt = currentPrompt && currentPromptBudget > 0
     ? `${currentPromptLabel}${currentPrompt.slice(0, currentPromptBudget)}`
     : "";
 
-  return [freshPrompt, boundedCurrentPrompt].filter(Boolean).join(" ").slice(0, imagePromptMaxLength);
+  return [fixedPrompt, boundedStyle, boundedRefinement, boundedPlaceContext, boundedCurrentPrompt].filter(Boolean).join(" ").slice(0, imagePromptMaxLength);
 }

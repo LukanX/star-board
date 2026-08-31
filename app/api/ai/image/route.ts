@@ -11,6 +11,7 @@ import { imageDraftSchema, imageGenerationInputSchema } from "@/lib/validation/i
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { dispatchImageBackgroundJob } from "@/lib/ai/image-jobs";
+import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 
 export const runtime = "nodejs";
 
@@ -45,13 +46,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "GM access is required for AI art assistance." }, { status: 403 });
     }
 
-    const env = getServerEnv();
-
-    if (!env.OPENROUTER_API_KEY) {
-      return NextResponse.json({ error: "OpenRouter image generation is not configured." }, { status: 503 });
+    let campaignCredential;
+    try {
+      campaignCredential = await resolveCampaignCredential(input.data.campaignId);
+    } catch (error) {
+      return campaignCredentialErrorResponse(error, "Art generation is temporarily unavailable.");
     }
 
-    const catalog = await getAiModelCatalog("image");
+    const env = getServerEnv();
+
+    const catalog = await getAiModelCatalog(campaignCredential.apiKey, "image");
     const availableModels = catalog.models.filter((model) => model.compatible);
     const settingsResult = await loadCampaignAiSettings(context.supabase, input.data.campaignId, availableModels.map((model) => model.id));
     if ("error" in settingsResult) return NextResponse.json({ error: settingsResult.error }, { status: 503 });
@@ -66,7 +70,7 @@ export async function POST(request: Request) {
 
     const { data: campaign, error: campaignError } = await context.supabase
       .from("campaigns")
-      .select("system, description, art_style_suffix")
+      .select("system, description, visual_style")
       .eq("id", input.data.campaignId)
       .maybeSingle();
 
@@ -78,11 +82,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Campaign was not found." }, { status: 404 });
     }
 
-    const campaignStyle = [
-      campaign.system,
-      campaign.description,
-      campaign.art_style_suffix,
-      input.data.campaignStyle,
+    const campaignPromptContext = [
+      `Campaign system: ${campaign.system}`,
+      `Campaign brief: ${campaign.description}`,
+      `Campaign visual style: ${campaign.visual_style}`,
     ].filter(Boolean).join(". ");
     const placeContextResult = input.data.targetKind === "place" && input.data.parentPlaceId
       ? await loadPlaceAiContext(context.supabase, input.data.campaignId, input.data.parentPlaceId)
@@ -92,7 +95,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: placeContextResult.error }, { status: placeContextResult.invalid ? 400 : 503 });
     }
 
-    const prompt = buildArtPrompt(input.data.subject, campaignStyle, input.data.refinement, input.data.currentPrompt, input.data.targetKind, placeContextResult.context);
+    const prompt = buildArtPrompt(input.data.subject, campaignPromptContext, input.data.refinement, input.data.currentPrompt, input.data.targetKind, placeContextResult.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundImageGeneration(request, env)) {
@@ -163,7 +166,7 @@ export async function POST(request: Request) {
     let response;
 
     try {
-      response = await generateImage(prompt, selectedModel.id, { aspectRatio: input.data.aspectRatio, size: input.data.size });
+      response = await generateImage(campaignCredential.apiKey, prompt, selectedModel.id, { aspectRatio: input.data.aspectRatio, size: input.data.size });
     } catch (error: unknown) {
       logAiProviderFailure(error, { kind: "image", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
       await context.supabase.from("ai_generation_runs").insert({

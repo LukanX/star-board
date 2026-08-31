@@ -3,6 +3,7 @@ import { getAiProviderFailure, logAiProviderFailure } from "../../lib/ai/errors"
 import { imageJobPendingTimeoutMs, imageJobProviderTimeoutMs } from "../../lib/ai/image-job-lifecycle";
 import { parseImageBackgroundJob, verifyImageBackgroundSignature } from "../../lib/ai/image-jobs";
 import { getServerEnv } from "../../lib/env";
+import { getCampaignCredentialForGeneration } from "../../lib/ai/campaign-credentials";
 import { campaignArtBucket } from "../../lib/storage/campaign-art";
 import { getSupabaseServiceRoleClient } from "../../lib/supabase/service";
 
@@ -139,7 +140,8 @@ export default async function handler(request: Request) {
   logWorkerEvent("claimed", { generationRunId: claimedRun.id, model: input.data.model });
 
   try {
-    const response = await generateImage(input.data.prompt, input.data.model, { aspectRatio: input.data.aspectRatio, size: input.data.size, timeoutMs: imageJobProviderTimeoutMs });
+    const campaignCredential = await getCampaignCredentialForGeneration(claimedRun.campaign_id, supabase);
+    const response = await generateImage(campaignCredential.apiKey, input.data.prompt, input.data.model, { aspectRatio: input.data.aspectRatio, size: input.data.size, timeoutMs: imageJobProviderTimeoutMs });
     const storedImage = await getStoredImage(response.image);
     const path = `${claimedRun.campaign_id}/${claimedRun.requested_by}/image-${claimedRun.id}.${imageMediaTypes[storedImage.mediaType]}`;
     const { error: uploadError } = await supabase.storage.from(campaignArtBucket).upload(path, storedImage.body, {

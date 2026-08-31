@@ -309,6 +309,20 @@ describe("enemy campaign routes", () => {
     expect(query.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
   });
 
+  it("accepts the offset-form timestamps returned for timestamptz fields", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: enemyId, error: null });
+    const supabase = { rpc };
+    const offsetEnemy = { ...enemy, updated_at: "2026-08-23T12:00:00+00:00" };
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignRole.mockResolvedValue("gm");
+    mocks.readCampaignEnemyForRole.mockResolvedValue(offsetEnemy);
+
+    const response = await updateEnemy(request({ expectedUpdatedAt: offsetEnemy.updated_at }, "PATCH"), enemyParams());
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("update_enemy_with_details", expect.objectContaining({ p_expected_updated_at: offsetEnemy.updated_at }));
+  });
+
   it("allows an AoN record to detach before saving edited mechanics", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: enemyId, error: null });
     const supabase = { rpc };

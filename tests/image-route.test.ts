@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   requireCampaignGM: vi.fn(),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  resolveCampaignCredential: vi.fn(),
   dispatchImageBackgroundJob: vi.fn(),
   loadPlaceAiContext: vi.fn(),
 }));
@@ -15,6 +16,10 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/ai/client", () => ({ generateImage: mocks.generateImage }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
+vi.mock("@/lib/ai/route-support", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/route-support")>();
+  return { ...actual, resolveCampaignCredential: mocks.resolveCampaignCredential };
+});
 vi.mock("@/lib/ai/image-jobs", () => ({ dispatchImageBackgroundJob: mocks.dispatchImageBackgroundJob }));
 vi.mock("@/lib/ai/assistance", () => ({ loadPlaceAiContext: mocks.loadPlaceAiContext }));
 
@@ -53,7 +58,7 @@ function createSupabaseMock() {
     select: vi.fn(),
     eq: vi.fn(),
     maybeSingle: vi.fn().mockResolvedValue({
-      data: { system: "Starfinder 2e", description: "A tense frontier campaign", art_style_suffix: "Cinematic sci-fi realism" },
+      data: { system: "Starfinder 2e", description: "A tense frontier campaign", visual_style: "Cinematic sci-fi realism" },
       error: null,
     }),
   };
@@ -90,6 +95,7 @@ describe("POST /api/ai/image", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.loadPlaceAiContext.mockResolvedValue({ context: undefined });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
   });
 
   it("rejects malformed input before checking campaign access", async () => {
@@ -119,7 +125,7 @@ describe("POST /api/ai/image", () => {
   it("returns a validated draft with a canonical timestamp and audit run", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini", "google/gemini-2.5-flash", "openai/gpt-4o", "openai/gpt-image-1", "google/gemini-2.5-flash-image", "bytedance-seed/seedream-4.5"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [
       { id: "openai/gpt-image-1", capability: "image", compatible: true },
@@ -139,8 +145,8 @@ describe("POST /api/ai/image", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-  expect(mocks.generateImage).toHaveBeenCalledWith(expect.stringContaining("The Glass Meridian"), "openai/gpt-image-1", { aspectRatio: "16:9", size: "3840x2160" });
-  expect(mocks.generateImage.mock.calls[0][0]).toContain("only one standalone faction symbol or logo");
+    expect(mocks.generateImage).toHaveBeenCalledWith("campaign-key", expect.stringContaining("The Glass Meridian"), "openai/gpt-image-1", { aspectRatio: "16:9", size: "3840x2160" });
+    expect(mocks.generateImage.mock.calls[0][1]).toContain("only one standalone faction symbol or in-world insignia");
     expect(payload.draft).toMatchObject({
       generationRunId: "00000000-0000-4000-8000-000000000003",
       aspectRatio: "16:9",
@@ -159,7 +165,7 @@ describe("POST /api/ai/image", () => {
   it("uses the campaign-scoped parent context for synchronous Place artwork", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
     mocks.loadPlaceAiContext.mockResolvedValue({ context: placeContext });
@@ -178,14 +184,14 @@ describe("POST /api/ai/image", () => {
     expect(response.status).toBe(200);
     expect(payload.draft).toBeDefined();
     expect(mocks.loadPlaceAiContext).toHaveBeenCalledWith(supabase, campaignId, parentId);
-    expect(mocks.generateImage.mock.calls[0][0]).toContain("Immediate parent description: A crowded district beneath the orbital ring.");
-    expect(mocks.generateImage.mock.calls[0][0]).toContain("keep the child place as the focal subject");
+    expect(mocks.generateImage.mock.calls[0][1]).toContain("Immediate parent description: A crowded district beneath the orbital ring.");
+    expect(mocks.generateImage.mock.calls[0][1]).toContain("keep the child place as the focal subject");
   });
 
   it("queues image generation for the Netlify background worker", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
 
@@ -203,7 +209,7 @@ describe("POST /api/ai/image", () => {
   it("uses the same parent context when queuing Place artwork", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
     mocks.loadPlaceAiContext.mockResolvedValue({ context: placeContext });
@@ -222,7 +228,7 @@ describe("POST /api/ai/image", () => {
   it("rejects an invalid Place parent before image generation", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
     mocks.loadPlaceAiContext.mockResolvedValue({ error: "Place parent must belong to this campaign.", invalid: true });
@@ -239,7 +245,7 @@ describe("POST /api/ai/image", () => {
   it("returns unavailable when Place context cannot be loaded", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
     mocks.loadPlaceAiContext.mockResolvedValue({ error: "Place hierarchy could not be loaded.", unavailable: true });
@@ -260,7 +266,7 @@ describe("POST /api/ai/image", () => {
     try {
       const supabase = createSupabaseMock();
       mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-      mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "sync" });
+      mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "sync" });
       mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
       mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
 
@@ -278,7 +284,7 @@ describe("POST /api/ai/image", () => {
   it("closes the queued run when the background worker cannot be reached", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
     mocks.dispatchImageBackgroundJob.mockRejectedValueOnce(new Error("worker unavailable"));
@@ -299,7 +305,7 @@ describe("POST /api/ai/image", () => {
     const providerLog = vi.spyOn(console, "error").mockImplementation(() => {});
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
     mocks.generateImage.mockRejectedValue(new AiProviderError("OpenRouter image generation failed. Provider rate limit exceeded", { status: 429, requestId: "image-request-1", retryAfter: "12", providerBody: "{\"error\":\"rate limit\"}", generationId: "image-generation-1" }));
@@ -318,7 +324,7 @@ describe("POST /api/ai/image", () => {
   it("surfaces provider timeouts with a retryable response", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
     mocks.generateImage.mockRejectedValue(new AiProviderError("OpenRouter image generation timed out. Try again, or use background generation for long-running requests.", { status: 504 }));

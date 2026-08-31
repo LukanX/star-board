@@ -4,13 +4,20 @@ const mocks = vi.hoisted(() => ({
   getAiModelCatalog: vi.fn(),
   getServerEnv: vi.fn(),
   requireCampaignGM: vi.fn(),
+  getAuthenticatedUser: vi.fn(),
+  getCampaignMembership: vi.fn(),
   loadCampaignAiSettings: vi.fn(),
+  resolveCampaignCredential: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/model-discovery", () => ({ aiModelSorts: ["most-popular", "pricing-low-to-high", "pricing-high-to-low"], getAiModelCatalog: mocks.getAiModelCatalog }));
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
-vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
+vi.mock("@/lib/auth/permissions", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser, getCampaignMembership: mocks.getCampaignMembership, requireCampaignGM: mocks.requireCampaignGM }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
+vi.mock("@/lib/ai/route-support", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/route-support")>();
+  return { ...actual, resolveCampaignCredential: mocks.resolveCampaignCredential };
+});
 
 import { GET } from "@/app/api/ai/models/route";
 
@@ -22,6 +29,7 @@ describe("GET /api/ai/models", () => {
     mocks.getServerEnv.mockReturnValue({ OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini", OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", available: true, compatible: true }] });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: {}, user: { id: "user-id" }, role: "gm" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
   });
 
@@ -42,6 +50,42 @@ describe("GET /api/ai/models", () => {
 
     expect(response.status).toBe(200);
     expect(payload).toMatchObject({ capability: "structured-text", defaultModel: "openai/gpt-4o-mini", status: "live" });
-    expect(mocks.getAiModelCatalog).toHaveBeenCalledWith("structured-text", "most-popular");
+    expect(mocks.getAiModelCatalog).toHaveBeenCalledWith("campaign-key", "structured-text", "most-popular");
+  });
+
+  it("allows an opted-in player to view the structured-text catalog", async () => {
+    mocks.requireCampaignGM.mockResolvedValue(null);
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase: {}, user: { id: "player-id" } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Nova" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key", status: { allowPlayerAi: true } });
+
+    const response = await GET(new Request(`http://localhost/api/ai/models?campaignId=${campaignId}&capability=structured-text`));
+
+    expect(response.status).toBe(200);
+    expect(mocks.getCampaignMembership).toHaveBeenCalledWith({}, campaignId, "player-id");
+  });
+
+  it("keeps image model discovery GM-only for players", async () => {
+    mocks.requireCampaignGM.mockResolvedValue(null);
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase: {}, user: { id: "player-id" } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Nova" });
+
+    const response = await GET(new Request(`http://localhost/api/ai/models?campaignId=${campaignId}&capability=image`));
+
+    expect(response.status).toBe(403);
+    expect(mocks.resolveCampaignCredential).not.toHaveBeenCalled();
+  });
+
+  it("rejects a player when campaign AI opt-in is disabled", async () => {
+    mocks.requireCampaignGM.mockResolvedValue(null);
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase: {}, user: { id: "player-id" } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Nova" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key", status: { allowPlayerAi: false } });
+
+    const response = await GET(new Request(`http://localhost/api/ai/models?campaignId=${campaignId}&capability=structured-text`));
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("Player AI assistance is not enabled for this campaign.");
   });
 });

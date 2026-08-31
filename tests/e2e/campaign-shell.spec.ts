@@ -61,7 +61,7 @@ test("preserves campaign AI settings action sizing", async ({
   await page.goto(`/campaigns/${campaign.campaignId}/settings`);
 
   const saveButton = page.getByRole("button", {
-    name: "SAVE MODEL ACCESS",
+    name: "SAVE AI PREFERENCES",
     exact: true,
   });
   await expect(saveButton).toBeVisible();

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   buildEnemyPrompt: vi.fn(() => "enemy-prompt"),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  resolveCampaignCredential: vi.fn(),
   dispatchEnemyBackgroundJob: vi.fn(),
 }));
 
@@ -21,6 +22,10 @@ vi.mock("@/lib/ai/assistance", () => ({ loadCampaignAiContext: mocks.loadCampaig
 vi.mock("@/lib/ai/prompts", () => ({ buildEnemyPrompt: mocks.buildEnemyPrompt }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
+vi.mock("@/lib/ai/route-support", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/route-support")>();
+  return { ...actual, resolveCampaignCredential: mocks.resolveCampaignCredential };
+});
 vi.mock("@/lib/ai/enemy-jobs", () => ({ dispatchEnemyBackgroundJob: mocks.dispatchEnemyBackgroundJob }));
 
 import { POST } from "@/app/api/ai/enemy/route";
@@ -98,9 +103,10 @@ const baseInput = {
 describe("POST /api/ai/enemy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini", SUPABASE_SECRET_KEY: "worker-secret" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini", SUPABASE_SECRET_KEY: "worker-secret" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: {}, user: { id: userId }, role: "gm" });
-    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", artStyleSuffix: "Cinematic sci-fi realism" } });
+    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Cinematic sci-fi realism" } });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true }] });
     mocks.recordAiGeneration.mockResolvedValue({ error: null });
@@ -174,7 +180,7 @@ describe("POST /api/ai/enemy", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
-    expect(mocks.generateJson).toHaveBeenCalledWith("enemy-prompt", expect.anything(), "openai/gpt-4o-mini");
+    expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "enemy-prompt", expect.anything(), "openai/gpt-4o-mini");
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "enemy", status: "complete", model: "openai/gpt-4o-mini", effectiveModel: "openrouter/fallback", generationId: "enemy-run-1" }));
   });
 
