@@ -24,6 +24,12 @@ type ImageAsset = {
   provider: string;
 };
 
+type ArtStyleOption = {
+  id: string;
+  name: string;
+  status: "draft" | "ready";
+};
+
 type AiArtStudioProps = {
   campaignId: string | null;
   kind: ArtKind;
@@ -92,6 +98,9 @@ function AiArtStudioContent({
   onApproved,
 }: AiArtStudioProps) {
   const [draft, setDraft] = useState<ImageDraft | null>(null);
+  const [styles, setStyles] = useState<ArtStyleOption[]>([]);
+  const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
+  const [styleSelectionChanged, setStyleSelectionChanged] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<ImageAspectRatio>(
     defaultImageAspectRatio,
@@ -107,6 +116,27 @@ function AiArtStudioContent({
 
   const subjectDraft = onSubjectChange ? (subject ?? "") : localSubjectDraft;
   const availableSizes = imageSizeOptions[aspectRatio];
+
+  useEffect(() => {
+    if (!campaignId) {
+      return;
+    }
+
+    let cancelled = false;
+    void fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/visual-styles`, { cache: "no-store" })
+      .then(async (response) => {
+        const result = (await response.json()) as { styles?: ArtStyleOption[] };
+        if (!response.ok || !result.styles || cancelled) return;
+        setStyles(result.styles.filter((style) => style.status === "ready"));
+      })
+      .catch(() => {
+        if (!cancelled) setStyles([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId]);
 
   useEffect(() => {
     return () => activeGenerationRef.current?.abort();
@@ -165,13 +195,14 @@ function AiArtStudioContent({
           campaignId,
           mode,
           targetKind: kind,
+          visualStyleId: selectedStyleId ?? undefined,
           parentPlaceId: parentPlaceId ?? undefined,
           model: selectedModel ?? undefined,
           subject: subjectDraft,
           aspectRatio,
           size,
           refinement: refinement.trim() || undefined,
-          currentPrompt: draft?.prompt ?? currentPrompt ?? undefined,
+          currentPrompt: draft?.prompt ?? (styleSelectionChanged ? undefined : currentPrompt) ?? undefined,
         }),
       });
       const result = (await response.json()) as {
@@ -269,6 +300,7 @@ function AiArtStudioContent({
     ? `data:${draft.image.mediaType};base64,${draft.image.base64}`
     : (draft?.image.url ?? null);
   const previewAspectRatio = draft?.aspectRatio.replace(":", " / ") ?? "1 / 1";
+  const selectedStyleName = styles.find((style) => style.id === selectedStyleId)?.name;
 
   return (
     <section className="grid gap-[10px] p-[13px] border border-[rgba(255,92,154,.3)] bg-[linear-gradient(120deg,rgba(255,92,154,.07),rgba(185,146,255,.035))]">
@@ -280,6 +312,28 @@ function AiArtStudioContent({
         <Sparkles size={17} />
       </div>
       <div className="grid gap-[10px]">
+        <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
+          VISUAL STYLE
+          <select
+            className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none px-[10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)]"
+            aria-label="Visual style for image generation"
+            value={selectedStyleId ?? ""}
+            onChange={(event) => {
+              const nextStyleId = event.target.value || null;
+              if (nextStyleId === selectedStyleId) return;
+              if (draft?.temporaryPath && campaignId) void removeTemporaryArt(campaignId, draft.temporaryPath);
+              setSelectedStyleId(nextStyleId);
+              setStyleSelectionChanged(true);
+              setDraft(null);
+              setRefinement("");
+              setError(null);
+            }}
+          >
+            <option value="">CAMPAIGN DEFAULT</option>
+            {styles.map((style) => <option key={style.id} value={style.id}>{style.name}</option>)}
+          </select>
+          <span className="text-[var(--dim)] text-[8px] tracking-[.04em]">{selectedStyleName ? `SELECTED // ${selectedStyleName}` : "SELECT A READY STYLE OR USE THE CAMPAIGN DEFAULT."}</span>
+        </label>
         <fieldset className="grid gap-2 min-w-0 m-0 p-0 border-0">
           <legend className="p-0 text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">ASPECT RATIO</legend>
           <div

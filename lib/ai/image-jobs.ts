@@ -3,8 +3,19 @@ import { imageBackgroundJobSchema, type ImageBackgroundJob } from "@/lib/validat
 
 export const imageBackgroundFunctionName = "generate-image-background";
 
+function canonicalImageBackgroundJob(job: ImageBackgroundJob) {
+  return {
+    generationRunId: job.generationRunId,
+    prompt: job.prompt,
+    model: job.model,
+    purpose: job.purpose ?? "entity-art",
+    aspectRatio: job.aspectRatio,
+    size: job.size,
+  };
+}
+
 export function createImageBackgroundSignature(job: ImageBackgroundJob, secret: string) {
-  return createHmac("sha256", secret).update(JSON.stringify(job)).digest("hex");
+  return createHmac("sha256", secret).update(JSON.stringify(canonicalImageBackgroundJob(job))).digest("hex");
 }
 
 export function verifyImageBackgroundSignature(job: ImageBackgroundJob, signature: string | null, secret: string) {

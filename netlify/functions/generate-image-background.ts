@@ -124,7 +124,7 @@ export default async function handler(request: Request) {
     .eq("id", input.data.generationRunId)
     .eq("status", "pending")
     .gte("status_updated_at", new Date(Date.now() - imageJobPendingTimeoutMs).toISOString())
-    .select("id, campaign_id, requested_by")
+    .select("id, campaign_id, requested_by, purpose")
     .maybeSingle();
 
   if (claimError) {
@@ -143,7 +143,8 @@ export default async function handler(request: Request) {
     const campaignCredential = await getCampaignCredentialForGeneration(claimedRun.campaign_id, supabase);
     const response = await generateImage(campaignCredential.apiKey, input.data.prompt, input.data.model, { aspectRatio: input.data.aspectRatio, size: input.data.size, timeoutMs: imageJobProviderTimeoutMs });
     const storedImage = await getStoredImage(response.image);
-    const path = `${claimedRun.campaign_id}/${claimedRun.requested_by}/image-${claimedRun.id}.${imageMediaTypes[storedImage.mediaType]}`;
+    const filePrefix = claimedRun.purpose === "style-preview" ? "style-preview" : "image";
+    const path = `${claimedRun.campaign_id}/${claimedRun.requested_by}/${filePrefix}-${claimedRun.id}.${imageMediaTypes[storedImage.mediaType]}`;
     const { error: uploadError } = await supabase.storage.from(campaignArtBucket).upload(path, storedImage.body, {
       cacheControl: "3600",
       contentType: storedImage.mediaType,

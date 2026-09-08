@@ -12,6 +12,42 @@ import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { dispatchImageBackgroundJob } from "@/lib/ai/image-jobs";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
+import { campaignArtBucket, createCampaignArtSignedUrl } from "@/lib/storage/campaign-art";
+
+const imageMediaTypes = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+} as const;
+
+async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSignedUrl>[0], campaignId: string, userId: string, generationRunId: string, image: Awaited<ReturnType<typeof generateImage>>["image"]) {
+  const mediaType = image.mediaType in imageMediaTypes ? image.mediaType as keyof typeof imageMediaTypes : null;
+  if (!mediaType) throw new Error("The AI provider returned an unsupported image type.");
+
+  const imageUrl = image.url;
+  const body = image.base64
+    ? new Blob([Buffer.from(image.base64, "base64")], { type: mediaType })
+    : imageUrl
+      ? await (async () => {
+          const response = await fetch(imageUrl, { signal: AbortSignal.timeout(60_000) });
+          if (!response.ok) throw new Error("The generated style preview could not be downloaded.");
+          return response.blob();
+        })()
+      : null;
+
+  if (!body) throw new Error("The AI provider returned no image data.");
+
+  const path = `${campaignId}/${userId}/style-preview-${generationRunId}.${imageMediaTypes[mediaType]}`;
+  const { error: uploadError } = await supabase.storage.from(campaignArtBucket).upload(path, body, {
+    cacheControl: "3600",
+    contentType: mediaType,
+    upsert: false,
+  });
+
+  if (uploadError) throw new Error("The generated style preview could not be stored.");
+
+  return { path, mediaType, signedUrl: await createCampaignArtSignedUrl(supabase, path) };
+}
 
 export const runtime = "nodejs";
 
@@ -82,10 +118,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Campaign was not found." }, { status: 404 });
     }
 
+    let visualStyle = campaign.visual_style;
+    if (input.data.visualStyleOverride) {
+      visualStyle = input.data.visualStyleOverride;
+    } else if (input.data.visualStyleId) {
+      const { data: savedStyle, error: styleError } = await context.supabase
+        .from("campaign_visual_styles")
+        .select("visual_style, status")
+        .eq("id", input.data.visualStyleId)
+        .eq("campaign_id", input.data.campaignId)
+        .maybeSingle();
+
+      if (styleError) return NextResponse.json({ error: "The selected visual style could not be loaded." }, { status: 503 });
+      if (!savedStyle) return NextResponse.json({ error: "The selected visual style was not found in this campaign." }, { status: 404 });
+      if (input.data.purpose === "entity-art" && savedStyle.status !== "ready") return NextResponse.json({ error: "Only ready visual styles can be used for campaign artwork." }, { status: 400 });
+      visualStyle = savedStyle.visual_style;
+    }
+
     const campaignPromptContext = [
       `Campaign system: ${campaign.system}`,
       `Campaign brief: ${campaign.description}`,
-      `Campaign visual style: ${campaign.visual_style}`,
     ].filter(Boolean).join(". ");
     const placeContextResult = input.data.targetKind === "place" && input.data.parentPlaceId
       ? await loadPlaceAiContext(context.supabase, input.data.campaignId, input.data.parentPlaceId)
@@ -95,7 +147,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: placeContextResult.error }, { status: placeContextResult.invalid ? 400 : 503 });
     }
 
-    const prompt = buildArtPrompt(input.data.subject, campaignPromptContext, input.data.refinement, input.data.currentPrompt, input.data.targetKind, placeContextResult.context);
+    const visualStyleHash = createHash("sha256").update(visualStyle).digest("hex");
+    const prompt = buildArtPrompt(input.data.subject, visualStyle, input.data.refinement, input.data.currentPrompt, input.data.targetKind, placeContextResult.context, campaignPromptContext);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundImageGeneration(request, env)) {
@@ -112,6 +165,9 @@ export async function POST(request: Request) {
           mode: input.data.mode,
           model: selectedModel.id,
           prompt_hash: promptHash,
+          purpose: input.data.purpose,
+          visual_style_hash: visualStyleHash,
+          image_subject: input.data.subject,
           provider: "openrouter",
           effective_model: selectedModel.id,
           target_kind: input.data.targetKind,
@@ -130,6 +186,7 @@ export async function POST(request: Request) {
         generationRunId: generationRun.id,
         prompt,
         model: selectedModel.id,
+        purpose: input.data.purpose,
         aspectRatio: input.data.aspectRatio,
         size: input.data.size,
       };
@@ -151,6 +208,7 @@ export async function POST(request: Request) {
           status: "pending",
           targetKind: input.data.targetKind,
           mode: input.data.mode,
+          purpose: input.data.purpose,
           subject: input.data.subject,
           aspectRatio: input.data.aspectRatio,
           size: input.data.size,
@@ -176,6 +234,12 @@ export async function POST(request: Request) {
         mode: input.data.mode,
         model: selectedModel.id,
         prompt_hash: promptHash,
+        purpose: input.data.purpose,
+        visual_style_hash: visualStyleHash,
+        image_subject: input.data.subject,
+        target_kind: input.data.targetKind,
+        aspect_ratio: input.data.aspectRatio,
+        size: input.data.size,
         provider: "openrouter",
         effective_model: selectedModel.id,
         status: "failed",
@@ -195,6 +259,9 @@ export async function POST(request: Request) {
         mode: input.data.mode,
         model: selectedModel.id,
         prompt_hash: promptHash,
+        purpose: input.data.purpose,
+        visual_style_hash: visualStyleHash,
+        image_subject: input.data.subject,
         provider: "openrouter",
         effective_model: selectedModel.id,
         status: "failed",
@@ -211,8 +278,14 @@ export async function POST(request: Request) {
         mode: input.data.mode,
         model: response.model,
         prompt_hash: promptHash,
+        purpose: input.data.purpose,
+        visual_style_hash: visualStyleHash,
+        image_subject: input.data.subject,
         provider: "openrouter",
         effective_model: response.model,
+        target_kind: input.data.targetKind,
+        aspect_ratio: input.data.aspectRatio,
+        size: input.data.size,
         generation_id: response.generationId,
         input_tokens: response.usage?.inputTokens,
         output_tokens: response.usage?.outputTokens,
@@ -226,19 +299,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Image draft metadata could not be saved." }, { status: 503 });
     }
 
+    let imageDraft = { base64: image.base64, url: image.url, mediaType: image.mediaType };
+    let temporaryPath: string | undefined;
+    if (input.data.purpose === "style-preview") {
+      try {
+        const storedPreview = await storeStylePreview(context.supabase, input.data.campaignId, context.user.id, generationRun.id, image);
+        temporaryPath = storedPreview.path;
+        imageDraft = { base64: null, url: storedPreview.signedUrl, mediaType: storedPreview.mediaType };
+        const { error: previewMetadataError } = await context.supabase
+          .from("ai_generation_runs")
+          .update({ image_path: storedPreview.path, image_media_type: storedPreview.mediaType })
+          .eq("id", generationRun.id);
+        if (previewMetadataError) {
+          await context.supabase.storage.from(campaignArtBucket).remove([storedPreview.path]);
+          throw new Error("The style preview metadata could not be saved.");
+        }
+      } catch {
+        await context.supabase.from("ai_generation_runs").update({ status: "failed", error_message: "The style preview could not be stored." }).eq("id", generationRun.id);
+        return NextResponse.json({ error: "The style preview could not be stored." }, { status: 503 });
+      }
+    }
+
     const createdAt = new Date(generationRun.created_at).toISOString();
     const draft = imageDraftSchema.safeParse({
       generationRunId: generationRun.id,
       targetKind: input.data.targetKind,
+      purpose: input.data.purpose,
       mode: input.data.mode,
       subject: input.data.subject,
       aspectRatio: input.data.aspectRatio,
       size: input.data.size,
       prompt,
-      image: { base64: image.base64, url: image.url, mediaType: image.mediaType },
+      image: imageDraft,
       provider: "openrouter",
       model: response.model,
       createdAt,
+      temporaryPath,
     });
 
     if (!draft.success) {

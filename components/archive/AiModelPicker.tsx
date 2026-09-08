@@ -16,6 +16,7 @@ type AiModel = {
   providerName: string | null;
   pricing: Record<string, string> | null;
   contextLength: number | null;
+  inputModalities?: string[];
   reason?: string;
 };
 
@@ -24,6 +25,7 @@ type AiModelPickerProps = {
   capability: AiCapability;
   value: string | null;
   onChange: (model: string) => void;
+  requiresImageInput?: boolean;
 };
 
 type CatalogStatus = "live" | "stale" | "unavailable" | "loading";
@@ -40,8 +42,9 @@ export default function AiModelPicker({
   capability,
   value,
   onChange,
+  requiresImageInput = false,
 }: AiModelPickerProps) {
-  const catalogKey = `${campaignId ?? "none"}:${capability}`;
+  const catalogKey = `${campaignId ?? "none"}:${capability}:${requiresImageInput ? "vision" : "all"}`;
   const [catalog, setCatalog] = useState<CatalogState>({
     key: "",
     models: [],
@@ -80,6 +83,7 @@ export default function AiModelPicker({
           result.models.filter(
             (model) =>
               model.enabled !== false &&
+              (!requiresImageInput || model.inputModalities?.includes("image")) &&
               (model.compatible || result.status === "unavailable"),
           ),
         );
@@ -117,7 +121,7 @@ export default function AiModelPicker({
     return () => {
       cancelled = true;
     };
-  }, [campaignId, capability, catalogKey, onChange]);
+  }, [campaignId, capability, catalogKey, onChange, requiresImageInput]);
 
   const hasCurrentCatalog = Boolean(campaignId) && catalog.key === catalogKey;
   const visibleModels = hasCurrentCatalog ? catalog.models : [];

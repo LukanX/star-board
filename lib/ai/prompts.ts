@@ -226,9 +226,10 @@ export function buildEnemyBriefPrompt(input: EnemyBriefGenerationInput, context?
   ].filter(Boolean).join("\n");
 }
 
-export function buildArtPrompt(subject: string, visualStyle?: string, refinement?: string, currentPrompt?: string, targetKind?: ImageGenerationInput["targetKind"], placeContext?: PlaceAiContext) {
-  const targetInstruction = targetKind === "faction" ? FACTION_ART_INSTRUCTION : targetKind === "enemy" ? ENEMY_ART_INSTRUCTION : "";
-  const fixedPrompt = [ART_SAFETY_INSTRUCTION, targetInstruction, `Subject: ${subject}`].filter(Boolean).join(" ");
+export function buildArtPrompt(subject: string, visualStyle?: string, refinement?: string, currentPrompt?: string, targetKind?: ImageGenerationInput["targetKind"], placeContext?: PlaceAiContext, campaignContext?: string) {
+  const targetInstruction = targetKind === "faction" ? FACTION_ART_INSTRUCTION : targetKind === "enemy" ? ENEMY_ART_INSTRUCTION : targetKind === "visual-style" ? "Style preview artwork should show one clear, neutral campaign subject chosen to reveal palette, lighting, texture, and composition. Do not add written text or logos." : "";
+  const boundedCampaignContext = campaignContext ? truncatePromptPart(`Campaign context: ${campaignContext}`, 700) : "";
+  const fixedPrompt = [ART_SAFETY_INSTRUCTION, targetInstruction, boundedCampaignContext, `Subject: ${subject}`].filter(Boolean).join(" ");
   let remaining = Math.max(0, imagePromptMaxLength - fixedPrompt.length);
   const styleBudget = Math.min(1200, remaining);
   const boundedStyle = visualStyle ? truncatePromptPart(`Campaign visual style: ${visualStyle}`, styleBudget) : "";

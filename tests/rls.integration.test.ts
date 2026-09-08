@@ -155,6 +155,55 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(unchanged.data?.description).toContain("local RLS integration suite");
   });
 
+  it("keeps visual styles GM-only and applies a ready style to the campaign snapshot", async () => {
+    const originalCampaign = await gmClient.from("campaigns").select("visual_style").eq("id", campaignId).single();
+    expect(originalCampaign.error).toBeNull();
+
+    const styleName = `RLS Visual Style ${Date.now()}`;
+    let styleId: string | null = null;
+
+    try {
+      const playerRead = await playerClient.from("campaign_visual_styles").select("id").eq("campaign_id", campaignId);
+      expect(playerRead.error).toBeNull();
+      expect(playerRead.data).toEqual([]);
+
+      const created = await gmClient.rpc("create_campaign_visual_style", {
+        p_campaign_id: campaignId,
+        p_name: styleName,
+        p_visual_style: "Crisp ink, cyan edge light, and restrained amber accents.",
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "inked-illustration" },
+      });
+      expect(created.error).toBeNull();
+      expect(created.data).toBeTruthy();
+      styleId = created.data;
+
+      const playerApply = await playerClient.rpc("apply_campaign_visual_style", { p_campaign_id: campaignId, p_style_id: styleId });
+      expect(playerApply.error).not.toBeNull();
+
+      const applied = await gmClient.rpc("apply_campaign_visual_style", { p_campaign_id: campaignId, p_style_id: styleId });
+      expect(applied.error).toBeNull();
+
+      const campaignAfterApply = await gmClient.from("campaigns").select("visual_style").eq("id", campaignId).single();
+      expect(campaignAfterApply.data?.visual_style).toBe("Crisp ink, cyan edge light, and restrained amber accents.");
+
+      const staleUpdate = await gmClient.rpc("update_campaign_visual_style", {
+        p_style_id: styleId,
+        p_name: styleName,
+        p_visual_style: "A stale update should not win.",
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "inked-illustration" },
+        p_expected_revision: 99,
+      });
+      expect(staleUpdate.error).not.toBeNull();
+    } finally {
+      if (styleId) await gmClient.rpc("delete_campaign_visual_style", { p_style_id: styleId });
+      if (originalCampaign.data?.visual_style !== undefined) {
+        await gmClient.from("campaigns").update({ visual_style: originalCampaign.data.visual_style }).eq("id", campaignId);
+      }
+    }
+  });
+
   it("keeps unrevealed enemy details private and saves parent/detail rows atomically", async () => {
     const gmUser = (await gmClient.auth.getUser()).data.user;
     const sourceHash = "a".repeat(64);

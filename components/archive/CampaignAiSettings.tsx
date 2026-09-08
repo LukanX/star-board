@@ -71,7 +71,6 @@ export default function CampaignAiSettings({
 }: CampaignAiSettingsProps) {
   const [models, setModels] = useState<AiModel[]>([]);
   const [enabledModelIds, setEnabledModelIds] = useState<string[]>([]);
-  const [visualStyle, setVisualStyle] = useState("");
   const [credentialAvailable, setCredentialAvailable] = useState(false);
   const [filter, setFilter] = useState<ModelFilter>("all");
   const [sort, setSort] = useState<AiModelSort>("most-popular");
@@ -114,7 +113,6 @@ export default function CampaignAiSettings({
         setCredentialAvailable(result.credentialAvailable === true);
         if (loadedCampaignRef.current !== campaignId) {
           setEnabledModelIds(result.enabledModelIds);
-          setVisualStyle(result.visualStyle ?? "");
           loadedCampaignRef.current = campaignId;
         }
         setLoadedCampaignId(campaignId);
@@ -169,11 +167,6 @@ export default function CampaignAiSettings({
       return;
     }
 
-    if (!visualStyle.trim()) {
-      setError("Enter a campaign visual style before saving.");
-      return;
-    }
-
     if (
       !activeModels.some(
         (model) =>
@@ -204,12 +197,11 @@ export default function CampaignAiSettings({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ enabledModelIds, visualStyle }),
+          body: JSON.stringify({ enabledModelIds }),
         },
       );
       const result = (await response.json()) as {
         enabledModelIds?: string[];
-        visualStyle?: string;
         error?: string;
       };
       if (!response.ok || !result.enabledModelIds)
@@ -217,7 +209,6 @@ export default function CampaignAiSettings({
           result.error ?? "Campaign model settings could not be saved.",
         );
       setEnabledModelIds(result.enabledModelIds);
-      if (result.visualStyle) setVisualStyle(result.visualStyle);
       clearDirty();
       setSaved(true);
       setStatus("Campaign AI preferences updated.");
@@ -291,36 +282,6 @@ export default function CampaignAiSettings({
           {error}
         </p>
       ) : null}
-      <div className="border-b border-[var(--line)]">
-        <div className={modelGroupHeadingClassName}>
-          <span>GLOBAL IMAGE STYLE</span>
-          <small className="text-[var(--dim)] text-[7px]">{visualStyle.length}/1200</small>
-        </div>
-        <div className="grid gap-[6px] px-[21px] pb-[15px]">
-          <label className={modelLabelClassName}>
-            CAMPAIGN VISUAL STYLE
-            <textarea
-              aria-describedby="campaign-visual-style-help"
-              aria-label="Campaign visual style"
-              className={`${modelControlClassName} h-auto min-h-[112px] resize-y py-[9px] leading-[1.5]`}
-              disabled={!credentialAvailable || isSaving}
-              maxLength={1200}
-              onChange={(event) => {
-                setDirty();
-                setSaved(false);
-                setError(null);
-                setVisualStyle(event.target.value);
-              }}
-              placeholder="Describe the campaign's palette, materials, atmosphere, and visual language."
-              rows={5}
-              value={visualStyle}
-            />
-          </label>
-          <p id="campaign-visual-style-help" className="m-0 text-[var(--dim)] font-mono text-[8px] leading-[1.5]">
-            This style is applied to new campaign artwork. Originality, no-text, no-logo, and no-watermark constraints remain enforced.
-          </p>
-        </div>
-      </div>
       <div className="grid grid-cols-2 w-full min-w-0 border-y border-[var(--line)] max-[760px]:grid-cols-1">
         <div className="min-w-0">
           <div className={modelGroupHeadingClassName}>

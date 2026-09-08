@@ -12,9 +12,9 @@ export const runtime = "nodejs";
 type RouteContext = { params: Promise<{ campaignId: string }> };
 
 const updateSettingsSchema = z.object({
-  visualStyle: z.string().min(1).max(1200).refine((value) => value === value.trim(), "Visual style must not have leading or trailing whitespace."),
-  enabledModelIds: z.array(z.string().trim().min(1).max(240)).min(1).max(2000),
-});
+  visualStyle: z.string().min(1).max(1200).refine((value) => value === value.trim(), "Visual style must not have leading or trailing whitespace.").optional(),
+  enabledModelIds: z.array(z.string().trim().min(1).max(240)).min(1).max(2000).optional(),
+}).refine((value) => value.visualStyle !== undefined || value.enabledModelIds !== undefined, "At least one campaign AI setting is required.");
 
 const capabilitySchema = z.enum(aiCapabilities);
 const sortSchema = z.enum(aiModelSorts);
@@ -119,23 +119,34 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return campaignCredentialErrorResponse(error, "Campaign AI settings cannot be changed right now.");
     }
 
-    const [textCatalog, imageCatalog] = await Promise.all([
-      getAiModelCatalog(campaignCredential.apiKey, "structured-text"),
-      getAiModelCatalog(campaignCredential.apiKey, "image"),
-    ]);
-    const availableModels = [...textCatalog.models, ...imageCatalog.models].filter((model) => model.compatible);
-    const validated = validateEnabledAiModelIds(input.data.enabledModelIds, availableModels);
-    if ("error" in validated) return NextResponse.json({ error: validated.error }, { status: 400 });
+    let enabledModelIds: string[] | null = null;
+    if (input.data.enabledModelIds) {
+      const [textCatalog, imageCatalog] = await Promise.all([
+        getAiModelCatalog(campaignCredential.apiKey, "structured-text"),
+        getAiModelCatalog(campaignCredential.apiKey, "image"),
+      ]);
+      const availableModels = [...textCatalog.models, ...imageCatalog.models].filter((model) => model.compatible);
+      const validated = validateEnabledAiModelIds(input.data.enabledModelIds, availableModels);
+      if ("error" in validated) return NextResponse.json({ error: validated.error }, { status: 400 });
+      enabledModelIds = validated.enabledModelIds;
+    }
+
+    const visualStyleResult = input.data.visualStyle
+      ? { visualStyle: input.data.visualStyle }
+      : await loadCampaignVisualStyle(result.context.supabase, campaignId);
+    if ("error" in visualStyleResult) return NextResponse.json({ error: visualStyleResult.error }, { status: 503 });
 
     const { error } = await result.context.supabase.rpc("update_campaign_ai_preferences", {
       p_campaign_id: campaignId,
-      p_visual_style: input.data.visualStyle,
-      p_enabled_model_ids: validated.enabledModelIds,
+      p_visual_style: visualStyleResult.visualStyle,
+      p_enabled_model_ids: enabledModelIds,
     });
 
     if (error) return NextResponse.json({ error: "Campaign AI settings could not be saved." }, { status: 503 });
 
-    return NextResponse.json({ enabledModelIds: validated.enabledModelIds, visualStyle: input.data.visualStyle });
+    const currentSettings = await loadCampaignAiSettings(result.context.supabase, campaignId);
+    if ("error" in currentSettings) return NextResponse.json({ error: currentSettings.error }, { status: 503 });
+    return NextResponse.json({ enabledModelIds: enabledModelIds ?? currentSettings.settings.enabledModelIds, visualStyle: visualStyleResult.visualStyle });
   } catch {
     return NextResponse.json({ error: "Campaign AI settings are temporarily unavailable." }, { status: 503 });
   }

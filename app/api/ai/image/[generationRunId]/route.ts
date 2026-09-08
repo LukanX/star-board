@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const { data: run, error } = await context.supabase
       .from("ai_generation_runs")
-      .select("id, campaign_id, requested_by, kind, mode, target_kind, aspect_ratio, size, model, effective_model, image_path, image_media_type, created_at, status, status_updated_at, error_message")
+      .select("id, campaign_id, requested_by, kind, mode, purpose, target_kind, aspect_ratio, size, model, effective_model, image_path, image_media_type, created_at, status, status_updated_at, error_message")
       .eq("id", generationRunId)
       .eq("kind", "image")
       .maybeSingle();
@@ -61,6 +61,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
         generationRunId: run.id,
         status: "complete",
         targetKind: run.target_kind,
+        purpose: run.purpose,
         mode: run.mode,
         aspectRatio: run.aspect_ratio,
         size: run.size,

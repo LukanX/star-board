@@ -36,7 +36,24 @@ export type JsonGenerationResult = {
 
 export type JsonGenerationOptions = {
   timeoutMs?: number;
+  imageReferences?: readonly JsonGenerationImageReference[];
 };
+
+export type JsonGenerationImageReference = {
+  dataUrl: string;
+};
+
+function buildJsonMessageContent(prompt: string, imageReferences: readonly JsonGenerationImageReference[]) {
+  if (!imageReferences.length) return prompt;
+
+  return [
+    { type: "text" as const, text: prompt },
+    ...imageReferences.map((reference) => ({
+      type: "image_url" as const,
+      image_url: { url: reference.dataUrl },
+    })),
+  ];
+}
 
 export async function generateJson(apiKey: string, prompt: string, schema?: ZodType, requestedModel?: string, options: JsonGenerationOptions = {}): Promise<JsonGenerationResult> {
   const { client, model } = getOpenRouterClient(apiKey);
@@ -45,7 +62,7 @@ export async function generateJson(apiKey: string, prompt: string, schema?: ZodT
   try {
     completion = await client.chat.completions.create({
       model: requestedModel ?? model,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: buildJsonMessageContent(prompt, options.imageReferences ?? []) }],
       response_format: schema ? zodResponseFormat(schema, "star_board_draft") : { type: "json_object" },
     }, options.timeoutMs === undefined ? undefined : { signal: AbortSignal.timeout(options.timeoutMs) });
   } catch (error: unknown) {

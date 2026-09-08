@@ -51,7 +51,8 @@ type MissionAiReferenceInput = {
 };
 
 type GenerationStatus = "complete" | "failed";
-type GenerationKind = "mission" | "npc" | "faction" | "place" | "character" | "image" | "enemy";
+type GenerationKind = "mission" | "npc" | "faction" | "place" | "character" | "image" | "enemy" | "visual-style";
+type GenerationPurpose = "entity-art" | "style-preview";
 
 export async function loadCampaignAiContext(supabase: SupabaseClient, campaignId: string) {
   const { data: campaign, error: campaignError } = await supabase
@@ -217,7 +218,7 @@ export async function loadMissionAiReferences(supabase: SupabaseClient, campaign
   return { references };
 }
 
-export async function recordAiGeneration(supabase: SupabaseClient, payload: { campaignId: string; userId: string; kind: GenerationKind; mode: "create" | "refine"; model: string; promptHash: string; status: GenerationStatus; provider?: string; effectiveModel?: string; generationId?: string; inputTokens?: number; outputTokens?: number; costUsd?: number }) {
+export async function recordAiGeneration(supabase: SupabaseClient, payload: { campaignId: string; userId: string; kind: GenerationKind; mode: "create" | "refine"; model: string; promptHash: string; status: GenerationStatus; purpose?: GenerationPurpose; visualStyleHash?: string; provider?: string; effectiveModel?: string; generationId?: string; inputTokens?: number; outputTokens?: number; costUsd?: number }) {
   return supabase.from("ai_generation_runs").insert({
     campaign_id: payload.campaignId,
     requested_by: payload.userId,
@@ -225,6 +226,8 @@ export async function recordAiGeneration(supabase: SupabaseClient, payload: { ca
     mode: payload.mode,
     model: payload.model,
     prompt_hash: payload.promptHash,
+    ...(payload.purpose ? { purpose: payload.purpose } : {}),
+    ...(payload.visualStyleHash ? { visual_style_hash: payload.visualStyleHash } : {}),
     ...(payload.provider ? { provider: payload.provider } : {}),
     ...(payload.effectiveModel ? { effective_model: payload.effectiveModel } : {}),
     ...(payload.generationId ? { generation_id: payload.generationId } : {}),
