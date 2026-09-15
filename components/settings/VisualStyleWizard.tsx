@@ -4,9 +4,10 @@ import { useRef, useState } from "react";
 import { ArrowLeft, FileImage, LoaderCircle, Sparkles, WandSparkles } from "lucide-react";
 import AiModelPicker from "@/components/archive/AiModelPicker";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
-import VisualStylePreview from "@/components/settings/VisualStylePreview";
+import VisualStylePreview, { type VisualStylePreviewRecord } from "@/components/settings/VisualStylePreview";
 import { panelClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import type { ImageDraft } from "@/lib/ai/image-job-polling";
 import { visualStyleDirections, type VisualStyleDirection, type VisualStyleWizardInput } from "@/lib/validation/visual-style";
 
 export type EditableVisualStyle = {
@@ -16,6 +17,7 @@ export type EditableVisualStyle = {
   status: "draft" | "ready";
   wizardInputs: VisualStyleWizardInput;
   revision: number;
+  preview: VisualStylePreviewRecord["preview"];
 };
 
 type VisualStyleWizardProps = {
@@ -58,13 +60,20 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [previewDraft, setPreviewDraft] = useState<ImageDraft | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const retainGeneratedPreviewRef = useRef<(() => void) | null>(null);
   const { setDirty, clearDirty } = useDirtyForm();
 
   const markChanged = () => {
     setDirty();
     setSavedNotice(null);
     setError(null);
+  };
+
+  const handlePreviewDraftChange = (nextDraft: ImageDraft | null, markRetained: () => void) => {
+    setPreviewDraft(nextDraft);
+    retainGeneratedPreviewRef.current = nextDraft ? markRetained : null;
   };
 
   const generateDraft = async () => {
@@ -107,6 +116,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
     setError(null);
     setSavedNotice(null);
     const wizardInputs = { campaignVibe: campaignVibe.trim() || undefined, artDirection, directionNotes: directionNotes.trim() || undefined };
+    const preview = previewDraft ? { generationRunId: previewDraft.generationRunId, prompt: previewDraft.prompt } : undefined;
 
     try {
       const endpoint = style
@@ -116,12 +126,13 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
         method: style ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(style
-          ? { name: name.trim(), visualStyle: visualStyle.trim(), status, wizardInputs, expectedRevision: style.revision, apply }
-          : { name: name.trim(), visualStyle: visualStyle.trim(), status, wizardInputs, apply }),
+          ? { name: name.trim(), visualStyle: visualStyle.trim(), status, wizardInputs, expectedRevision: style.revision, apply, preview }
+          : { name: name.trim(), visualStyle: visualStyle.trim(), status, wizardInputs, apply, preview }),
       });
       const result = (await response.json()) as { styleId?: string; error?: string };
       if (!response.ok || !result.styleId) throw new Error(result.error ?? "The visual style could not be saved.");
 
+      if (preview) retainGeneratedPreviewRef.current?.();
       clearDirty();
       setSavedNotice(apply ? "SAVED AND APPLIED AS CAMPAIGN DEFAULT." : status === "ready" ? "READY STYLE SAVED." : "DRAFT STYLE SAVED.");
       onSaved(result.styleId);
@@ -207,7 +218,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
             REUSABLE VISUAL LANGUAGE <span className="text-[var(--dim)] tracking-normal">{visualStyle.length}/1200</span>
             <textarea className={`${controlClassName} min-h-[180px] resize-y leading-[1.5]`} maxLength={1200} value={visualStyle} onChange={(event) => { setVisualStyle(event.target.value); markChanged(); }} placeholder="Palette, light, materials, line treatment, texture, and composition rules..." />
           </label>
-          {visualStyle.trim() ? <VisualStylePreview campaignId={campaignId} visualStyleOverride={visualStyle} /> : null}
+          {visualStyle.trim() ? <VisualStylePreview campaignId={campaignId} style={style ?? undefined} visualStyleOverride={visualStyle} canRetain={false} onDraftChange={handlePreviewDraftChange} /> : null}
           {error ? <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}
           {savedNotice ? <p className="m-0 text-[var(--green)] font-mono text-[8px] tracking-[.08em]" role="status">{savedNotice}</p> : null}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] pt-4">

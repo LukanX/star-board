@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadEnv } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -201,6 +201,203 @@ describeLocal("local Supabase RLS boundaries", () => {
       if (originalCampaign.data?.visual_style !== undefined) {
         await gmClient.from("campaigns").update({ visual_style: originalCampaign.data.visual_style }).eq("id", campaignId);
       }
+    }
+  });
+
+  it("retains a completed visual style preview through the attach RPC", async () => {
+    const campaign = await gmClient.from("campaigns").select("created_by").eq("id", campaignId).single();
+    expect(campaign.error).toBeNull();
+
+    const gmUserId = campaign.data?.created_by;
+    if (!gmUserId) throw new Error("The local RLS campaign has no creator.");
+
+    const styleName = `RLS Preview Style ${Date.now()}`;
+    const previewPrompt = "A lone courier skiff crossing a luminous dust storm above a frontier moon";
+    const previewStyle = "Crisp ink, cyan edge light, and restrained amber accents.";
+    let styleId: string | null = null;
+    let generationRunId: string | null = null;
+
+    try {
+      const created = await gmClient.rpc("create_campaign_visual_style", {
+        p_campaign_id: campaignId,
+        p_name: styleName,
+        p_visual_style: previewStyle,
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "inked-illustration" },
+      });
+      expect(created.error).toBeNull();
+      expect(created.data).toBeTruthy();
+      styleId = created.data;
+
+      generationRunId = randomUUID();
+      const previewPath = `${campaignId}/${gmUserId}/style-preview-${generationRunId}.png`;
+      const generationRun = await gmClient.from("ai_generation_runs").insert({
+        id: generationRunId,
+        campaign_id: campaignId,
+        requested_by: gmUserId,
+        kind: "image",
+        mode: "create",
+        model: "test/image-model",
+        prompt_hash: createHash("sha256").update(previewPrompt).digest("hex"),
+        purpose: "style-preview",
+        visual_style_hash: createHash("sha256").update(previewStyle).digest("hex"),
+        image_subject: previewPrompt,
+        provider: "openrouter",
+        effective_model: "test/image-model",
+        target_kind: "visual-style",
+        aspect_ratio: "1:1",
+        size: "1024x1024",
+        image_path: previewPath,
+        image_media_type: "image/png",
+        status: "complete",
+      }).select("id").single();
+      expect(generationRun.error).toBeNull();
+      expect(generationRun.data?.id).toBe(generationRunId);
+
+      const attached = await gmClient.rpc("attach_campaign_visual_style_preview", {
+        p_style_id: styleId,
+        p_generation_run_id: generationRunId,
+        p_prompt: previewPrompt,
+        p_style_hash: createHash("sha256").update(previewStyle).digest("hex"),
+        p_expected_revision: 1,
+      });
+      expect(attached.error).toBeNull();
+
+      const retained = await gmClient
+        .from("campaign_visual_styles")
+        .select("revision, preview_generation_run_id, preview_path, preview_media_type, preview_prompt, preview_provider, preview_model, preview_subject, preview_aspect_ratio, preview_size, preview_style_hash")
+        .eq("id", styleId)
+        .single();
+      expect(retained.error).toBeNull();
+      expect(retained.data).toMatchObject({
+        revision: 2,
+        preview_generation_run_id: generationRunId,
+        preview_path: previewPath,
+        preview_media_type: "image/png",
+        preview_prompt: previewPrompt,
+        preview_provider: "openrouter",
+        preview_model: "test/image-model",
+        preview_subject: previewPrompt,
+        preview_aspect_ratio: "1:1",
+        preview_size: "1024x1024",
+        preview_style_hash: createHash("sha256").update(previewStyle).digest("hex"),
+      });
+    } finally {
+      if (styleId) await gmClient.rpc("delete_campaign_visual_style", { p_style_id: styleId });
+      if (generationRunId) await gmClient.from("ai_generation_runs").delete().eq("id", generationRunId);
+    }
+  });
+
+  it("saves visual style text and preview metadata atomically", async () => {
+    const campaign = await gmClient.from("campaigns").select("created_by").eq("id", campaignId).single();
+    expect(campaign.error).toBeNull();
+
+    const gmUserId = campaign.data?.created_by;
+    if (!gmUserId) throw new Error("The local RLS campaign has no creator.");
+
+    const firstStyle = "Crisp ink, cyan edge light, and restrained amber accents.";
+    const firstPrompt = "A first generated style preview";
+    const secondStyle = "Painterly nebula haze, bright hull highlights, and controlled amber accents.";
+    const secondPrompt = "A replacement generated style preview";
+    const failedStyle = "This update must roll back when preview attachment fails.";
+    const failedPrompt = "A failed generated style preview";
+    const firstRunId = randomUUID();
+    const secondRunId = randomUUID();
+    const failedRunId = randomUUID();
+    const firstPath = `${campaignId}/${gmUserId}/style-preview-${firstRunId}.png`;
+    const secondPath = `${campaignId}/${gmUserId}/style-preview-${secondRunId}.png`;
+    const failedPath = `${campaignId}/${gmUserId}/style-preview-${failedRunId}.png`;
+    let styleId: string | null = null;
+
+    const insertPreviewRun = async (runId: string, path: string, prompt: string, style: string) => {
+      const result = await gmClient.from("ai_generation_runs").insert({
+        id: runId,
+        campaign_id: campaignId,
+        requested_by: gmUserId,
+        kind: "image",
+        mode: "create",
+        model: "test/image-model",
+        prompt_hash: createHash("sha256").update(prompt).digest("hex"),
+        purpose: "style-preview",
+        visual_style_hash: createHash("sha256").update(style).digest("hex"),
+        image_subject: prompt,
+        provider: "openrouter",
+        effective_model: "test/image-model",
+        target_kind: "visual-style",
+        aspect_ratio: "1:1",
+        size: "1024x1024",
+        image_path: path,
+        image_media_type: "image/png",
+        status: "complete",
+      }).select("id").single();
+      expect(result.error).toBeNull();
+    };
+
+    try {
+      await insertPreviewRun(firstRunId, firstPath, firstPrompt, firstStyle);
+      const created = await gmClient.rpc("create_campaign_visual_style_with_preview", {
+        p_campaign_id: campaignId,
+        p_name: `Atomic Preview Style ${Date.now()}`,
+        p_visual_style: firstStyle,
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "inked-illustration" },
+        p_generation_run_id: firstRunId,
+        p_prompt: firstPrompt,
+      });
+      expect(created.error).toBeNull();
+      expect(created.data).toBeTruthy();
+      styleId = created.data;
+
+      const createdRow = await gmClient.from("campaign_visual_styles")
+        .select("revision, visual_style, preview_generation_run_id, preview_path")
+        .eq("id", styleId)
+        .single();
+      expect(createdRow.error).toBeNull();
+      expect(createdRow.data).toMatchObject({ revision: 2, visual_style: firstStyle, preview_generation_run_id: firstRunId, preview_path: firstPath });
+
+      await insertPreviewRun(secondRunId, secondPath, secondPrompt, secondStyle);
+      const updated = await gmClient.rpc("update_campaign_visual_style_with_preview", {
+        p_style_id: styleId,
+        p_name: "Atomic Preview Style Updated",
+        p_visual_style: secondStyle,
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "painterly" },
+        p_expected_revision: 2,
+        p_generation_run_id: secondRunId,
+        p_prompt: secondPrompt,
+      });
+      expect(updated.error).toBeNull();
+
+      const updatedRow = await gmClient.from("campaign_visual_styles")
+        .select("revision, visual_style, preview_generation_run_id, preview_path")
+        .eq("id", styleId)
+        .single();
+      expect(updatedRow.error).toBeNull();
+      expect(updatedRow.data).toMatchObject({ revision: 4, visual_style: secondStyle, preview_generation_run_id: secondRunId, preview_path: secondPath });
+
+      await insertPreviewRun(failedRunId, failedPath, failedPrompt, firstStyle);
+      const failedUpdate = await gmClient.rpc("update_campaign_visual_style_with_preview", {
+        p_style_id: styleId,
+        p_name: "Should Roll Back",
+        p_visual_style: failedStyle,
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "painterly" },
+        p_expected_revision: 4,
+        p_generation_run_id: failedRunId,
+        p_prompt: failedPrompt,
+      });
+      expect(failedUpdate.error).not.toBeNull();
+      expect(failedUpdate.error?.code).toBe("22023");
+
+      const unchanged = await gmClient.from("campaign_visual_styles")
+        .select("revision, visual_style, preview_generation_run_id, preview_path")
+        .eq("id", styleId)
+        .single();
+      expect(unchanged.error).toBeNull();
+      expect(unchanged.data).toMatchObject({ revision: 4, visual_style: secondStyle, preview_generation_run_id: secondRunId, preview_path: secondPath });
+    } finally {
+      if (styleId) await gmClient.rpc("delete_campaign_visual_style", { p_style_id: styleId });
+      await gmClient.from("ai_generation_runs").delete().in("id", [firstRunId, secondRunId, failedRunId]);
     }
   });
 

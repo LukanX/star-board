@@ -47,10 +47,15 @@ export async function POST(request: Request, { params }: RouteContext) {
     const result = await getContext(campaignId);
     if (result.response) return result.response;
 
-    const rpcName = input.data.apply ? "create_and_apply_campaign_visual_style" : "create_campaign_visual_style";
+    const rpcName = input.data.preview
+      ? input.data.apply ? "create_and_apply_campaign_visual_style_with_preview" : "create_campaign_visual_style_with_preview"
+      : input.data.apply ? "create_and_apply_campaign_visual_style" : "create_campaign_visual_style";
+    const previewArgs = input.data.preview
+      ? { p_generation_run_id: input.data.preview.generationRunId, p_prompt: input.data.preview.prompt }
+      : {};
     const rpcArgs = input.data.apply
-      ? { p_campaign_id: campaignId, p_name: input.data.name, p_visual_style: input.data.visualStyle, p_wizard_inputs: input.data.wizardInputs }
-      : { p_campaign_id: campaignId, p_name: input.data.name, p_visual_style: input.data.visualStyle, p_status: input.data.status, p_wizard_inputs: input.data.wizardInputs };
+      ? { p_campaign_id: campaignId, p_name: input.data.name, p_visual_style: input.data.visualStyle, p_wizard_inputs: input.data.wizardInputs, ...previewArgs }
+      : { p_campaign_id: campaignId, p_name: input.data.name, p_visual_style: input.data.visualStyle, p_status: input.data.status, p_wizard_inputs: input.data.wizardInputs, ...previewArgs };
     const { data: styleId, error } = await result.context.supabase.rpc(rpcName, rpcArgs);
 
     if (error) return NextResponse.json({ error: visualStyleRpcMessage(error, "The visual style could not be saved.") }, { status: visualStyleRpcStatus(error) });

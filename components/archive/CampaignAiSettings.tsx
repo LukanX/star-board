@@ -406,7 +406,13 @@ export default function CampaignAiSettings({
             {addableModels.length} AVAILABLE
           </small>
         </div>
-        <div className="grid w-full min-w-0 gap-px p-[0_10px_10px]">
+        <div
+          aria-label="Available campaign AI models"
+          className="grid h-[360px] w-full min-w-0 gap-px overflow-y-auto overscroll-contain p-[0_10px_10px] focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--cyan)_inset] max-[760px]:h-[300px]"
+          data-campaign-ai-model-catalog
+          role="region"
+          tabIndex={0}
+        >
           {isLoading ? (
             <p className="m-[4px_8px_12px] text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">
               LOADING MODEL CATALOG...

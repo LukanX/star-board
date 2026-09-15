@@ -30,6 +30,10 @@ const optionalTrimmedText = (maxLength: number) =>
 
 export const visualStyleNameSchema = trimmedText(visualStyleNameMaxLength, "Style name");
 export const visualStyleTextSchema = trimmedText(visualStyleTextMaxLength, "Visual style");
+export const visualStylePreviewSaveSchema = z.object({
+  generationRunId: z.string().uuid(),
+  prompt: z.string().trim().min(1).max(3000),
+});
 
 export const visualStyleWizardInputSchema = z.object({
   campaignVibe: optionalTrimmedText(visualStyleVibeMaxLength),
@@ -45,6 +49,7 @@ export const visualStyleCreateInputSchema = z.object({
   status: visualStyleStatusSchema.default("draft"),
   wizardInputs: visualStyleWizardInputSchema.default({ artDirection: "choose-for-me" }),
   apply: z.boolean().default(false),
+  preview: visualStylePreviewSaveSchema.optional(),
 });
 
 export const visualStyleUpdateInputSchema = z.object({
@@ -54,6 +59,7 @@ export const visualStyleUpdateInputSchema = z.object({
   wizardInputs: visualStyleWizardInputSchema,
   expectedRevision: z.number().int().positive(),
   apply: z.boolean().default(false),
+  preview: visualStylePreviewSaveSchema.optional(),
 });
 
 export const visualStyleGenerationInputSchema = z.object({
@@ -64,9 +70,7 @@ export const visualStyleGenerationInputSchema = z.object({
   directionNotes: optionalTrimmedText(visualStyleDirectionNotesMaxLength),
 });
 
-export const visualStylePreviewAttachInputSchema = z.object({
-  generationRunId: z.string().uuid(),
-  prompt: z.string().trim().min(1).max(3000),
+export const visualStylePreviewAttachInputSchema = visualStylePreviewSaveSchema.extend({
   expectedRevision: z.number().int().positive(),
 });
 

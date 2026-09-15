@@ -26,13 +26,32 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const context = await requireCampaignGM(campaignId);
     if (!context) return NextResponse.json({ error: "Campaign GM access is required to manage visual styles." }, { status: 403 });
 
-    const rpcName = input.data.apply ? "update_and_apply_campaign_visual_style" : "update_campaign_visual_style";
+    let previousPreviewPath: string | null = null;
+    if (input.data.preview) {
+      const { data: currentStyle, error: currentStyleError } = await context.supabase
+        .from("campaign_visual_styles")
+        .select("preview_path")
+        .eq("id", styleId)
+        .eq("campaign_id", campaignId)
+        .maybeSingle();
+      if (currentStyleError) return NextResponse.json({ error: "The visual style could not be loaded." }, { status: 503 });
+      if (!currentStyle) return NextResponse.json({ error: "The visual style was not found in this campaign." }, { status: 404 });
+      previousPreviewPath = currentStyle.preview_path;
+    }
+
+    const rpcName = input.data.preview
+      ? input.data.apply ? "update_and_apply_campaign_visual_style_with_preview" : "update_campaign_visual_style_with_preview"
+      : input.data.apply ? "update_and_apply_campaign_visual_style" : "update_campaign_visual_style";
+    const previewArgs = input.data.preview
+      ? { p_generation_run_id: input.data.preview.generationRunId, p_prompt: input.data.preview.prompt }
+      : {};
     const rpcArgs = input.data.apply
-      ? { p_style_id: styleId, p_name: input.data.name, p_visual_style: input.data.visualStyle, p_wizard_inputs: input.data.wizardInputs, p_expected_revision: input.data.expectedRevision }
-      : { p_style_id: styleId, p_name: input.data.name, p_visual_style: input.data.visualStyle, p_status: input.data.status, p_wizard_inputs: input.data.wizardInputs, p_expected_revision: input.data.expectedRevision };
+      ? { p_style_id: styleId, p_name: input.data.name, p_visual_style: input.data.visualStyle, p_wizard_inputs: input.data.wizardInputs, p_expected_revision: input.data.expectedRevision, ...previewArgs }
+      : { p_style_id: styleId, p_name: input.data.name, p_visual_style: input.data.visualStyle, p_status: input.data.status, p_wizard_inputs: input.data.wizardInputs, p_expected_revision: input.data.expectedRevision, ...previewArgs };
     const { error } = await context.supabase.rpc(rpcName, rpcArgs);
 
     if (error) return NextResponse.json({ error: visualStyleRpcMessage(error, "The visual style could not be updated.") }, { status: visualStyleRpcStatus(error) });
+    if (previousPreviewPath) void removeCampaignArtIfUnreferenced(context.supabase, campaignId, previousPreviewPath);
 
     return NextResponse.json({ styleId });
   } catch {

@@ -59,6 +59,7 @@ test("preserves campaign AI settings action sizing", async ({
   campaign,
 }) => {
   await page.goto(`/campaigns/${campaign.campaignId}/settings`);
+  await page.getByRole("tab", { name: /AI SETUP/ }).click();
 
   const saveButton = page.getByRole("button", {
     name: "SAVE AI PREFERENCES",
@@ -67,6 +68,42 @@ test("preserves campaign AI settings action sizing", async ({
   await expect(saveButton).toBeVisible();
   await expect(saveButton).toHaveClass(/min-w-\[166px\]/);
   await expect(saveButton).toHaveCSS("min-width", "166px");
+});
+
+test("organizes campaign settings into tabs and bounds model selection", async ({
+  page,
+  campaign,
+}) => {
+  await page.goto(`/campaigns/${campaign.campaignId}/settings`);
+
+  const detailsTab = page.getByRole("tab", { name: /CAMPAIGN DETAILS/ });
+  const visualsTab = page.getByRole("tab", { name: /VISUAL STYLES/ });
+  const aiTab = page.getByRole("tab", { name: /AI SETUP/ });
+  await expect(detailsTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#settings-panel-details")).toBeVisible();
+
+  await page.getByLabel("CAMPAIGN NAME").fill("Unsaved signal");
+  page.once("dialog", (dialog) => void dialog.dismiss());
+  await visualsTab.click();
+  await expect(detailsTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("CAMPAIGN NAME")).toHaveValue("Unsaved signal");
+
+  page.once("dialog", (dialog) => void dialog.accept());
+  await visualsTab.click();
+  await expect(visualsTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#settings-panel-visuals")).toBeVisible();
+
+  await aiTab.click();
+  const catalog = page.locator("[data-campaign-ai-model-catalog]");
+  await expect(catalog).toBeVisible();
+  await expect(catalog).toHaveCSS("height", "360px");
+  await expect(catalog).toHaveCSS("overflow-y", "auto");
+  await expect(page.getByRole("button", { name: "SAVE AI PREFERENCES", exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(catalog).toHaveCSS("height", "300px");
+  const pageWidth = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+  expect(pageWidth.scrollWidth).toBeLessThanOrEqual(pageWidth.clientWidth);
 });
 
 test("preserves campaign creation action sizing", async ({ page }) => {

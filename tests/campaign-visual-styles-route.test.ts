@@ -7,6 +7,7 @@ vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampa
 import { POST } from "@/app/api/campaigns/[campaignId]/visual-styles/route";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
+const generationRunId = "00000000-0000-4000-8000-000000000003";
 
 function routeContext() {
   return { params: Promise.resolve({ campaignId }) };
@@ -52,6 +53,30 @@ describe("campaign visual styles route", () => {
       p_name: "Neon frontier",
       p_visual_style: "Crisp ink and neon light.",
       p_wizard_inputs: { artDirection: "choose-for-me" },
+    });
+  });
+
+  it("creates a style and retains its generated preview through the atomic RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "style-id", error: null });
+    mocks.requireCampaignGM.mockResolvedValue({ supabase: { rpc }, user: { id: "user-id" }, role: "gm" });
+
+    const response = await POST(request({
+      name: "Neon frontier",
+      visualStyle: "Crisp ink and neon light.",
+      status: "ready",
+      apply: false,
+      preview: { generationRunId, prompt: "A generated preview prompt" },
+    }), routeContext());
+
+    expect(response.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("create_campaign_visual_style_with_preview", {
+      p_campaign_id: campaignId,
+      p_name: "Neon frontier",
+      p_visual_style: "Crisp ink and neon light.",
+      p_status: "ready",
+      p_wizard_inputs: { artDirection: "choose-for-me" },
+      p_generation_run_id: generationRunId,
+      p_prompt: "A generated preview prompt",
     });
   });
 

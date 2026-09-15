@@ -58,7 +58,7 @@ export default function CampaignVisualStyles({ campaignId }: { campaignId: strin
   const openEdit = (style: CampaignVisualStyle) => {
     setError(null);
     setNotice(null);
-    setEditingStyle({ id: style.id, name: style.name, visualStyle: style.visualStyle, status: style.status, wizardInputs: style.wizardInputs, revision: style.revision });
+    setEditingStyle({ id: style.id, name: style.name, visualStyle: style.visualStyle, status: style.status, wizardInputs: style.wizardInputs, revision: style.revision, preview: style.preview });
     setWizardOpen(true);
   };
 
@@ -125,7 +125,8 @@ export default function CampaignVisualStyles({ campaignId }: { campaignId: strin
           <div className="grid gap-px p-[10px]">
             {styles.map((style) => (
               <article key={style.id} className="grid gap-3 min-w-0 p-[13px] border border-[rgba(139,151,169,.2)] bg-[rgba(255,255,255,.018)]">
-                <div className="flex items-start justify-between gap-3 min-w-0">
+                <div className="flex items-start gap-4 min-w-0">
+                  {style.preview ? <div className="w-[175px] h-[175px] shrink-0 border border-[rgba(255,92,154,.35)] bg-center bg-cover max-[480px]:w-[138px] max-[480px]:h-[138px]" role="img" aria-label={`${style.name} preview`} style={{ backgroundImage: `url(${style.preview.signedUrl})` }} /> : <div className="grid place-items-center w-[175px] h-[175px] shrink-0 border border-[rgba(139,151,169,.22)] bg-[repeating-linear-gradient(45deg,rgba(255,255,255,.035)_0_1px,transparent_1px_8px)] text-[var(--dim)] max-[480px]:w-[138px] max-[480px]:h-[138px]" role="img" aria-label={`${style.name} preview unavailable`}><Sparkles size={18} /></div>}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="m-0 text-[12px] text-[var(--ink)]">{style.name}</h3>
@@ -134,7 +135,6 @@ export default function CampaignVisualStyles({ campaignId }: { campaignId: strin
                     </div>
                     <p className="m-0 mt-2 text-[var(--muted)] text-[10px] leading-[1.5]">{style.visualStyle}</p>
                   </div>
-                  {style.preview ? <div className="w-[58px] h-[58px] shrink-0 border border-[rgba(255,92,154,.35)] bg-center bg-cover" role="img" aria-label={`${style.name} preview`} style={{ backgroundImage: `url(${style.preview.signedUrl})` }} /> : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button className={actionButtonClassName} type="button" disabled={isWorking} onClick={() => openEdit(style)}><Edit3 size={13} /> EDIT</button>

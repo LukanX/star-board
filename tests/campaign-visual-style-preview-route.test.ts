@@ -9,7 +9,7 @@ vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampa
 vi.mock("@/lib/storage/campaign-art", () => ({ removeCampaignArtIfUnreferenced: mocks.removeCampaignArtIfUnreferenced }));
 
 import { POST } from "@/app/api/campaigns/[campaignId]/visual-styles/[styleId]/preview/route";
-import { DELETE } from "@/app/api/campaigns/[campaignId]/visual-styles/[styleId]/route";
+import { DELETE, PATCH } from "@/app/api/campaigns/[campaignId]/visual-styles/[styleId]/route";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const styleId = "00000000-0000-4000-8000-000000000002";
@@ -34,6 +34,14 @@ function routeContext() {
 function request(body: unknown) {
   return new Request(`http://localhost/api/campaigns/${campaignId}/visual-styles/${styleId}/preview`, {
     method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function updateRequest(body: unknown) {
+  return new Request(`http://localhost/api/campaigns/${campaignId}/visual-styles/${styleId}`, {
+    method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -82,6 +90,55 @@ describe("visual style preview routes", () => {
     const response = await POST(request({ generationRunId, prompt: "A prompt", expectedRevision: 1 }), routeContext());
 
     expect(response.status).toBe(409);
+    expect(mocks.removeCampaignArtIfUnreferenced).not.toHaveBeenCalled();
+  });
+
+  it("updates a style and replaces its preview through the atomic RPC", async () => {
+    const query = createQuery({ data: { preview_path: previousPath }, error: null });
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const supabase = { from: vi.fn().mockReturnValue(query), rpc };
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: "00000000-0000-4000-8000-000000000005" }, role: "gm" });
+
+    const response = await PATCH(updateRequest({
+      name: "Updated frontier",
+      visualStyle: "Updated ink and neon light.",
+      status: "ready",
+      wizardInputs: { artDirection: "inked-illustration" },
+      expectedRevision: 7,
+      apply: false,
+      preview: { generationRunId, prompt: "A generated preview prompt" },
+    }), routeContext());
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("update_campaign_visual_style_with_preview", {
+      p_style_id: styleId,
+      p_name: "Updated frontier",
+      p_visual_style: "Updated ink and neon light.",
+      p_status: "ready",
+      p_wizard_inputs: { artDirection: "inked-illustration" },
+      p_expected_revision: 7,
+      p_generation_run_id: generationRunId,
+      p_prompt: "A generated preview prompt",
+    });
+    expect(mocks.removeCampaignArtIfUnreferenced).toHaveBeenCalledWith(supabase, campaignId, previousPath);
+  });
+
+  it("does not clean up the old preview when the atomic update fails", async () => {
+    const query = createQuery({ data: { preview_path: previousPath }, error: null });
+    const rpc = vi.fn().mockResolvedValue({ error: { code: "22023" } });
+    const supabase = { from: vi.fn().mockReturnValue(query), rpc };
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: "00000000-0000-4000-8000-000000000005" }, role: "gm" });
+
+    const response = await PATCH(updateRequest({
+      name: "Updated frontier",
+      visualStyle: "Updated ink and neon light.",
+      status: "ready",
+      wizardInputs: { artDirection: "inked-illustration" },
+      expectedRevision: 7,
+      preview: { generationRunId, prompt: "A generated preview prompt" },
+    }), routeContext());
+
+    expect(response.status).toBe(400);
     expect(mocks.removeCampaignArtIfUnreferenced).not.toHaveBeenCalled();
   });
 
