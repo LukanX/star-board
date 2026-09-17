@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
-import { getCampaignCredentialForManager } from "@/lib/ai/campaign-credentials";
+import { assertCampaignCredentialEncryptionConfigured, getCampaignCredentialForManager } from "@/lib/ai/campaign-credentials";
 import { buildOpenRouterAuthorizationUrl, createOpenRouterOAuthState } from "@/lib/ai/openrouter-oauth";
 import { campaignCredentialErrorResponse } from "@/lib/ai/route-support";
 import { buildOpenRouterCallbackUrl, getOpenRouterOAuthStateSecret, isSameOriginRequest, setOpenRouterOAuthStateCookie } from "@/lib/ai/openrouter-route";
@@ -24,6 +24,8 @@ export async function POST(request: Request, { params }: RouteContext) {
     } catch (error) {
       return campaignCredentialErrorResponse(error, "OpenRouter connection is temporarily unavailable.");
     }
+
+    assertCampaignCredentialEncryptionConfigured();
 
     const env = getServerEnv();
     const pending = createOpenRouterOAuthState(campaignId, context.user.id, getOpenRouterOAuthStateSecret());

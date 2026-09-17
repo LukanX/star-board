@@ -7,6 +7,7 @@ import CampaignAiSettings from "@/components/settings/CampaignAiSettings";
 import CampaignDetailsSettings from "@/components/settings/CampaignDetailsSettings";
 import CampaignVisualStyles from "@/components/settings/CampaignVisualStyles";
 import OpenRouterConnectionSettings from "@/components/settings/OpenRouterConnectionSettings";
+import type { OpenRouterCallbackOutcome } from "@/components/settings/openRouterOutcome";
 import PageLayout from "@/components/ui/PageLayout";
 
 type CampaignDetails = {
@@ -25,11 +26,14 @@ const settingsTabs = [
 export default function SettingsRouteView({
   campaignId,
   initialCampaign,
+  initialOpenRouterOutcome,
 }: {
   campaignId: string;
   initialCampaign: CampaignDetails;
+  initialOpenRouterOutcome?: OpenRouterCallbackOutcome | null;
 }) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("details");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialOpenRouterOutcome ? "ai" : "details");
+  const [callbackOutcomeDismissed, setCallbackOutcomeDismissed] = useState(false);
   const tabButtonRefs = useRef<Partial<Record<SettingsTab, HTMLButtonElement | null>>>({});
   const { clearDirty, confirmNavigation } = useDirtyForm();
 
@@ -113,7 +117,12 @@ export default function SettingsRouteView({
           {activeTab === "visuals" ? <CampaignVisualStyles campaignId={campaignId} /> : null}
           {activeTab === "ai" ? (
             <div className="grid gap-5">
-              <OpenRouterConnectionSettings campaignId={campaignId} />
+              <OpenRouterConnectionSettings
+                campaignId={campaignId}
+                callbackOutcome={initialOpenRouterOutcome}
+                callbackOutcomeDismissed={callbackOutcomeDismissed}
+                onDismissCallbackOutcome={() => setCallbackOutcomeDismissed(true)}
+              />
               <CampaignAiSettings campaignId={campaignId} />
             </div>
           ) : null}

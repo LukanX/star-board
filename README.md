@@ -96,9 +96,20 @@ Set these server-side values:
 - `OPENROUTER_TEXT_MODEL` and `OPENROUTER_IMAGE_MODEL`: the default model IDs used when a campaign has not selected another enabled model.
 - `OPENROUTER_SITE_URL` and `OPENROUTER_APP_NAME`: optional attribution headers sent to OpenRouter.
 
+Before enabling campaign connections in production, create one persistent 32-byte AES key and encode it with standard base64. Store it in Netlify as a secret with the Functions scope (or all scopes), using a stable key ID in both variables:
+
+```env
+CAMPAIGN_CREDENTIAL_ACTIVE_KEY_ID=key-2026-09
+CAMPAIGN_CREDENTIAL_ENCRYPTION_KEYS={"key-2026-09":"base64-encoded-32-byte-key"}
+```
+
+Generate key material locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`; never use an OpenRouter key, password, or a `NEXT_PUBLIC_` variable. Redeploy after changing these Netlify variables because function instances receive environment changes on deploy. Keep the keyring backed up and retain old key IDs during rotation so existing encrypted campaign credentials remain decryptable.
+
 Keep the encryption keyring and Supabase secret in the server or Netlify Functions scope. Never use `NEXT_PUBLIC_` names for them. `NEXT_PUBLIC_APP_URL` must be the deployed origin in production; it is used to build the OAuth callback URL, and that callback URL must be allowed in the OpenRouter application configuration.
 
 GMs connect a campaign key from Campaign settings. The connection uses OpenRouter OAuth with PKCE S256: Star Board receives a short-lived, single-use authorization code, exchanges it server-side, verifies the returned key, and stores only encrypted key material plus safe metadata. The browser receives an authorization URL, never the key, OAuth code, or PKCE verifier.
+
+Star Board checks encryption configuration before sending a GM to OpenRouter and reports callback failures in the AI Setup tab. If a return URL contains `openrouter=error&reason=configuration` and OpenRouter shows a newly created key, the server keyring is missing or invalid; configure the Netlify Functions variables and redeploy before retrying. Review and revoke unused provider keys created by failed attempts manually.
 
 The connected GM or campaign creator can refresh provider metadata, reconnect, change player access, or disconnect the local connection. Disconnecting deletes Star Board's encrypted credential and stops new requests; it does not revoke the provider-side OpenRouter key. Use the owner controls link or OpenRouter's dashboard to revoke that key. Reconnecting resets player AI access off so a replacement key is not silently shared with players.
 

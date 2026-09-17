@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
   return {
     cookies: vi.fn(),
     getAuthenticatedUser: vi.fn(),
+    assertCampaignCredentialEncryptionConfigured: vi.fn(),
     getCampaignCredentialForManager: vi.fn(),
     getCampaignCredentialForRefresh: vi.fn(),
     getCampaignCredentialStatusForManager: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/auth/permissions", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
 vi.mock("@/lib/ai/campaign-credentials", () => ({
+  assertCampaignCredentialEncryptionConfigured: mocks.assertCampaignCredentialEncryptionConfigured,
   CampaignCredentialError: mocks.CampaignCredentialError,
   disconnectCampaignCredential: mocks.disconnectCampaignCredential,
   getCampaignCredentialForManager: mocks.getCampaignCredentialForManager,
@@ -176,6 +178,23 @@ describe("OpenRouter campaign connection routes", () => {
     expect(setCookie).toMatch(/SameSite=lax/i);
     expect(setCookie).toMatch(/Max-Age=600/i);
     expect(setCookie).toMatch(/Secure/i);
+    expect(mocks.assertCampaignCredentialEncryptionConfigured).toHaveBeenCalledOnce();
+  });
+
+  it("blocks authorization when credential encryption is misconfigured", async () => {
+    mocks.assertCampaignCredentialEncryptionConfigured.mockImplementationOnce(() => {
+      throw new mocks.CampaignCredentialError("misconfigured", "Campaign AI credential encryption is not configured.");
+    });
+
+    const response = await connect(request(`/api/campaigns/${campaignId}/openrouter/connect`, {
+      method: "POST",
+      headers: { origin },
+    }), routeContext());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "misconfigured" });
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(mocks.assertCampaignCredentialEncryptionConfigured).toHaveBeenCalledOnce();
   });
 
   it("persists a verified callback key and clears the OAuth cookie", async () => {
@@ -190,6 +209,7 @@ describe("OpenRouter campaign connection routes", () => {
     expect(location.pathname).toBe(`/campaigns/${campaignId}/settings`);
     expect(location.searchParams.get("openrouter")).toBe("connected");
     expect(mocks.exchangeOpenRouterCode).toHaveBeenCalledWith("single-use-code", pending.codeVerifier);
+    expect(mocks.assertCampaignCredentialEncryptionConfigured).toHaveBeenCalledOnce();
     expect(mocks.saveCampaignCredential).toHaveBeenCalledWith(expect.objectContaining({
       campaignId,
       apiKey: "sk-or-v1-created",
@@ -199,6 +219,23 @@ describe("OpenRouter campaign connection routes", () => {
     }));
     expect(response.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
     expect(JSON.stringify(await response.text())).not.toContain("sk-or-v1-created");
+  });
+
+  it("does not exchange an authorization code when credential encryption becomes misconfigured", async () => {
+    const pending = createOpenRouterOAuthState(campaignId, userId, secret);
+    setOAuthCookie(pending.cookieValue);
+    mocks.assertCampaignCredentialEncryptionConfigured.mockImplementationOnce(() => {
+      throw new mocks.CampaignCredentialError("misconfigured", "Campaign AI credential encryption is not configured.");
+    });
+
+    const response = await callback(callbackRequest(`state=${encodeURIComponent(pending.state)}&code=single-use-code`), routeContext());
+    const location = locationUrl(response);
+
+    expect(location.searchParams.get("openrouter")).toBe("error");
+    expect(location.searchParams.get("reason")).toBe("configuration");
+    expect(mocks.exchangeOpenRouterCode).not.toHaveBeenCalled();
+    expect(mocks.saveCampaignCredential).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
   });
 
   it("rejects a replay or mismatched OAuth state before exchanging a code", async () => {

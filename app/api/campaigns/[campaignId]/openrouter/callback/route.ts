@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
-import { CampaignCredentialError, getCampaignCredentialForManager, saveCampaignCredential } from "@/lib/ai/campaign-credentials";
+import { assertCampaignCredentialEncryptionConfigured, CampaignCredentialError, getCampaignCredentialForManager, saveCampaignCredential } from "@/lib/ai/campaign-credentials";
 import { exchangeOpenRouterCode, getOpenRouterKeyMetadata, OpenRouterOAuthError, openRouterOAuthStateCookieName, verifyOpenRouterOAuthState } from "@/lib/ai/openrouter-oauth";
 import { getOpenRouterOAuthStateSecret, redirectOpenRouterCallback } from "@/lib/ai/openrouter-route";
 
@@ -57,6 +57,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   if (!code) return redirectOpenRouterCallback(request, campaignId, { status: "error", reason: "missing_code" });
 
   try {
+    assertCampaignCredentialEncryptionConfigured();
     const apiKey = await exchangeOpenRouterCode(code, state.codeVerifier);
     const metadata = await getOpenRouterKeyMetadata(apiKey);
     await saveCampaignCredential({

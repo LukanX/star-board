@@ -10,6 +10,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceRoleClient: mocks.getSupabaseServiceRoleClient }));
 
 import {
+  assertCampaignCredentialEncryptionConfigured,
   CampaignCredentialError,
   disconnectCampaignCredential,
   getCampaignCredentialForGeneration,
@@ -178,6 +179,33 @@ describe("campaign credential repository", () => {
     });
     expect(payload.ciphertext).not.toBe(apiKey);
     expect(JSON.stringify(payload)).not.toContain(apiKey);
+  });
+
+  it("rejects credential encryption configuration before writing a key", async () => {
+    const { credentialQuery } = createManagerSupabase({ row: null, currentUserId: creatorId });
+    mocks.getServerEnv.mockReturnValue({
+      CAMPAIGN_CREDENTIAL_ENCRYPTION_KEYS: undefined,
+      CAMPAIGN_CREDENTIAL_ACTIVE_KEY_ID: undefined,
+    });
+
+    expect(() => assertCampaignCredentialEncryptionConfigured()).toThrowError(
+      expect.objectContaining({ code: "misconfigured" }),
+    );
+    await expect(saveCampaignCredential({
+      campaignId,
+      apiKey,
+      connectedBy: creatorId,
+      metadata: {
+        label: "Campaign key",
+        limitUsd: 20,
+        remainingUsd: 19,
+        usageUsd: 1,
+        unlimited: false,
+        verificationStatus: "verified",
+      },
+      resetPlayerAccess: true,
+    })).rejects.toMatchObject({ code: "misconfigured" });
+    expect(credentialQuery.upsert).not.toHaveBeenCalled();
   });
 
   it("decrypts only verified credentials for generation and normalizes tampering failures", async () => {
