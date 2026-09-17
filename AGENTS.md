@@ -52,7 +52,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Supabase, Auth, and API Boundaries
 
 - Use `lib/supabase/browser.ts` only in client code, `lib/supabase/server.ts` in Server Components and route handlers, and `lib/supabase/service.ts` only for explicit privileged server or function work.
-- Never expose `SUPABASE_SECRET_KEY`, `OPENROUTER_API_KEY`, or other server credentials through `NEXT_PUBLIC_*`, client bundles, responses, logs, or fixtures. Access validated configuration through `lib/env.ts`.
+- Never expose `SUPABASE_SECRET_KEY`, campaign OpenRouter key material, `CAMPAIGN_CREDENTIAL_ENCRYPTION_KEYS`, or other server credentials through `NEXT_PUBLIC_*`, client bundles, responses, logs, or fixtures. Access validated configuration through `lib/env.ts`.
 - Scope every campaign record read and mutation to the campaign and authenticated membership. Preserve GM/player authorization and separate GM-only note storage; never rely on a client-supplied role.
 - Campaign display names belong to `campaign_members`, not the global profile. One account may have a different display name in each campaign.
 - Route handlers should follow the local sequence: parse input, validate with the schema in `lib/validation/`, authenticate/authorize with shared helpers, perform the query or RPC, and return the established JSON/error shape.

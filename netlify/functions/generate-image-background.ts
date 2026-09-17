@@ -3,6 +3,8 @@ import { getAiProviderFailure, logAiProviderFailure } from "../../lib/ai/errors"
 import { imageJobPendingTimeoutMs, imageJobProviderTimeoutMs } from "../../lib/ai/image-job-lifecycle";
 import { parseImageBackgroundJob, verifyImageBackgroundSignature } from "../../lib/ai/image-jobs";
 import { getServerEnv } from "../../lib/env";
+import { getCampaignCredentialForGeneration } from "../../lib/ai/campaign-credentials";
+import { canUseCharacterPortraitAi, loadCharacterPortraitAccess } from "../../lib/ai/character-portrait-access";
 import { campaignArtBucket } from "../../lib/storage/campaign-art";
 import { getSupabaseServiceRoleClient } from "../../lib/supabase/service";
 
@@ -123,7 +125,7 @@ export default async function handler(request: Request) {
     .eq("id", input.data.generationRunId)
     .eq("status", "pending")
     .gte("status_updated_at", new Date(Date.now() - imageJobPendingTimeoutMs).toISOString())
-    .select("id, campaign_id, requested_by")
+    .select("id, campaign_id, requested_by, purpose, kind, target_kind, target_character_id")
     .maybeSingle();
 
   if (claimError) {
@@ -139,9 +141,24 @@ export default async function handler(request: Request) {
   logWorkerEvent("claimed", { generationRunId: claimedRun.id, model: input.data.model });
 
   try {
-    const response = await generateImage(input.data.prompt, input.data.model, { aspectRatio: input.data.aspectRatio, size: input.data.size, timeoutMs: imageJobProviderTimeoutMs });
+    const characterAccess = claimedRun.target_kind === "character"
+      ? claimedRun.target_character_id
+        ? await loadCharacterPortraitAccess(supabase, claimedRun.campaign_id, claimedRun.target_character_id, claimedRun.requested_by)
+        : { failure: "not-found" as const }
+      : null;
+
+    if (characterAccess && (characterAccess.failure || !characterAccess.access)) {
+      throw new Error("The saved character for this image job is no longer available.");
+    }
+
+    const campaignCredential = await getCampaignCredentialForGeneration(claimedRun.campaign_id, supabase);
+    if (characterAccess?.access && !canUseCharacterPortraitAi(characterAccess.access, campaignCredential.status.allowPlayerAi)) {
+      throw new Error("Player AI assistance is no longer enabled for this campaign.");
+    }
+    const response = await generateImage(campaignCredential.apiKey, input.data.prompt, input.data.model, { aspectRatio: input.data.aspectRatio, size: input.data.size, timeoutMs: imageJobProviderTimeoutMs });
     const storedImage = await getStoredImage(response.image);
-    const path = `${claimedRun.campaign_id}/${claimedRun.requested_by}/image-${claimedRun.id}.${imageMediaTypes[storedImage.mediaType]}`;
+    const filePrefix = claimedRun.purpose === "style-preview" ? "style-preview" : "image";
+    const path = `${claimedRun.campaign_id}/${claimedRun.requested_by}/${filePrefix}-${claimedRun.id}.${imageMediaTypes[storedImage.mediaType]}`;
     const { error: uploadError } = await supabase.storage.from(campaignArtBucket).upload(path, storedImage.body, {
       cacheControl: "3600",
       contentType: storedImage.mediaType,

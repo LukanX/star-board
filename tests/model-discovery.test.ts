@@ -13,7 +13,7 @@ describe("OpenRouter model discovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetAiModelDiscoveryCache();
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key" });
+    mocks.getServerEnv.mockReturnValue({});
     vi.stubGlobal("fetch", mocks.fetch);
   });
 
@@ -26,7 +26,7 @@ describe("OpenRouter model discovery", () => {
       { id: "provider/not-curated", name: "Ignore me", supported_parameters: ["structured_outputs"] },
     ] }), { status: 200 }));
 
-    const result = await getAiModelCatalog("structured-text");
+    const result = await getAiModelCatalog("test-key", "structured-text");
     const gpt = result.models.find((model) => model.id === "openai/gpt-4o-mini");
     const externalModel = result.models.find((model) => model.id === "provider/not-curated");
 
@@ -45,7 +45,7 @@ describe("OpenRouter model discovery", () => {
       { id: "google/gemini-2.5-flash-image", name: "Gemini 2.5 Flash Image", architecture: { output_modalities: ["image"] } },
     ] }), { status: 200 }));
 
-    const result = await getAiModelCatalog("image");
+    const result = await getAiModelCatalog("test-key", "image");
 
     expect(result.models.map((model) => model.id)).toEqual(["openai/gpt-5-image-mini", "google/gemini-2.5-flash-image"]);
     expect(mocks.fetch).toHaveBeenCalledWith("https://openrouter.ai/api/v1/images/models?sort=most-popular", expect.anything());
@@ -54,7 +54,7 @@ describe("OpenRouter model discovery", () => {
   it("returns a usable offline fallback list when discovery is unavailable", async () => {
     mocks.fetch.mockResolvedValue(new Response("provider unavailable", { status: 503 }));
 
-    const result = await getAiModelCatalog("image");
+    const result = await getAiModelCatalog("test-key", "image");
 
     expect(result.status).toBe("unavailable");
     expect(result.models.length).toBeGreaterThan(0);
@@ -63,5 +63,22 @@ describe("OpenRouter model discovery", () => {
       "bytedance-seed/seedream-5-0-lite",
       "bytedance-seed/seedream-5-0-pro",
     ]));
+  });
+
+  it("does not reuse a live catalog discovered with a different campaign key", async () => {
+    mocks.fetch
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [
+        { id: "provider/key-one-model", name: "Key one model", supported_parameters: ["structured_outputs"] },
+      ] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [
+        { id: "provider/key-two-model", name: "Key two model", supported_parameters: ["structured_outputs"] },
+      ] }), { status: 200 }));
+
+    const first = await getAiModelCatalog("campaign-key-one", "structured-text");
+    const second = await getAiModelCatalog("campaign-key-two", "structured-text");
+
+    expect(first.models.map((model) => model.id)).toEqual(["provider/key-one-model"]);
+    expect(second.models.map((model) => model.id)).toEqual(["provider/key-two-model"]);
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
   });
 });

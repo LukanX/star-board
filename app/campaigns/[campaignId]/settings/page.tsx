@@ -8,5 +8,5 @@ export default async function SettingsPage({ params }: { params: Promise<{ campa
 
   if (!result) notFound();
 
-  return <SettingsRouteView campaignId={campaignId} />;
+  return <SettingsRouteView campaignId={campaignId} initialCampaign={result.campaign} />;
 }

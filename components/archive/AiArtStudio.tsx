@@ -24,13 +24,22 @@ type ImageAsset = {
   provider: string;
 };
 
+type ArtStyleOption = {
+  id: string;
+  name: string;
+  status: "draft" | "ready";
+};
+
 type AiArtStudioProps = {
   campaignId: string | null;
   kind: ArtKind;
+  characterId?: string;
+  portraitAiRole?: "gm" | "player";
   parentPlaceId?: string | null;
   subject?: string;
   currentPrompt?: string | null;
   onSubjectChange?: (subject: string) => void;
+  onBusyChange?: (busy: boolean) => void;
   onApproved: (asset: ImageAsset) => void;
 };
 
@@ -76,7 +85,7 @@ async function removeTemporaryArt(
 export default function AiArtStudio(props: AiArtStudioProps) {
   return (
     <AiArtStudioContent
-      key={`${props.campaignId ?? "none"}:${props.kind}:${props.parentPlaceId ?? "root"}`}
+      key={`${props.campaignId ?? "none"}:${props.kind}:${props.characterId ?? "none"}:${props.portraitAiRole ?? "default"}:${props.parentPlaceId ?? "root"}`}
       {...props}
     />
   );
@@ -85,13 +94,19 @@ export default function AiArtStudio(props: AiArtStudioProps) {
 function AiArtStudioContent({
   campaignId,
   kind,
+  characterId,
+  portraitAiRole,
   parentPlaceId,
   subject,
   currentPrompt,
   onSubjectChange,
+  onBusyChange,
   onApproved,
 }: AiArtStudioProps) {
   const [draft, setDraft] = useState<ImageDraft | null>(null);
+  const [styles, setStyles] = useState<ArtStyleOption[]>([]);
+  const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
+  const [styleSelectionChanged, setStyleSelectionChanged] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<ImageAspectRatio>(
     defaultImageAspectRatio,
@@ -107,10 +122,38 @@ function AiArtStudioContent({
 
   const subjectDraft = onSubjectChange ? (subject ?? "") : localSubjectDraft;
   const availableSizes = imageSizeOptions[aspectRatio];
+  const isCharacterPortrait = kind === "character" && Boolean(characterId);
+  const canCustomizePortrait = !isCharacterPortrait || portraitAiRole === "gm";
+
+  useEffect(() => {
+    if (!campaignId || (isCharacterPortrait && portraitAiRole !== "gm")) return;
+
+    let cancelled = false;
+    void fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/visual-styles`, { cache: "no-store" })
+      .then(async (response) => {
+        const result = (await response.json()) as { styles?: ArtStyleOption[] };
+        if (!response.ok || !result.styles || cancelled) return;
+        setStyles(result.styles.filter((style) => style.status === "ready"));
+      })
+      .catch(() => {
+        if (!cancelled) setStyles([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId, isCharacterPortrait, portraitAiRole]);
 
   useEffect(() => {
     return () => activeGenerationRef.current?.abort();
   }, []);
+
+  useEffect(() => {
+    onBusyChange?.(isGenerating || isApproving);
+    return () => {
+      if (isGenerating || isApproving) onBusyChange?.(false);
+    };
+  }, [isApproving, isGenerating, onBusyChange]);
 
   useEffect(() => {
     if (!isPreviewOpen) return;
@@ -141,6 +184,11 @@ function AiArtStudioContent({
       return;
     }
 
+    if (subjectDraft.length > 1200) {
+      setError("Visual direction must be 1200 characters or fewer.");
+      return;
+    }
+
     if (!subjectDraft.trim()) {
       setError("Add a subject before generating art.");
       return;
@@ -165,13 +213,15 @@ function AiArtStudioContent({
           campaignId,
           mode,
           targetKind: kind,
+          characterId: characterId ?? undefined,
+          visualStyleId: canCustomizePortrait ? selectedStyleId ?? undefined : undefined,
           parentPlaceId: parentPlaceId ?? undefined,
-          model: selectedModel ?? undefined,
+          model: canCustomizePortrait ? selectedModel ?? undefined : undefined,
           subject: subjectDraft,
           aspectRatio,
           size,
           refinement: refinement.trim() || undefined,
-          currentPrompt: draft?.prompt ?? currentPrompt ?? undefined,
+          currentPrompt: draft?.prompt ?? (styleSelectionChanged ? undefined : currentPrompt) ?? undefined,
         }),
       });
       const result = (await response.json()) as {
@@ -269,17 +319,40 @@ function AiArtStudioContent({
     ? `data:${draft.image.mediaType};base64,${draft.image.base64}`
     : (draft?.image.url ?? null);
   const previewAspectRatio = draft?.aspectRatio.replace(":", " / ") ?? "1 / 1";
+  const selectedStyleName = styles.find((style) => style.id === selectedStyleId)?.name;
 
   return (
     <section className="grid gap-[10px] p-[13px] border border-[rgba(255,92,154,.3)] bg-[linear-gradient(120deg,rgba(255,92,154,.07),rgba(185,146,255,.035))]">
       <div className="flex items-start justify-between gap-3 text-[var(--pink)]">
         <div>
-          <p className={`${eyebrowClassName} !mb-[5px] text-[var(--pink)]`}>GM TOOL // IMAGE DRAFT</p>
-          <h3 className="m-0 text-[14px]">Shape the visual signal</h3>
+          <p className={`${eyebrowClassName} !mb-[5px] text-[var(--pink)]`}>{isCharacterPortrait ? `${portraitAiRole === "player" ? "PLAYER TOOL" : "GM TOOL"} // PORTRAIT DRAFT` : "GM TOOL // IMAGE DRAFT"}</p>
+          <h3 className="m-0 text-[14px]">{isCharacterPortrait ? "Shape the saved character portrait" : "Shape the visual signal"}</h3>
         </div>
         <Sparkles size={17} />
       </div>
       <div className="grid gap-[10px]">
+        {canCustomizePortrait ? <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
+          VISUAL STYLE
+          <select
+            className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none px-[10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)]"
+            aria-label="Visual style for image generation"
+            value={selectedStyleId ?? ""}
+            onChange={(event) => {
+              const nextStyleId = event.target.value || null;
+              if (nextStyleId === selectedStyleId) return;
+              if (draft?.temporaryPath && campaignId) void removeTemporaryArt(campaignId, draft.temporaryPath);
+              setSelectedStyleId(nextStyleId);
+              setStyleSelectionChanged(true);
+              setDraft(null);
+              setRefinement("");
+              setError(null);
+            }}
+          >
+            <option value="">CAMPAIGN DEFAULT</option>
+            {styles.map((style) => <option key={style.id} value={style.id}>{style.name}</option>)}
+          </select>
+          <span className="text-[var(--dim)] text-[8px] tracking-[.04em]">{selectedStyleName ? `SELECTED // ${selectedStyleName}` : "SELECT A READY STYLE OR USE THE CAMPAIGN DEFAULT."}</span>
+        </label> : null}
         <fieldset className="grid gap-2 min-w-0 m-0 p-0 border-0">
           <legend className="p-0 text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">ASPECT RATIO</legend>
           <div
@@ -306,12 +379,12 @@ function AiArtStudioContent({
           </div>
         </fieldset>
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(180px,.8fr)] gap-[10px] items-start">
-          <AiModelPicker
-            campaignId={campaignId}
-            capability="image"
-            value={selectedModel}
-            onChange={setSelectedModel}
-          />
+          {canCustomizePortrait ? <AiModelPicker
+              campaignId={campaignId}
+              capability="image"
+              value={selectedModel}
+              onChange={setSelectedModel}
+            /> : null}
           <label>
             OUTPUT SIZE
             <select
@@ -381,18 +454,34 @@ function AiArtStudioContent({
         </div>
       ) : null}
       <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
-        Visual subject
-        <input
-          className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)] placeholder:text-[#4d5a6b]"
-          maxLength={1200}
-          placeholder="Describe the character, faction, mission, or scene..."
-          value={subjectDraft}
-          onChange={(event) => {
-            const nextSubject = event.target.value;
-            if (onSubjectChange) onSubjectChange(nextSubject);
-            else setLocalSubjectDraft(nextSubject);
-          }}
-        />
+        {isCharacterPortrait ? "Image description" : "Visual subject"}
+        {isCharacterPortrait ? (
+          <textarea
+            className="w-full min-h-[110px] resize-y border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] leading-[1.45] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)] placeholder:text-[#4d5a6b]"
+            aria-label="Image description"
+            maxLength={1200}
+            placeholder="Describe this saved character's appearance..."
+            value={subjectDraft}
+            onChange={(event) => {
+              const nextSubject = event.target.value;
+              if (onSubjectChange) onSubjectChange(nextSubject);
+              else setLocalSubjectDraft(nextSubject);
+            }}
+          />
+        ) : (
+          <input
+            className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)] placeholder:text-[#4d5a6b]"
+            aria-label="Visual subject"
+            maxLength={1200}
+            placeholder="Describe the character, faction, mission, or scene..."
+            value={subjectDraft}
+            onChange={(event) => {
+              const nextSubject = event.target.value;
+              if (onSubjectChange) onSubjectChange(nextSubject);
+              else setLocalSubjectDraft(nextSubject);
+            }}
+          />
+        )}
       </label>
       <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
         Focused refinement

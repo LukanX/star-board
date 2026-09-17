@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   buildFactionPrompt: vi.fn(() => "faction-prompt"),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  resolveCampaignCredential: vi.fn(),
   loadMissionAiReferences: vi.fn(),
 }));
 
@@ -29,6 +30,10 @@ vi.mock("@/lib/ai/prompts", () => ({
 }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
+vi.mock("@/lib/ai/route-support", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/route-support")>();
+  return { ...actual, resolveCampaignCredential: mocks.resolveCampaignCredential };
+});
 
 import { POST as generateFaction } from "@/app/api/ai/faction/route";
 import { POST as generateMission } from "@/app/api/ai/mission/route";
@@ -51,9 +56,10 @@ const baseInput = { campaignId, mode: "create" as const };
 describe("structured AI assistance routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: {}, user: { id: userId }, role: "gm" });
-    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", artStyleSuffix: "Cinematic sci-fi realism" } });
+    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Cinematic sci-fi realism" } });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini", "google/gemini-2.5-flash", "openai/gpt-4o", "openai/gpt-image-1", "google/gemini-2.5-flash-image", "bytedance-seed/seedream-4.5"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [
       { id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true },
@@ -81,6 +87,45 @@ describe("structured AI assistance routes", () => {
     expect(payload.error).toBe("GM access is required for AI NPC assistance.");
   });
 
+  it("preserves protected NPC fields when a provider changes them", async () => {
+    const providerDraft = {
+      name: "Changed by AI",
+      species: "Human",
+      role: "Smuggler",
+      shortDescription: "A guarded medic with a practical streak.",
+      playerNotes: "She keeps emergency supplies close.",
+      gmNotes: "She is hiding a debt to the station boss.",
+      motivation: "Keep the clinic open.",
+      visualPrompt: "A tired medic in a patched station clinic.",
+    };
+    mocks.generateJson.mockResolvedValue({ data: providerDraft, model: "openrouter/fallback", generationId: "npc-refinement-1" });
+
+    const response = await generateNpc(request({
+      ...baseInput,
+      mode: "refine",
+      name: "Kept Name",
+      species: "Android",
+      role: "Medic",
+      feedback: "Make the character warmer without changing their identity.",
+      protectedFields: ["name", "species"],
+      currentDraft: {
+        name: "Kept Name",
+        species: "Android",
+        role: "Medic",
+        shortDescription: "A guarded medic.",
+        playerNotes: "She keeps emergency supplies close.",
+        gmNotes: "She owes the station boss.",
+        motivation: "Keep the clinic open.",
+        visualPrompt: "A medic in a station clinic.",
+      },
+    }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.draft).toMatchObject({ name: "Kept Name", species: "Android", role: "Smuggler" });
+    expect(mocks.buildNpcPrompt).toHaveBeenCalledWith(expect.objectContaining({ feedback: "Make the character warmer without changing their identity.", protectedFields: ["name", "species"] }), expect.anything());
+  });
+
   it("returns a validated faction draft and records metadata", async () => {
     const draft = { name: "The Glass Meridian", status: "active", description: "A trade consortium with a public relief arm.", playerNotes: "They offer safe passage to crews who keep their word.", gmNotes: "The relief arm is a cover for a quiet intelligence network.", visualPrompt: "A fractured glass compass over a star chart." };
     mocks.generateJson.mockResolvedValue({ data: draft, model: "openrouter/fallback", generationId: "text-run-1", usage: { inputTokens: 12, outputTokens: 34, cost: 0.001 } });
@@ -103,7 +148,7 @@ describe("structured AI assistance routes", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
-    expect(mocks.generateJson).toHaveBeenCalledWith("mission-prompt", expect.anything(), "openai/gpt-4o-mini");
+    expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "mission-prompt", expect.anything(), "openai/gpt-4o-mini");
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "mission", status: "complete", model: "openai/gpt-4o-mini", provider: "openrouter", effectiveModel: "openrouter/fallback", generationId: "text-run-2", inputTokens: 12, outputTokens: 34, costUsd: 0.001 }));
   });
 
@@ -146,7 +191,7 @@ describe("structured AI assistance routes", () => {
     const response = await generateMission(request({ ...baseInput, title: "The Relay", model: liveModel }));
 
     expect(response.status).toBe(200);
-    expect(mocks.generateJson).toHaveBeenCalledWith("mission-prompt", expect.anything(), liveModel);
+    expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "mission-prompt", expect.anything(), liveModel);
   });
 
   it("rejects a model outside the live catalog before calling the provider", async () => {

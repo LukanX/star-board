@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getServerEnv } from "@/lib/env";
+import { hashCredential } from "@/lib/ai/credential-crypto";
 import { fallbackAiModels, type AiCapability } from "@/lib/ai/model-catalog";
 
 const openRouterBaseUrl = "https://openrouter.ai/api/v1";
@@ -90,16 +91,14 @@ function normalizeParameters(value: unknown) {
   return [];
 }
 
-async function fetchDiscovery(capability: AiCapability, sort: AiModelSort) {
+async function fetchDiscovery(apiKey: string, capability: AiCapability, sort: AiModelSort, cacheKey: string) {
   const env = getServerEnv();
-
-  if (!env.OPENROUTER_API_KEY) throw new Error("OpenRouter is not configured.");
 
   const query = new URLSearchParams(capability === "image" ? { sort } : { output_modalities: "text", sort });
   const endpoint = capability === "image"
     ? `${openRouterBaseUrl}/images/models?${query.toString()}`
     : `${openRouterBaseUrl}/models?${query.toString()}`;
-  const headers: Record<string, string> = { Authorization: `Bearer ${env.OPENROUTER_API_KEY}` };
+  const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}` };
   if (env.OPENROUTER_SITE_URL) headers["HTTP-Referer"] = env.OPENROUTER_SITE_URL;
   if (env.OPENROUTER_APP_NAME) headers["X-Title"] = env.OPENROUTER_APP_NAME;
 
@@ -111,7 +110,7 @@ async function fetchDiscovery(capability: AiCapability, sort: AiModelSort) {
 
   const models = payload.data.data.filter((model) => providerSupportsCapability(model, capability));
   const cacheEntry = { expiresAt: Date.now() + modelDiscoveryCacheMs, models };
-  discoveryCache.set(`${capability}:${sort}`, cacheEntry);
+  discoveryCache.set(cacheKey, cacheEntry);
   return cacheEntry;
 }
 
@@ -156,8 +155,8 @@ function fallbackCatalog(capability: AiCapability): AiModelCatalogEntry[] {
   }));
 }
 
-export async function getAiModelCatalog(capability: AiCapability, sort: AiModelSort = "most-popular"): Promise<AiModelCatalogSnapshot> {
-  const cacheKey = `${capability}:${sort}`;
+export async function getAiModelCatalog(apiKey: string, capability: AiCapability, sort: AiModelSort = "most-popular"): Promise<AiModelCatalogSnapshot> {
+  const cacheKey = `${hashCredential(apiKey)}:${capability}:${sort}`;
   const cached = discoveryCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {
@@ -165,7 +164,7 @@ export async function getAiModelCatalog(capability: AiCapability, sort: AiModelS
   }
 
   try {
-    const discovered = await fetchDiscovery(capability, sort);
+    const discovered = await fetchDiscovery(apiKey, capability, sort, cacheKey);
     return { status: "live", models: discovered.models.map((model) => toCatalogEntry(capability, model, "live")) };
   } catch {
     if (cached) return { status: "stale", models: cached.models.map((model) => toCatalogEntry(capability, model, "stale")) };
@@ -175,4 +174,8 @@ export async function getAiModelCatalog(capability: AiCapability, sort: AiModelS
 
 export function resetAiModelDiscoveryCache() {
   discoveryCache.clear();
+}
+
+export function getLocalAiModelCatalog(capability: AiCapability): AiModelCatalogSnapshot {
+  return { status: "unavailable", models: fallbackCatalog(capability) };
 }

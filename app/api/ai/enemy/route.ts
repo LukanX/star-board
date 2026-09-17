@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
 import { NextResponse } from "next/server";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
@@ -12,6 +13,7 @@ import { enemyAiDraftSchema } from "@/lib/validation/enemy";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { dispatchEnemyBackgroundJob } from "@/lib/ai/enemy-jobs";
+import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 
 export const runtime = "nodejs";
 
@@ -37,10 +39,16 @@ export async function POST(request: Request) {
     const context = await requireCampaignGM(input.data.campaignId);
     if (!context) return NextResponse.json({ error: "GM access is required for AI enemy assistance." }, { status: 403 });
 
-    const env = getServerEnv();
-    if (!env.OPENROUTER_API_KEY) return NextResponse.json({ error: "OpenRouter text generation is not configured." }, { status: 503 });
+    let campaignCredential;
+    try {
+      campaignCredential = await resolveCampaignCredential(input.data.campaignId);
+    } catch (error) {
+      return campaignCredentialErrorResponse(error, "Enemy assistance is temporarily unavailable.");
+    }
 
-    const catalog = await getAiModelCatalog("structured-text");
+    const env = getServerEnv();
+
+    const catalog = await getAiModelCatalog(campaignCredential.apiKey, "structured-text");
     const availableModels = catalog.models.filter((model) => model.compatible);
     const settingsResult = await loadCampaignAiSettings(context.supabase, input.data.campaignId, availableModels.map((model) => model.id));
     if ("error" in settingsResult) return NextResponse.json({ error: settingsResult.error }, { status: 503 });
@@ -88,6 +96,10 @@ export async function POST(request: Request) {
         generationRunId: generationRun.id,
         prompt,
         model: selectedModel.id,
+        ...(input.data.protectedFields?.length
+          ? { protectedFields: input.data.protectedFields }
+          : {}),
+        ...(input.data.currentDraft ? { currentDraft: input.data.currentDraft } : {}),
       };
 
       try {
@@ -116,7 +128,7 @@ export async function POST(request: Request) {
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
 
     try {
-      providerResult = await generateJson(prompt, enemyAiDraftSchema, selectedModel.id);
+      providerResult = await generateJson(campaignCredential.apiKey, prompt, enemyAiDraftSchema, selectedModel.id);
     } catch (error: unknown) {
       logAiProviderFailure(error, { kind: "enemy", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
       await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "enemy", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: selectedModel.id, status: "failed" });
@@ -131,10 +143,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The AI response did not match the enemy draft format." }, { status: 502 });
     }
 
+    const reviewedDraft = enemyAiDraftSchema.safeParse(
+      mergeProtectedDraftFields(
+        draft.data,
+        input.data.currentDraft as Record<string, unknown> | undefined,
+        input.data.protectedFields,
+      ),
+    );
+
+    if (!reviewedDraft.success) {
+      await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "enemy", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult.model ?? selectedModel.id, generationId: providerResult.generationId, inputTokens: providerResult.usage?.inputTokens, outputTokens: providerResult.usage?.outputTokens, costUsd: providerResult.usage?.cost, status: "failed" });
+      return NextResponse.json({ error: "The reviewed enemy draft is outside the allowed field limits." }, { status: 502 });
+    }
+
     const { error: auditError } = await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "enemy", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult.model ?? selectedModel.id, generationId: providerResult.generationId, inputTokens: providerResult.usage?.inputTokens, outputTokens: providerResult.usage?.outputTokens, costUsd: providerResult.usage?.cost, status: "complete" });
     if (auditError) return NextResponse.json({ error: "Enemy draft metadata could not be saved." }, { status: 503 });
 
-    return NextResponse.json({ draft: draft.data, model: providerResult.model ?? selectedModel.id });
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult.model ?? selectedModel.id });
   } catch {
     return NextResponse.json({ error: "Enemy assistance is temporarily unavailable." }, { status: 503 });
   }

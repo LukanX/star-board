@@ -7,7 +7,7 @@ import DirtyFormProvider from "@/components/campaign-shell/DirtyFormProvider";
 describe("CampaignOverview initial render", () => {
   it("renders server-provided campaign data without a client bootstrap", () => {
     const overview = {
-      campaign: { id: "campaign-42", name: "Starfall", system: "scifi", description: "Brief", created_by: "gm-1" },
+      campaign: { id: "campaign-42", name: "Starfall", system: "scifi", description: "Brief", visual_style: "Cinematic", created_by: "gm-1" },
       role: "player" as const,
       displayName: "Nova",
       jobs: [],
@@ -27,7 +27,7 @@ describe("CampaignOverview initial render", () => {
 
   it("uses the canonical job detail link for overview missions", () => {
     const overview = {
-      campaign: { id: "campaign-42", name: "Starfall", system: "scifi", description: "Brief", created_by: "gm-1" },
+      campaign: { id: "campaign-42", name: "Starfall", system: "scifi", description: "Brief", visual_style: "Cinematic", created_by: "gm-1" },
       role: "player" as const,
       displayName: "Nova",
       jobs: [{

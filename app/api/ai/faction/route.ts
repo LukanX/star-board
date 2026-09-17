@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
 import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
@@ -7,9 +8,10 @@ import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { buildFactionPrompt } from "@/lib/ai/prompts";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
-import { factionDraftSchema, factionGenerationInputSchema } from "@/lib/validation/ai";
+import { factionDraftSchema, factionGenerationInputSchema, factionReviewDraftSchema } from "@/lib/validation/ai";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
+import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 
 export const runtime = "nodejs";
 
@@ -36,13 +38,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "GM access is required for AI faction assistance." }, { status: 403 });
     }
 
-    const env = getServerEnv();
-
-    if (!env.OPENROUTER_API_KEY) {
-      return NextResponse.json({ error: "OpenRouter text generation is not configured." }, { status: 503 });
+    let campaignCredential;
+    try {
+      campaignCredential = await resolveCampaignCredential(input.data.campaignId);
+    } catch (error) {
+      return campaignCredentialErrorResponse(error, "Faction assistance is temporarily unavailable.");
     }
 
-    const catalog = await getAiModelCatalog("structured-text");
+    const env = getServerEnv();
+
+    const catalog = await getAiModelCatalog(campaignCredential.apiKey, "structured-text");
     const availableModels = catalog.models.filter((model) => model.compatible);
     const settingsResult = await loadCampaignAiSettings(context.supabase, input.data.campaignId, availableModels.map((model) => model.id));
     if ("error" in settingsResult) return NextResponse.json({ error: settingsResult.error }, { status: 503 });
@@ -67,7 +72,7 @@ export async function POST(request: Request) {
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
 
     try {
-      providerResult = await generateJson(prompt, factionDraftSchema, selectedModel.id);
+      providerResult = await generateJson(campaignCredential.apiKey, prompt, factionDraftSchema, selectedModel.id);
       rawDraft = providerResult.data;
     } catch (error: unknown) {
       logAiProviderFailure(error, { kind: "faction", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
@@ -84,13 +89,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The AI response did not match the faction draft format." }, { status: 502 });
     }
 
+    const reviewedDraft = factionReviewDraftSchema.safeParse(
+      mergeProtectedDraftFields(
+        draft.data,
+        input.data.currentDraft as Record<string, unknown> | undefined,
+        input.data.protectedFields,
+      ),
+    );
+
+    if (!reviewedDraft.success) {
+      await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "faction", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult?.model ?? selectedModel.id, generationId: providerResult?.generationId, inputTokens: providerResult?.usage?.inputTokens, outputTokens: providerResult?.usage?.outputTokens, costUsd: providerResult?.usage?.cost, status: "failed" });
+      return NextResponse.json({ error: "The reviewed faction draft is outside the allowed field limits." }, { status: 502 });
+    }
+
     const { error: auditError } = await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "faction", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult?.model ?? selectedModel.id, generationId: providerResult?.generationId, inputTokens: providerResult?.usage?.inputTokens, outputTokens: providerResult?.usage?.outputTokens, costUsd: providerResult?.usage?.cost, status: "complete" });
 
     if (auditError) {
       return NextResponse.json({ error: "Faction draft metadata could not be saved." }, { status: 503 });
     }
 
-    return NextResponse.json({ draft: draft.data, model: providerResult?.model ?? selectedModel.id });
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult?.model ?? selectedModel.id });
   } catch {
     return NextResponse.json({ error: "Faction assistance is temporarily unavailable." }, { status: 503 });
   }

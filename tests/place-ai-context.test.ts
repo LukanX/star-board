@@ -123,7 +123,7 @@ describe("Place AI context", () => {
     const prompt = buildPlacePrompt(input, {
       system: "Starfinder 2e",
       description: "A frontier campaign",
-      artStyleSuffix: "Cinematic sci-fi realism",
+      visualStyle: "Cinematic sci-fi realism",
     }, {
       hierarchy: [
         { name: "Asterion", kind: "planet" },

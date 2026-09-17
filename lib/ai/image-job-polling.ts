@@ -8,11 +8,13 @@ import {
 } from "@/lib/ai/image-job-lifecycle";
 import type { ImageAspectRatio, ImageSize } from "@/lib/ai/image-options";
 
-export type ImageJobTargetKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
+export type ImageJobTargetKind = "character" | "npc" | "faction" | "job" | "place" | "enemy" | "visual-style";
 
 export type ImageDraft = {
   generationRunId: string;
   targetKind: ImageJobTargetKind;
+  characterId?: string;
+  purpose: "entity-art" | "style-preview";
   mode: "create" | "refine";
   subject: string;
   aspectRatio: ImageAspectRatio;
@@ -33,6 +35,8 @@ export type ImageBackgroundJob = {
   generationRunId: string;
   status: "pending" | "running";
   targetKind: ImageJobTargetKind;
+  characterId?: string;
+  purpose?: "entity-art" | "style-preview";
   mode: "create" | "refine";
   subject: string;
   aspectRatio: ImageAspectRatio;
@@ -165,6 +169,8 @@ export async function waitForImageBackgroundJob(
         return {
           generationRunId: job.generationRunId,
           targetKind: job.targetKind,
+          ...(job.characterId ? { characterId: job.characterId } : {}),
+          purpose: job.purpose ?? "entity-art",
           mode: job.mode,
           subject: job.subject,
           aspectRatio: job.aspectRatio,

@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getAuthenticatedUser: vi.fn(),
+  getCampaignRole: vi.fn(),
+  loadCharacterPortraitAccess: vi.fn(),
   createCampaignArtSignedUrl: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/permissions", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
+vi.mock("@/lib/auth/permissions", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser, getCampaignRole: mocks.getCampaignRole }));
+vi.mock("@/lib/ai/character-portrait-access", () => ({ loadCharacterPortraitAccess: mocks.loadCharacterPortraitAccess }));
 vi.mock("@/lib/storage/campaign-art", () => ({ createCampaignArtSignedUrl: mocks.createCampaignArtSignedUrl }));
 
 import { GET } from "@/app/api/ai/image/[generationRunId]/route";
@@ -122,5 +125,55 @@ describe("GET /api/ai/image/[generationRunId]", () => {
     expect(response.status).toBe(200);
     expect(mocks.createCampaignArtSignedUrl).toHaveBeenCalledWith(supabase, imagePath);
     expect(payload.job).toMatchObject({ generationRunId, status: "complete", targetKind: "npc", mode: "refine", temporaryPath: imagePath, image: { base64: null, url: "https://storage.example/generated.png", mediaType: "image/png" } });
+  });
+
+  it("allows the character owner to read a saved portrait job", async () => {
+    const characterId = "00000000-0000-4000-8000-000000000004";
+    const supabase = createSupabaseMock({
+      id: generationRunId,
+      campaign_id: campaignId,
+      requested_by: "00000000-0000-4000-8000-000000000006",
+      kind: "image",
+      target_kind: "character",
+      target_character_id: characterId,
+      aspect_ratio: "1:1",
+      size: "1024x1024",
+      model: "openai/gpt-image-1",
+      effective_model: "openai/gpt-image-1",
+      image_path: `${campaignId}/${userId}/image-${generationRunId}.png`,
+      image_media_type: "image/png",
+      created_at: "2026-08-13T12:34:56+00:00",
+      status_updated_at: "2026-08-13T12:34:56+00:00",
+      status: "complete",
+    });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.loadCharacterPortraitAccess.mockResolvedValue({ access: { character: { id: characterId }, role: "player", isOwner: true } });
+    mocks.createCampaignArtSignedUrl.mockResolvedValue("https://storage.example/portrait.png");
+
+    const response = await GET(new Request("http://localhost"), params());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.job).toMatchObject({ targetKind: "character", characterId, image: { url: "https://storage.example/portrait.png" } });
+  });
+
+  it("hides a saved portrait job from another player", async () => {
+    const supabase = createSupabaseMock({
+      id: generationRunId,
+      campaign_id: campaignId,
+      requested_by: userId,
+      kind: "image",
+      target_kind: "character",
+      target_character_id: "00000000-0000-4000-8000-000000000004",
+      status: "pending",
+      status_updated_at: new Date().toISOString(),
+    });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: "00000000-0000-4000-8000-000000000005" } });
+    mocks.loadCharacterPortraitAccess.mockResolvedValue({ failure: "forbidden" });
+
+    const response = await GET(new Request("http://localhost"), params());
+
+    expect(response.status).toBe(403);
+    expect(mocks.createCampaignArtSignedUrl).not.toHaveBeenCalled();
   });
 });

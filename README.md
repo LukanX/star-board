@@ -51,7 +51,7 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0023_async_enemy_generation.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0027_visual_style_save_previews.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
 
@@ -63,9 +63,10 @@ Set these server-only values in the Netlify site environment:
 
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: the Supabase project URL and publishable key, available to the Functions scope as well as the build.
 - `SUPABASE_SECRET_KEY`: the Supabase secret key. Never expose this as a `NEXT_PUBLIC_` variable.
-- `OPENROUTER_API_KEY`: the OpenRouter key used by the background worker.
+- `CAMPAIGN_CREDENTIAL_ENCRYPTION_KEYS`: the versioned JSON keyring used to encrypt campaign-owned OpenRouter keys.
+- `CAMPAIGN_CREDENTIAL_ACTIVE_KEY_ID`: the key ID used for new credentials and automatic rotation of old ciphertext.
 
-These values must be available to the Netlify Functions scope, not only to the build environment. Changing a function variable requires a new deploy. The deploy summary should list exactly one `generate-image-background` function with background invocation mode. Worker logs and the matching `ai_generation_runs` row distinguish a job that was never claimed (`pending`), a provider or storage failure (`failed`), and a completed review draft (`complete`).
+`SUPABASE_SECRET_KEY`, `CAMPAIGN_CREDENTIAL_ENCRYPTION_KEYS`, and `CAMPAIGN_CREDENTIAL_ACTIVE_KEY_ID` must be available to the Netlify Functions scope, not only to the build environment. Changing a function variable requires a new deploy. The deploy summary should list exactly one `generate-image-background` function with background invocation mode. Worker logs and the matching `ai_generation_runs` row distinguish a job that was never claimed (`pending`), a provider or storage failure (`failed`), and a completed review draft (`complete`).
 
 Deployed Netlify requests always use the background path even if a stale `NETLIFY_IMAGE_GENERATION=sync` variable is present. Runtime request metadata identifies Netlify when build-only metadata is unavailable, and the worker is dispatched through the incoming deploy origin so Deploy Previews remain isolated from production. Set `NETLIFY_IMAGE_GENERATION=background` to force the queue mode in another deployment environment; leave it as `sync` for local synchronous testing. Apply migrations `0012_async_image_generation.sql` and `0022_ai_image_job_lifecycle.sql` before using the deployed art studio.
 
@@ -85,7 +86,25 @@ The email address belongs to the Auth account in `auth.users`; `public.profiles`
 
 ## OpenRouter AI setup
 
-Set `OPENROUTER_API_KEY` in the server environment to enable the GM-only routes:
+AI requests use one OpenRouter key connected to each campaign. Star Board does not use an app-wide OpenRouter key, does not ask users to paste key material into the browser, and does not fund a silent fallback when a campaign has no verified key.
+
+Set these server-side values:
+
+- `SUPABASE_SECRET_KEY`: used for OAuth state signing and privileged background-worker database access.
+- `CAMPAIGN_CREDENTIAL_ENCRYPTION_KEYS`: a JSON object whose values are base64-encoded 32-byte AES keys, for example `{"key-2026-01":"base64-encoded-32-byte-key"}`.
+- `CAMPAIGN_CREDENTIAL_ACTIVE_KEY_ID`: one key ID present in that JSON object.
+- `OPENROUTER_TEXT_MODEL` and `OPENROUTER_IMAGE_MODEL`: the default model IDs used when a campaign has not selected another enabled model.
+- `OPENROUTER_SITE_URL` and `OPENROUTER_APP_NAME`: optional attribution headers sent to OpenRouter.
+
+Keep the encryption keyring and Supabase secret in the server or Netlify Functions scope. Never use `NEXT_PUBLIC_` names for them. `NEXT_PUBLIC_APP_URL` must be the deployed origin in production; it is used to build the OAuth callback URL, and that callback URL must be allowed in the OpenRouter application configuration.
+
+GMs connect a campaign key from Campaign settings. The connection uses OpenRouter OAuth with PKCE S256: Star Board receives a short-lived, single-use authorization code, exchanges it server-side, verifies the returned key, and stores only encrypted key material plus safe metadata. The browser receives an authorization URL, never the key, OAuth code, or PKCE verifier.
+
+The connected GM or campaign creator can refresh provider metadata, reconnect, change player access, or disconnect the local connection. Disconnecting deletes Star Board's encrypted credential and stops new requests; it does not revoke the provider-side OpenRouter key. Use the owner controls link or OpenRouter's dashboard to revoke that key. Reconnecting resets player AI access off so a replacement key is not silently shared with players.
+
+Player character assistance remains disabled unless a GM explicitly enables the player opt-in. The server and database policies enforce that players can use only the existing character-assistance path; GM text, image, enemy, mission, NPC, faction, Place, model-management, and campaign-settings routes remain GM-only.
+
+### Campaign AI routes
 
 - `POST /api/ai/mission`
 - `POST /api/ai/npc`
@@ -95,9 +114,15 @@ Set `OPENROUTER_API_KEY` in the server environment to enable the GM-only routes:
 - `POST /api/ai/enemy/brief`
 - `POST /api/ai/image`
 
-Text and image models can be changed with `OPENROUTER_TEXT_MODEL` and `OPENROUTER_IMAGE_MODEL`. `OPENROUTER_SITE_URL` and `OPENROUTER_APP_NAME` are optional attribution headers. GMs can choose compatible models from the live OpenRouter catalog, and campaign settings enforce the saved model allowlist for every generation request.
+GMs can choose compatible models from the live OpenRouter catalog, and campaign settings enforce the saved model allowlist for every generation request. When provider discovery is unavailable, settings can show a read-only local fallback catalog; changing preferences still requires a verified campaign key.
 
 Mission, NPC, faction, Place, enemy, and image responses are schema-validated. Enemy records support complete structured stat-block drafts and a separate spoiler-safe player brief draft. All AI output remains review-before-save. Image drafts are reviewed and approved before the selected asset is saved to a campaign record; generated approvals persist the originating prompt and provider, while manual uploads clear stale generation provenance. Provider failures preserve their HTTP status and safe request ID in the response, while bounded diagnostics are written to server logs without storing raw prompts or generated image data. AI usage is tracked by token and provider metadata, but generation-count quotas are not enforced. Keep the API key server-only.
+
+### Key rotation and compromise boundary
+
+To rotate the application encryption key, add a new key ID and base64-encoded 32-byte value to `CAMPAIGN_CREDENTIAL_ENCRYPTION_KEYS`, set `CAMPAIGN_CREDENTIAL_ACTIVE_KEY_ID` to that ID, and deploy. Existing credentials remain decryptable with their stored key ID and are re-encrypted with the active key after a successful request. Keep old keys until every stored row has rotated, then remove them in a later deploy. Do not overwrite an old key value under the same ID.
+
+The credential table is service-role-only. Campaign rows contain ciphertext, initialization vectors, authentication tags, key IDs, hashes, safe provider metadata, and connector identity; raw OpenRouter keys are not returned to clients or written to jobs and audit records. A fully compromised application runtime that can read both the database and the active keyring can decrypt credentials, so revoke affected OpenRouter keys at the provider and rotate the application keyring after a server compromise.
 
 ### Enemies archive and Archives of Nethys imports
 

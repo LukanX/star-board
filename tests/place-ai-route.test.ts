@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   buildPlacePrompt: vi.fn(() => "place-prompt"),
   loadCampaignAiSettings: vi.fn(),
   getAiModelCatalog: vi.fn(),
+  resolveCampaignCredential: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/client", () => ({ generateJson: mocks.generateJson }));
@@ -23,6 +24,10 @@ vi.mock("@/lib/ai/assistance", () => ({
 vi.mock("@/lib/ai/prompts", () => ({ buildPlacePrompt: mocks.buildPlacePrompt }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
+vi.mock("@/lib/ai/route-support", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/route-support")>();
+  return { ...actual, resolveCampaignCredential: mocks.resolveCampaignCredential };
+});
 
 import { POST as generatePlace } from "@/app/api/ai/place/route";
 
@@ -59,9 +64,10 @@ function createPlacesQuery() {
 describe("AI place assistance route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getServerEnv.mockReturnValue({ OPENROUTER_API_KEY: "test-key", OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: { from: vi.fn().mockReturnValue(createPlacesQuery()) }, user: { id: userId }, role: "gm" });
-    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A frontier campaign", artStyleSuffix: "Cinematic sci-fi realism" } });
+    mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A frontier campaign", visualStyle: "Cinematic sci-fi realism" } });
     mocks.loadPlaceAiContext.mockResolvedValue({ context: undefined });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true }] });
@@ -125,6 +131,39 @@ describe("AI place assistance route", () => {
       outputTokens: 42,
       costUsd: 0.002,
     }));
+  });
+
+  it("preserves pinned place fields when the provider changes them", async () => {
+    const providerDraft = {
+      name: "A Different Door",
+      kind: "room",
+      description: "A revised description.",
+      playerNotes: "Revised public notes.",
+      gmNotes: "Revised GM notes.",
+      visualPrompt: "A revised blue door.",
+    };
+    mocks.generateJson.mockResolvedValue({ data: providerDraft, model: "openai/gpt-4o-mini" });
+
+    const response = await generatePlace(request({
+      campaignId,
+      mode: "refine",
+      name: "The Blue Door",
+      kind: "room",
+      feedback: "Make the description more mysterious.",
+      protectedFields: ["name"],
+      currentDraft: {
+        name: "The Blue Door",
+        kind: "room",
+        description: "An earlier description.",
+        playerNotes: "Earlier public notes.",
+        gmNotes: "Earlier GM notes.",
+        visualPrompt: "An earlier blue door.",
+      },
+    }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.draft).toEqual({ ...providerDraft, name: "The Blue Door" });
   });
 
   it("rejects an invalid Place parent before calling the provider", async () => {

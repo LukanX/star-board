@@ -10,6 +10,10 @@ type ArtKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
 export type CampaignArtEditorTarget = {
   campaignId: string | null;
   kind: ArtKind;
+  characterId?: string;
+  portraitAiRole?: "gm" | "player";
+  visible?: boolean;
+  showGenerator?: boolean;
   parentPlaceId?: string | null;
   value: string | null;
   trackUnsavedUploads?: boolean;
@@ -21,6 +25,7 @@ export type CampaignArtEditorTarget = {
   onUrlChange: (url: string | null) => void;
   onPromptChange?: (prompt: string | null) => void;
   onProviderChange?: (provider: string | null) => void;
+  onBusyChange?: (busy: boolean) => void;
   onApproved?: (asset: {
     path: string;
     signedUrl: string;
@@ -69,12 +74,19 @@ export function useCampaignArtEditor(target: CampaignArtEditorTarget | null) {
 
 export function CampaignArtEditorSlot() {
   const target = useSyncExternalStore(subscribe, getTarget, () => null);
-  return target ? <CampaignArtField key={target.kind} {...target} /> : null;
+  return target ? (
+    <div hidden={target.visible === false} aria-hidden={target.visible === false}>
+      <CampaignArtField key={`${target.kind}:${target.characterId ?? "none"}:${target.showGenerator === false ? "manual" : "generator"}`} {...target} />
+    </div>
+  ) : null;
 }
 
 export default function CampaignArtField({
   campaignId,
   kind,
+  characterId,
+  portraitAiRole,
+  showGenerator = true,
   parentPlaceId,
   value,
   trackUnsavedUploads = false,
@@ -86,6 +98,7 @@ export default function CampaignArtField({
   onUrlChange,
   onPromptChange,
   onProviderChange,
+  onBusyChange,
   onApproved,
 }: CampaignArtEditorTarget) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -98,7 +111,12 @@ export default function CampaignArtField({
   );
   const [artStudioOpen, setArtStudioOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isArtStudioBusy, setIsArtStudioBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onBusyChange?.(isUploading || isArtStudioBusy);
+  }, [isArtStudioBusy, isUploading, onBusyChange]);
 
   useEffect(() => {
     if (!trackUnsavedUploads)
@@ -254,7 +272,7 @@ export default function CampaignArtField({
                 </>
               )}
             </button>
-            <button
+            {showGenerator ? <button
               aria-expanded={artStudioOpen}
               className={`h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px min-h-[30px] !px-[10px] !text-[8px] ${artStudioOpen ? "bg-[rgba(255,255,255,.035)] text-[var(--muted)] hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]" : "!border-[rgba(255,92,154,.34)] bg-[rgba(255,92,154,.08)] !text-[var(--pink)] hover:!border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)]"}`}
               onClick={() => setArtStudioOpen((current) => !current)}
@@ -263,6 +281,7 @@ export default function CampaignArtField({
               <Sparkles size={14} />{" "}
               {artStudioOpen ? "HIDE GENERATOR" : "GENERATE ART"}
             </button>
+            : null}
             {previewUrl ? (
               <button
                 aria-label="Remove campaign art"
@@ -286,15 +305,18 @@ export default function CampaignArtField({
           ) : null}
         </div>
       </div>
-      {campaignId && artStudioOpen ? (
+      {campaignId && showGenerator && artStudioOpen ? (
         <div>
           <AiArtStudio
             campaignId={campaignId}
             kind={kind}
+            characterId={characterId}
+            portraitAiRole={portraitAiRole}
             parentPlaceId={parentPlaceId}
             subject={subject}
             currentPrompt={currentPrompt}
             onSubjectChange={onSubjectChange}
+            onBusyChange={setIsArtStudioBusy}
             onApproved={(asset) => {
               onChange(asset.path);
               onUrlChange(asset.signedUrl);

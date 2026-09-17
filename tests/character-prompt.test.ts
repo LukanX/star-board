@@ -11,7 +11,7 @@ describe("character portrait prompt", () => {
       className: "Mechanic",
       backstoryMarkdown: "Nova survived a derelict ship and distrusts corporate salvage crews.",
       physicalDescription: "Tall, silver-eyed, with a split left ear and a patched flight jacket.",
-    }, { system: "Starfinder 2e", description: "A tense frontier campaign", artStyleSuffix: "Retro-futurist" });
+    }, { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Retro-futurist" });
 
     expect(prompt).toContain("Backstory: Nova survived a derelict ship");
     expect(prompt).toContain("Physical appearance: Tall, silver-eyed");

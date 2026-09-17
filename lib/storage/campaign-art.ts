@@ -81,6 +81,15 @@ export async function removeCampaignArtIfUnreferenced(supabase: SupabaseClient, 
       if (error) return true;
       return (data ?? []).length > 0;
     }));
+    const { data: styleReferences, error: styleReferenceError } = await supabase
+      .from("campaign_visual_styles")
+      .select("id")
+      .eq("campaign_id", campaignId)
+      .eq("preview_path", path)
+      .limit(1);
+
+    if (styleReferenceError) return false;
+    references.push((styleReferences ?? []).length > 0);
 
     if (references.some(Boolean)) return false;
 

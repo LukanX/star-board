@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { LockKeyhole, Save, Sparkles, Trash2, X } from "lucide-react";
-import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
+import AiDraftAssistant, { type AiDraftSelectField } from "@/components/archive/AiDraftAssistant";
 import {
   markCampaignArtPersisted,
   useCampaignArtEditor,
@@ -86,7 +86,7 @@ export default function PlaceEditor({
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const { setDirty, clearDirty } = useDirtyForm();
+  const { setDirty, clearDirty, confirmNavigation } = useDirtyForm();
   const setDraft = (updater: (current: PlaceDraft) => PlaceDraft) => {
     setDirty();
     setDraftState(updater);
@@ -94,14 +94,37 @@ export default function PlaceEditor({
   const update = (field: keyof PlaceDraft, value: string | null) =>
     setDraft((current) => ({ ...current, [field]: value }));
   const onCancel = () => {
+    if (!confirmNavigation()) return;
     clearDirty();
     parentOnCancel?.();
   };
   const flattenedPlaces = flattenPlaceTree(places);
+  const parentOptions = flattenedPlaces
+    .filter(
+      ({ place: candidate }) =>
+        !place ||
+        (candidate.id !== place.id &&
+          !isPlaceDescendant(places, candidate.id, place.id)),
+    )
+    .map(({ place: candidate, depth }) => ({
+      value: candidate.id,
+      label: `${"  ".repeat(depth)}${depth ? "|- " : ""}${candidate.name} [${candidate.kind}]`,
+    }));
+  const contextFields: AiDraftSelectField[] = [
+    {
+      key: "parentPlaceId",
+      label: "Parent",
+      value: draft.parentPlaceId ?? "",
+      placeholder: "ROOT PLACE",
+      options: parentOptions,
+      onChange: () => undefined,
+    },
+  ];
 
   useCampaignArtEditor({
     campaignId,
     kind: "place",
+    visible: !assistantOpen,
     parentPlaceId: draft.parentPlaceId,
     value: draft.artPath,
     trackUnsavedUploads: true,
@@ -117,6 +140,7 @@ export default function PlaceEditor({
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!confirmNavigation("Save this record and discard the unapplied AI draft?", "ai")) return;
     setIsSaving(true);
     setError(null);
 
@@ -159,6 +183,7 @@ export default function PlaceEditor({
       )
     )
       return;
+    if (!confirmNavigation("Delete this record and discard the unapplied AI draft?", "ai")) return;
 
     setIsSaving(true);
     setError(null);
@@ -207,7 +232,7 @@ export default function PlaceEditor({
             type="button"
           >
             <Sparkles size={14} />{" "}
-            {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE PLACE"}
+            {assistantOpen ? "BACK TO EDITOR" : "OPEN AI WORKSPACE"}
           </button>
           <button
             aria-label="Close place editor"
@@ -220,28 +245,37 @@ export default function PlaceEditor({
           </button>
         </div>
       </div>
-      {assistantOpen ? (
-        <AiDraftAssistant
-          campaignId={campaignId}
-          endpoint="/api/ai/place"
-          entityLabel="place"
-          mode={place ? "refine" : "create"}
-          requestFields={{
-            ...(draft.parentPlaceId
-              ? { parentPlaceId: draft.parentPlaceId }
-              : {}),
-            name: draft.name,
-            kind: draft.kind,
-          }}
-          currentDraft={{
-            name: draft.name,
-            kind: draft.kind,
-            description: draft.description,
-            playerNotes: draft.playerNotesMarkdown,
-            gmNotes: draft.gmNotesMarkdown,
-            visualPrompt: draft.artSubject ?? "",
-          }}
-          fields={[
+      <AiDraftAssistant
+        open={assistantOpen}
+        onBack={() => setAssistantOpen(false)}
+        onDirtyChange={(dirty) => (dirty ? setDirty("ai") : clearDirty("ai"))}
+        campaignId={campaignId}
+        endpoint="/api/ai/place"
+        entityLabel="place"
+        mode={place ? "refine" : "create"}
+        stageContextFields
+        contextFields={contextFields}
+        requestFields={{
+          name: draft.name,
+          kind: draft.kind,
+        }}
+        currentDraft={{
+          name: draft.name,
+          kind: draft.kind,
+          description: draft.description,
+          playerNotes: draft.playerNotesMarkdown,
+          gmNotes: draft.gmNotesMarkdown,
+          visualPrompt: draft.artSubject ?? "",
+        }}
+        briefFields={[
+          { key: "name", label: "Name", maxLength: 160 },
+          { key: "kind", label: "Kind", maxLength: 80 },
+        ]}
+        protectedFieldKeys={[
+          ...(draft.name ? ["name"] : []),
+          ...(draft.kind ? ["kind"] : []),
+        ]}
+        fields={[
             { key: "name", label: "Name", maxLength: 160 },
             { key: "kind", label: "Kind", maxLength: 80 },
             {
@@ -268,22 +302,28 @@ export default function PlaceEditor({
               maxLength: 1600,
               multiline: true,
             },
-          ]}
-          onApply={(candidate) =>
-            setDraft((current) => ({
-              ...current,
-              name: candidate.name ?? current.name,
-              kind: candidate.kind ?? current.kind,
-              description: candidate.description ?? current.description,
-              playerNotesMarkdown:
-                candidate.playerNotes ?? current.playerNotesMarkdown,
-              gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
-              artSubject: candidate.visualPrompt || current.artSubject,
-            }))
-          }
-        />
-      ) : null}
+        ]}
+        onApply={(candidate) =>
+          setDraft((current) => ({
+            ...current,
+            name: candidate.name ?? current.name,
+            kind: candidate.kind ?? current.kind,
+            description: candidate.description ?? current.description,
+            playerNotesMarkdown:
+              candidate.playerNotes ?? current.playerNotesMarkdown,
+            gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
+            artSubject: candidate.visualPrompt || current.artSubject,
+          }))
+        }
+        onApplyContext={(context) =>
+          setDraft((current) => ({
+            ...current,
+            parentPlaceId: context.parentPlaceId || null,
+          }))
+        }
+      />
       <form
+        hidden={assistantOpen}
         className="character-form grid gap-[13px] [&_label]:grid [&_label]:gap-[7px] [&_label]:text-[var(--dim)] [&_label]:font-mono [&_label]:text-[8px] [&_label]:tracking-[.12em] [&_input]:w-full [&_input]:border [&_input]:border-[rgba(139,151,169,.28)] [&_input]:outline-0 [&_input]:p-[10px_12px] [&_input]:bg-[#0a1118] [&_input]:text-[var(--ink)] [&_input]:font-mono [&_input]:text-[11px] [&_input]:h-[42px] [&_input:focus]:border-[var(--cyan)] [&_input:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_input::placeholder]:text-[#4d5a6b] [&_textarea]:w-full [&_textarea]:border [&_textarea]:border-[rgba(139,151,169,.28)] [&_textarea]:outline-0 [&_textarea]:p-[10px_12px] [&_textarea]:bg-[#0a1118] [&_textarea]:text-[var(--ink)] [&_textarea]:font-mono [&_textarea]:text-[11px] [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:leading-[1.55] [&_textarea:focus]:border-[var(--cyan)] [&_textarea:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_textarea::placeholder]:text-[#4d5a6b]"
         onSubmit={save}
       >
@@ -317,19 +357,9 @@ export default function PlaceEditor({
               }
             >
               <option value="">ROOT PLACE</option>
-              {flattenedPlaces
-                .filter(
-                  ({ place: candidate }) =>
-                    !place ||
-                    (candidate.id !== place.id &&
-                      !isPlaceDescendant(places, candidate.id, place.id)),
-                )
-                .map(({ place: candidate, depth }) => (
-                  <option
-                    key={candidate.id}
-                    value={candidate.id}
-                  >{`${"  ".repeat(depth)}${depth ? "|- " : ""}${candidate.name} [${candidate.kind}]`}</option>
-                ))}
+              {parentOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </label>
         </div>

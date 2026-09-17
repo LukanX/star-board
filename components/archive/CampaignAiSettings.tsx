@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { formatAiModelPricing } from "@/lib/ai/model-pricing";
 import { panelClassName } from "@/components/ui/recordStyles";
 import {
@@ -70,6 +71,7 @@ export default function CampaignAiSettings({
 }: CampaignAiSettingsProps) {
   const [models, setModels] = useState<AiModel[]>([]);
   const [enabledModelIds, setEnabledModelIds] = useState<string[]>([]);
+  const [credentialAvailable, setCredentialAvailable] = useState(false);
   const [filter, setFilter] = useState<ModelFilter>("all");
   const [sort, setSort] = useState<AiModelSort>("most-popular");
   const [search, setSearch] = useState("");
@@ -80,6 +82,7 @@ export default function CampaignAiSettings({
   const [loadedCampaignId, setLoadedCampaignId] = useState<string | null>(null);
   const [loadedSort, setLoadedSort] = useState<AiModelSort | null>(null);
   const loadedCampaignRef = useRef<string | null>(null);
+  const { setDirty, clearDirty } = useDirtyForm();
 
   useEffect(() => {
     if (!campaignId) {
@@ -96,6 +99,8 @@ export default function CampaignAiSettings({
         const result = (await response.json()) as {
           models?: AiModel[];
           enabledModelIds?: string[];
+          visualStyle?: string;
+          credentialAvailable?: boolean;
           status?: "live" | "stale" | "unavailable";
           error?: string;
         };
@@ -105,15 +110,16 @@ export default function CampaignAiSettings({
           );
         if (cancelled) return;
         setModels(result.models);
+        setCredentialAvailable(result.credentialAvailable === true);
         if (loadedCampaignRef.current !== campaignId) {
           setEnabledModelIds(result.enabledModelIds);
           loadedCampaignRef.current = campaignId;
         }
         setLoadedCampaignId(campaignId);
         setLoadedSort(sort);
-        setStatus(
-          `${result.status === "live" ? "Live" : result.status === "stale" ? "Cached" : "Offline"} OpenRouter catalog // choose which models GMs can use for this campaign.`,
-        );
+        setStatus(result.credentialAvailable
+          ? `${result.status === "live" ? "Live" : result.status === "stale" ? "Cached" : "Offline"} OpenRouter catalog // choose which models GMs can use for this campaign.`
+          : "Offline fallback catalog // connect a verified OpenRouter key to edit campaign AI preferences.");
       })
       .catch((loadError: unknown) => {
         if (!cancelled) {
@@ -131,6 +137,8 @@ export default function CampaignAiSettings({
   }, [campaignId, sort]);
 
   const addModel = (modelId: string) => {
+    if (!credentialAvailable) return;
+    setDirty();
     setSaved(false);
     setError(null);
     setEnabledModelIds((current) =>
@@ -139,6 +147,8 @@ export default function CampaignAiSettings({
   };
 
   const removeModel = (modelId: string) => {
+    if (!credentialAvailable) return;
+    setDirty();
     setSaved(false);
     setError(null);
     setEnabledModelIds((current) => current.filter((id) => id !== modelId));
@@ -151,6 +161,11 @@ export default function CampaignAiSettings({
 
   const save = async () => {
     if (!campaignId) return;
+
+    if (!credentialAvailable) {
+      setError("Connect and verify an OpenRouter key before changing campaign AI settings.");
+      return;
+    }
 
     if (
       !activeModels.some(
@@ -194,8 +209,9 @@ export default function CampaignAiSettings({
           result.error ?? "Campaign model settings could not be saved.",
         );
       setEnabledModelIds(result.enabledModelIds);
+      clearDirty();
       setSaved(true);
-      setStatus("Campaign model access updated.");
+      setStatus("Campaign AI preferences updated.");
     } catch (saveError: unknown) {
       setError(
         saveError instanceof Error
@@ -288,6 +304,7 @@ export default function CampaignAiSettings({
                 <button
                   aria-label={`Remove ${model.label}`}
                   className={modelActionClassName}
+                  disabled={!credentialAvailable || isSaving}
                   onClick={() => removeModel(model.id)}
                   type="button"
                 >
@@ -389,7 +406,13 @@ export default function CampaignAiSettings({
             {addableModels.length} AVAILABLE
           </small>
         </div>
-        <div className="grid w-full min-w-0 gap-px p-[0_10px_10px]">
+        <div
+          aria-label="Available campaign AI models"
+          className="grid h-[360px] w-full min-w-0 gap-px overflow-y-auto overscroll-contain p-[0_10px_10px] focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--cyan)_inset] max-[760px]:h-[300px]"
+          data-campaign-ai-model-catalog
+          role="region"
+          tabIndex={0}
+        >
           {isLoading ? (
             <p className="m-[4px_8px_12px] text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">
               LOADING MODEL CATALOG...
@@ -413,7 +436,7 @@ export default function CampaignAiSettings({
                   <button
                     aria-label={`Add ${model.label}`}
                     className={modelActionClassName}
-                    disabled={isUnavailable}
+                    disabled={isUnavailable || !credentialAvailable || isSaving}
                     onClick={() => addModel(model.id)}
                     type="button"
                   >
@@ -435,7 +458,7 @@ export default function CampaignAiSettings({
       <div className="flex justify-end p-[15px_21px_20px] border-t border-[var(--line)]">
         <button
           className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px !border-[var(--cyan)] bg-[var(--cyan)] !text-[#061017] shadow-[0_0_20px_rgba(98,232,255,.16)] hover:bg-[#8ceeff] min-w-[166px]"
-          disabled={isSaving || !activeModels.length}
+          disabled={isSaving || !credentialAvailable || !activeModels.length}
           onClick={() => void save()}
           type="button"
         >
@@ -449,7 +472,7 @@ export default function CampaignAiSettings({
             </>
           ) : (
             <>
-              <Save size={14} /> SAVE MODEL ACCESS
+              <Save size={14} /> SAVE AI PREFERENCES
             </>
           )}
         </button>

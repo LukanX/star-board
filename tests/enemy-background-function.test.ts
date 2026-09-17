@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   getSupabaseServiceRoleClient: vi.fn(),
   getAiProviderFailure: vi.fn(),
   logAiProviderFailure: vi.fn(),
+  getCampaignCredentialForGeneration: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/client", () => ({ generateJson: mocks.generateJson }));
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceRoleClient: mocks.getSupabaseServiceRoleClient }));
 vi.mock("@/lib/ai/errors", () => ({ getAiProviderFailure: mocks.getAiProviderFailure, logAiProviderFailure: mocks.logAiProviderFailure }));
+vi.mock("@/lib/ai/campaign-credentials", () => ({ getCampaignCredentialForGeneration: mocks.getCampaignCredentialForGeneration }));
 
 import handler, { config } from "@/netlify/functions/generate-enemy-background";
 
@@ -92,7 +94,8 @@ function createRequest() {
 describe("generate-enemy-background", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getServerEnv.mockReturnValue({ SUPABASE_SECRET_KEY: secret, NEXT_PUBLIC_SUPABASE_URL: "https://supabase.example", OPENROUTER_API_KEY: "test-key" });
+    mocks.getServerEnv.mockReturnValue({ SUPABASE_SECRET_KEY: secret, NEXT_PUBLIC_SUPABASE_URL: "https://supabase.example" });
+    mocks.getCampaignCredentialForGeneration.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.getAiProviderFailure.mockImplementation((error: unknown, fallback: string) => ({ message: error instanceof Error ? error.message : fallback }));
     mocks.generateJson.mockResolvedValue({ data: draft, model: "openrouter/fallback", generationId: "enemy-provider-run", usage: { inputTokens: 12, outputTokens: 34, cost: 0.001 } });
   });
@@ -132,7 +135,7 @@ describe("generate-enemy-background", () => {
     expect(response.status).toBe(202);
     expect(claimQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "running", status_updated_at: expect.any(String), draft: null }));
     expect(claimQuery.gte).toHaveBeenCalledWith("status_updated_at", expect.any(String));
-    expect(mocks.generateJson).toHaveBeenCalledWith(job.prompt, expect.anything(), job.model, { timeoutMs: enemyJobProviderTimeoutMs });
+    expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", job.prompt, expect.anything(), job.model, { timeoutMs: enemyJobProviderTimeoutMs });
     expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "complete", status_updated_at: expect.any(String), draft }));
   });
 

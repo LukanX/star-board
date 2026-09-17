@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { aiModelSorts, getAiModelCatalog, type AiModelSort } from "@/lib/ai/model-discovery";
-import { loadCampaignAiSettings, validateEnabledAiModelIds } from "@/lib/ai/campaign-settings";
+import { aiModelSorts, getAiModelCatalog, getLocalAiModelCatalog, type AiModelSort } from "@/lib/ai/model-discovery";
+import { loadCampaignAiSettings, loadCampaignVisualStyle, validateEnabledAiModelIds } from "@/lib/ai/campaign-settings";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { aiCapabilities, type AiCapability } from "@/lib/ai/model-catalog";
+import { getCampaignCredentialStatusForManager, getCampaignCredentialForGeneration } from "@/lib/ai/campaign-credentials";
+import { campaignCredentialErrorResponse } from "@/lib/ai/route-support";
 
 export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 
 const updateSettingsSchema = z.object({
-  enabledModelIds: z.array(z.string().trim().min(1).max(240)).min(1).max(2000),
-});
+  visualStyle: z.string().min(1).max(1200).refine((value) => value === value.trim(), "Visual style must not have leading or trailing whitespace.").optional(),
+  enabledModelIds: z.array(z.string().trim().min(1).max(240)).min(1).max(2000).optional(),
+}).refine((value) => value.visualStyle !== undefined || value.enabledModelIds !== undefined, "At least one campaign AI setting is required.");
 
 const capabilitySchema = z.enum(aiCapabilities);
 const sortSchema = z.enum(aiModelSorts);
@@ -41,13 +44,29 @@ export async function GET(_request: Request, { params }: RouteContext) {
     if (result.response) return result.response;
 
     const sort = sortResult.data as AiModelSort;
-    const [textCatalog, imageCatalog] = await Promise.all([
-      getAiModelCatalog("structured-text", sort),
-      getAiModelCatalog("image", sort),
-    ]);
+    const credentialResult = await getCampaignCredentialStatusForManager(campaignId, result.context.supabase, result.context.user.id);
+    let textCatalog = getLocalAiModelCatalog("structured-text");
+    let imageCatalog = getLocalAiModelCatalog("image");
+    let credentialAvailable = false;
+
+    if (credentialResult.status.verificationStatus === "verified") {
+      try {
+        const campaignCredential = await getCampaignCredentialForGeneration(campaignId);
+        [textCatalog, imageCatalog] = await Promise.all([
+          getAiModelCatalog(campaignCredential.apiKey, "structured-text", sort),
+          getAiModelCatalog(campaignCredential.apiKey, "image", sort),
+        ]);
+        credentialAvailable = true;
+      } catch {
+        credentialAvailable = false;
+      }
+    }
+
     const availableModels = [...textCatalog.models, ...imageCatalog.models].filter((model) => model.compatible);
     const settingsResult = await loadCampaignAiSettings(result.context.supabase, campaignId, availableModels.map((model) => model.id));
     if ("error" in settingsResult) return NextResponse.json({ error: settingsResult.error }, { status: 503 });
+    const visualStyleResult = await loadCampaignVisualStyle(result.context.supabase, campaignId);
+    if ("error" in visualStyleResult) return NextResponse.json({ error: visualStyleResult.error }, { status: 503 });
 
     const models = [...textCatalog.models, ...imageCatalog.models]
       .filter((model) => !capabilityResult || model.capability === (capabilityResult.data as AiCapability))
@@ -61,6 +80,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     return NextResponse.json({
       enabledModelIds: settingsResult.settings.enabledModelIds,
+      visualStyle: visualStyleResult.visualStyle,
+      credential: credentialResult.status,
+      credentialAvailable,
       models,
       status,
       sort,
@@ -90,23 +112,41 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const result = await getContext(campaignId);
     if (result.response) return result.response;
 
-    const [textCatalog, imageCatalog] = await Promise.all([
-      getAiModelCatalog("structured-text"),
-      getAiModelCatalog("image"),
-    ]);
-    const availableModels = [...textCatalog.models, ...imageCatalog.models].filter((model) => model.compatible);
-    const validated = validateEnabledAiModelIds(input.data.enabledModelIds, availableModels);
-    if ("error" in validated) return NextResponse.json({ error: validated.error }, { status: 400 });
+    let campaignCredential;
+    try {
+      campaignCredential = await getCampaignCredentialForGeneration(campaignId);
+    } catch (error) {
+      return campaignCredentialErrorResponse(error, "Campaign AI settings cannot be changed right now.");
+    }
 
-    const { data, error } = await result.context.supabase
-      .from("campaign_ai_settings")
-      .upsert({ campaign_id: campaignId, enabled_model_ids: validated.enabledModelIds, updated_at: new Date().toISOString() }, { onConflict: "campaign_id" })
-      .select("enabled_model_ids, updated_at")
-      .single();
+    let enabledModelIds: string[] | null = null;
+    if (input.data.enabledModelIds) {
+      const [textCatalog, imageCatalog] = await Promise.all([
+        getAiModelCatalog(campaignCredential.apiKey, "structured-text"),
+        getAiModelCatalog(campaignCredential.apiKey, "image"),
+      ]);
+      const availableModels = [...textCatalog.models, ...imageCatalog.models].filter((model) => model.compatible);
+      const validated = validateEnabledAiModelIds(input.data.enabledModelIds, availableModels);
+      if ("error" in validated) return NextResponse.json({ error: validated.error }, { status: 400 });
+      enabledModelIds = validated.enabledModelIds;
+    }
 
-    if (error || !data) return NextResponse.json({ error: "Campaign AI settings could not be saved." }, { status: 503 });
+    const visualStyleResult = input.data.visualStyle
+      ? { visualStyle: input.data.visualStyle }
+      : await loadCampaignVisualStyle(result.context.supabase, campaignId);
+    if ("error" in visualStyleResult) return NextResponse.json({ error: visualStyleResult.error }, { status: 503 });
 
-    return NextResponse.json({ enabledModelIds: data.enabled_model_ids, updatedAt: data.updated_at });
+    const { error } = await result.context.supabase.rpc("update_campaign_ai_preferences", {
+      p_campaign_id: campaignId,
+      p_visual_style: visualStyleResult.visualStyle,
+      p_enabled_model_ids: enabledModelIds,
+    });
+
+    if (error) return NextResponse.json({ error: "Campaign AI settings could not be saved." }, { status: 503 });
+
+    const currentSettings = await loadCampaignAiSettings(result.context.supabase, campaignId);
+    if ("error" in currentSettings) return NextResponse.json({ error: currentSettings.error }, { status: 503 });
+    return NextResponse.json({ enabledModelIds: enabledModelIds ?? currentSettings.settings.enabledModelIds, visualStyle: visualStyleResult.visualStyle });
   } catch {
     return NextResponse.json({ error: "Campaign AI settings are temporarily unavailable." }, { status: 503 });
   }

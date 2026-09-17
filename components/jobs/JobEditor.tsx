@@ -100,7 +100,7 @@ export default function JobEditor({
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const { setDirty, clearDirty } = useDirtyForm();
+  const { setDirty, clearDirty, confirmNavigation } = useDirtyForm();
   const setDraft = (updater: (current: JobDraft) => JobDraft) => {
     setDirty();
     setDraftState(updater);
@@ -121,6 +121,7 @@ export default function JobEditor({
   };
 
   const onCancel = () => {
+    if (!confirmNavigation()) return;
     clearDirty();
     parentOnCancel?.();
   };
@@ -128,6 +129,7 @@ export default function JobEditor({
   useCampaignArtEditor({
     campaignId,
     kind: "job",
+    visible: !assistantOpen,
     value: draft.artPath,
     trackUnsavedUploads: true,
     url: draft.artUrl,
@@ -172,8 +174,11 @@ export default function JobEditor({
     },
   ];
 
-  const assistant = assistantOpen ? (
+  const assistant = (
     <AiDraftAssistant
+      open={assistantOpen}
+      onBack={() => setAssistantOpen(false)}
+      onDirtyChange={(dirty) => (dirty ? setDirty("ai") : clearDirty("ai"))}
       campaignId={campaignId}
       endpoint="/api/ai/mission"
       entityLabel="job"
@@ -194,6 +199,8 @@ export default function JobEditor({
         hook: draft.hook,
         thumbnailDescription: draft.artSubject,
       }}
+      briefFields={[{ key: "title", label: "Title", maxLength: 160 }]}
+      protectedFieldKeys={draft.title ? ["title"] : []}
       fields={[
         { key: "title", label: "Title", maxLength: 160 },
         { key: "summary", label: "Summary", maxLength: 4000, multiline: true },
@@ -242,10 +249,11 @@ export default function JobEditor({
         }))
       }
     />
-  ) : null;
+  );
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!confirmNavigation("Save this record and discard the unapplied AI draft?", "ai")) return;
     setIsSaving(true);
     setError(null);
 
@@ -286,6 +294,7 @@ export default function JobEditor({
       !window.confirm(`Remove ${job.title} from the job board?`)
     )
       return;
+    if (!confirmNavigation("Remove this record and discard the unapplied AI draft?", "ai")) return;
     setIsSaving(true);
     setError(null);
 
@@ -330,7 +339,7 @@ export default function JobEditor({
             type="button"
           >
             <Sparkles size={14} />{" "}
-            {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE JOB"}
+            {assistantOpen ? "BACK TO EDITOR" : "OPEN AI WORKSPACE"}
           </button>
           <button
             aria-label="Close mission editor"
@@ -346,6 +355,7 @@ export default function JobEditor({
       {assistant}
       {
         <form
+          hidden={assistantOpen}
           className="character-form grid gap-[13px] [&_label]:grid [&_label]:gap-[7px] [&_label]:text-[var(--dim)] [&_label]:font-mono [&_label]:text-[8px] [&_label]:tracking-[.12em] [&_input]:w-full [&_input]:border [&_input]:border-[rgba(139,151,169,.28)] [&_input]:outline-0 [&_input]:p-[10px_12px] [&_input]:bg-[#0a1118] [&_input]:text-[var(--ink)] [&_input]:font-mono [&_input]:text-[11px] [&_input]:h-[42px] [&_input:focus]:border-[var(--cyan)] [&_input:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_input::placeholder]:text-[#4d5a6b] [&_textarea]:w-full [&_textarea]:border [&_textarea]:border-[rgba(139,151,169,.28)] [&_textarea]:outline-0 [&_textarea]:p-[10px_12px] [&_textarea]:bg-[#0a1118] [&_textarea]:text-[var(--ink)] [&_textarea]:font-mono [&_textarea]:text-[11px] [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:leading-[1.55] [&_textarea:focus]:border-[var(--cyan)] [&_textarea:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_textarea::placeholder]:text-[#4d5a6b]"
           onSubmit={save}
         >

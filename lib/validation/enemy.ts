@@ -363,7 +363,7 @@ export const updateEnemySchema = z.object({
   artProvider: nullableText(80).optional(),
   sourceSnapshot: enemySourceSnapshotSchema.nullable().optional(),
   expectedSourceHash: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
-  expectedUpdatedAt: z.string().datetime(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
 }).superRefine((value, context) => {
   if (value.origin === "aon" && value.sourceSnapshot === null) {
     context.addIssue({ code: "custom", path: ["sourceSnapshot"], message: "An Archives of Nethys enemy needs source provenance." });
@@ -385,10 +385,38 @@ const enemyDraftFields = {
   artSubject: shortText(1600),
 };
 
+export const enemyAiProtectedFieldSchema = z.enum([
+  "name",
+  "playerDescription",
+  "level",
+  "size",
+  "rarity",
+  "traits",
+  "family",
+  "statBlock",
+  "gmNotesMarkdown",
+  "artSubject",
+]);
+
+export const enemyAiCurrentDraftSchema = z.object({
+  name: shortText(160).optional(),
+  playerDescription: z.string().max(4000).optional(),
+  level: z.number().int().min(-1).max(25).optional(),
+  size: enemySizeSchema.optional(),
+  rarity: enemyRaritySchema.optional(),
+  traits: traitListSchema.optional(),
+  family: nullableText(160).optional(),
+  statBlock: enemyStatBlockSchema.optional(),
+  gmNotesMarkdown: z.string().max(20000).optional(),
+  artSubject: z.string().max(1600).optional(),
+}).partial().optional();
+
 export const enemyBackgroundJobSchema = z.object({
   generationRunId: z.string().uuid(),
   prompt: z.string().trim().min(1).max(200000),
   model: z.string().trim().min(1).max(160),
+  protectedFields: z.array(enemyAiProtectedFieldSchema).max(10).optional(),
+  currentDraft: enemyAiCurrentDraftSchema,
 });
 
 export type EnemyBackgroundJob = z.infer<typeof enemyBackgroundJobSchema>;

@@ -94,9 +94,10 @@ test("threads the selected Place parent through image generation", async ({
         exact: true,
       })
       .click();
-    await expect(page.getByLabel("Parent")).toHaveValue(parentId);
-    await page.getByLabel("Name").fill(childName);
-    await page.getByLabel("Kind").fill("room");
+    const placeForm = page.locator("form.character-form");
+    await expect(placeForm.getByLabel("Parent")).toHaveValue(parentId);
+    await placeForm.getByLabel("Name").fill(childName);
+    await placeForm.getByLabel("Kind").fill("room");
     await page
       .getByRole("button", { name: "GENERATE ART", exact: true })
       .click();
@@ -113,7 +114,7 @@ test("threads the selected Place parent through image generation", async ({
       subject: "A hidden transit room",
     });
 
-    await page.getByLabel("Parent").selectOption("");
+    await placeForm.getByLabel("Parent").selectOption("");
     await expect(
       page.getByRole("button", { name: "GENERATE DRAFT", exact: true }),
     ).toBeVisible();

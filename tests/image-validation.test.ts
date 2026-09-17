@@ -56,6 +56,7 @@ describe("image generation schemas", () => {
       campaignId: "00000000-0000-4000-8000-000000000001",
       mode: "refine",
       targetKind: "character",
+      characterId: "00000000-0000-4000-8000-000000000003",
       subject: "A pilot with a cracked visor",
       refinement: "Make the lighting warmer and add a scar over the left eyebrow.",
       currentPrompt: "A pilot in a flight suit, portrait composition.",
@@ -129,6 +130,7 @@ describe("image generation schemas", () => {
       campaignId: "00000000-0000-4000-8000-000000000001",
       mode: "refine",
       targetKind: "character",
+      characterId: "00000000-0000-4000-8000-000000000003",
       subject: "A pilot with a cracked visor",
       currentPrompt: "x".repeat(2000),
     });
@@ -174,12 +176,13 @@ describe("image generation schemas", () => {
     expect(prompt).toContain("Subject: A hidden transit room");
   });
 
-  it("directs faction artwork toward a standalone symbol or logo", () => {
+  it("directs faction artwork toward a standalone in-world insignia", () => {
     const prompt = buildArtPrompt("The Glass Meridian", undefined, undefined, undefined, "faction");
 
-    expect(prompt).toContain("only one standalone faction symbol or logo");
+    expect(prompt).toContain("only one standalone faction symbol or in-world insignia");
     expect(prompt).toContain("Do not create characters");
     expect(prompt).not.toContain("no logos");
+    expect(prompt).not.toContain("synthwave space opera");
   });
 
   it("directs enemy artwork toward one readable creature subject", () => {

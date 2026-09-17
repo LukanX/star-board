@@ -1,10 +1,12 @@
 import { generateJson } from "../../lib/ai/client";
+import { mergeProtectedDraftFields } from "../../lib/ai/draft-refinement";
 import { getAiProviderFailure, logAiProviderFailure } from "../../lib/ai/errors";
 import { enemyJobPendingTimeoutMs, enemyJobProviderTimeoutMs } from "../../lib/ai/enemy-job-lifecycle";
 import { parseEnemyBackgroundJob, verifyEnemyBackgroundSignature } from "../../lib/ai/enemy-jobs";
 import { getServerEnv } from "../../lib/env";
 import { getSupabaseServiceRoleClient } from "../../lib/supabase/service";
 import { enemyAiDraftSchema } from "../../lib/validation/enemy";
+import { getCampaignCredentialForGeneration } from "../../lib/ai/campaign-credentials";
 
 function truncate(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
@@ -109,8 +111,15 @@ export default async function handler(request: Request) {
   logWorkerEvent("claimed", { generationRunId: claimedRun.id, model: input.data.model });
 
   try {
-    const response = await generateJson(input.data.prompt, enemyAiDraftSchema, input.data.model, { timeoutMs: enemyJobProviderTimeoutMs });
-    const draft = enemyAiDraftSchema.safeParse(response.data);
+    const campaignCredential = await getCampaignCredentialForGeneration(claimedRun.campaign_id, supabase);
+    const response = await generateJson(campaignCredential.apiKey, input.data.prompt, enemyAiDraftSchema, input.data.model, { timeoutMs: enemyJobProviderTimeoutMs });
+    const draft = enemyAiDraftSchema.safeParse(
+      mergeProtectedDraftFields(
+        response.data as Record<string, unknown>,
+        input.data.currentDraft as Record<string, unknown> | undefined,
+        input.data.protectedFields,
+      ),
+    );
     if (!draft.success) throw new Error("The AI response did not match the enemy draft format.");
 
     const { data: completedRun, error: completeError } = await supabase.from("ai_generation_runs").update({

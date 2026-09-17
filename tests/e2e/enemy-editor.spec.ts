@@ -12,25 +12,26 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
 
     const editor = page.locator('[data-enemy-editor="true"]');
     await expect(editor).toBeVisible();
-    await editor.getByLabel("Name", { exact: true }).fill(enemyName);
-    await editor.getByLabel("Level", { exact: true }).fill("4");
-    await editor.locator("form select").nth(0).selectOption("medium");
-    await editor.locator("form select").nth(1).selectOption("common");
-    await editor.getByLabel("Traits / type", { exact: true }).fill("aberration, occult");
-    await editor.getByLabel("Player-safe description", { exact: true }).fill("A threat assembled for the editor workflow.");
+    const form = editor.locator("form.character-form");
+    await form.getByLabel("Name", { exact: true }).fill(enemyName);
+    await form.getByLabel("Level", { exact: true }).fill("4");
+    await form.locator("select").nth(0).selectOption("medium");
+    await form.locator("select").nth(1).selectOption("common");
+    await form.getByLabel("Traits / type", { exact: true }).fill("aberration, occult");
+    await form.getByLabel("Player-safe description", { exact: true }).fill("A threat assembled for the editor workflow.");
 
-    await editor.getByLabel("Armor class", { exact: true }).fill("20");
-    const hitPoints = editor.locator('[data-enemy-repeatable="hit points"]');
+    await form.getByLabel("Armor class", { exact: true }).fill("20");
+    const hitPoints = form.locator('[data-enemy-repeatable="hit points"]');
     await hitPoints.getByRole("button", { name: "Add hit point pool" }).click();
     await hitPoints.getByLabel("Label", { exact: true }).fill("HP");
     await hitPoints.getByLabel("Value", { exact: true }).fill("120");
 
-    const movement = editor.locator('[data-enemy-repeatable="movement"]');
+    const movement = form.locator('[data-enemy-repeatable="movement"]');
     await movement.getByRole("button", { name: "Add movement mode" }).click();
     await movement.getByLabel("Mode", { exact: true }).fill("land");
     await movement.getByLabel("Speed", { exact: true }).fill("30 feet");
 
-    const strikes = editor.locator('[data-enemy-repeatable="strikes"]');
+    const strikes = form.locator('[data-enemy-repeatable="strikes"]');
     await strikes.getByRole("button", { name: "Add strike" }).click();
     await strikes.getByLabel("Name", { exact: true }).fill("Void blade");
     await strikes.getByLabel("Activation", { exact: true }).fill("one-action");
@@ -44,7 +45,7 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
     await strikes.getByRole("button", { name: "Add strike trait" }).click();
     await strikes.getByLabel("strike trait 1", { exact: true }).fill("agile");
 
-    const spellcasting = editor.locator('[data-enemy-repeatable="spellcasting"]');
+    const spellcasting = form.locator('[data-enemy-repeatable="spellcasting"]');
     await spellcasting.getByRole("button", { name: "Add spellcasting group" }).click();
     await spellcasting.getByLabel("Tradition", { exact: true }).fill("occult");
     await spellcasting.getByLabel("DC", { exact: true }).fill("25");
@@ -55,7 +56,7 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
     await spellcasting.getByLabel("spell 1", { exact: true }).fill("mindlink");
     await spellcasting.getByLabel("Uses", { exact: true }).fill("At will");
 
-    const specialAbilities = editor.locator('[data-enemy-repeatable="special abilities"]');
+    const specialAbilities = form.locator('[data-enemy-repeatable="special abilities"]');
     await specialAbilities.getByRole("button", { name: "Add special ability" }).click();
     await specialAbilities.getByLabel("Name", { exact: true }).fill("Phase step");
     await specialAbilities.getByRole("combobox", { name: "Activation", exact: true }).selectOption("two-actions");
@@ -68,7 +69,7 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
     await specialAbilities.getByLabel("Effect", { exact: true }).fill("The creature shifts out of phase.");
 
     const createResponsePromise = page.waitForResponse((response) => response.url() === apiUrl && response.request().method() === "POST");
-    await editor.getByRole("button", { name: "SAVE ENEMY", exact: true }).click();
+    await form.getByRole("button", { name: "SAVE ENEMY", exact: true }).click();
     const createResponse = await createResponsePromise;
     expect(createResponse.ok()).toBeTruthy();
     const createPayload = (await createResponse.json()) as { enemy?: { id?: string } };
@@ -213,10 +214,11 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
     await expect(page.locator('[data-enemy-stat-block="true"]')).toContainText("Void blade");
     await page.getByRole("button", { name: `Edit ${enemyName}`, exact: true }).click();
     const hydratedEditor = page.locator('[data-enemy-editor="true"]');
-    await expect(hydratedEditor.getByLabel("Name", { exact: true }).first()).toHaveValue(enemyName);
-    await expect(hydratedEditor.getByLabel("Value", { exact: true })).toHaveValue("120");
-    await expect(hydratedEditor.getByLabel("Speed", { exact: true })).toHaveValue("30 feet");
-    await expect(hydratedEditor.locator('[data-enemy-repeatable="strikes"]').getByLabel("Name", { exact: true })).toHaveValue("Void blade");
+    const hydratedForm = hydratedEditor.locator("form.character-form");
+    await expect(hydratedForm.locator('input[required][maxlength="160"]')).toHaveValue(enemyName);
+    await expect(hydratedForm.getByLabel("Value", { exact: true })).toHaveValue("120");
+    await expect(hydratedForm.getByLabel("Speed", { exact: true })).toHaveValue("30 feet");
+    await expect(hydratedForm.locator('[data-enemy-repeatable="strikes"]').getByLabel("Name", { exact: true })).toHaveValue("Void blade");
     await expect(hydratedEditor.locator('[data-enemy-repeatable="special abilities"]').getByRole("textbox", { name: "Effect", exact: true })).toHaveValue("The creature shifts out of phase.");
 
     const textareaValues = await hydratedEditor.locator("textarea").evaluateAll((elements) => elements.map((element) => (element as HTMLTextAreaElement).value));

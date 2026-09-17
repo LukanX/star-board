@@ -10,19 +10,15 @@ export { AiProviderError } from "@/lib/ai/errors";
 const openRouterBaseUrl = "https://openrouter.ai/api/v1";
 const defaultImageGenerationTimeoutMs = 2 * 60 * 1000;
 
-export function getOpenRouterClient() {
+export function getOpenRouterClient(apiKey: string) {
   const env = getServerEnv();
-
-  if (!env.OPENROUTER_API_KEY) {
-    throw new Error("OpenRouter is not configured. Add OPENROUTER_API_KEY to the server environment.");
-  }
 
   const defaultHeaders: Record<string, string> = {};
   if (env.OPENROUTER_SITE_URL) defaultHeaders["HTTP-Referer"] = env.OPENROUTER_SITE_URL;
   if (env.OPENROUTER_APP_NAME) defaultHeaders["X-Title"] = env.OPENROUTER_APP_NAME;
 
   return {
-    client: new OpenAI({ apiKey: env.OPENROUTER_API_KEY, baseURL: openRouterBaseUrl, defaultHeaders }),
+    client: new OpenAI({ apiKey, baseURL: openRouterBaseUrl, defaultHeaders }),
     model: env.OPENROUTER_TEXT_MODEL,
   };
 }
@@ -40,16 +36,33 @@ export type JsonGenerationResult = {
 
 export type JsonGenerationOptions = {
   timeoutMs?: number;
+  imageReferences?: readonly JsonGenerationImageReference[];
 };
 
-export async function generateJson(prompt: string, schema?: ZodType, requestedModel?: string, options: JsonGenerationOptions = {}): Promise<JsonGenerationResult> {
-  const { client, model } = getOpenRouterClient();
+export type JsonGenerationImageReference = {
+  dataUrl: string;
+};
+
+function buildJsonMessageContent(prompt: string, imageReferences: readonly JsonGenerationImageReference[]) {
+  if (!imageReferences.length) return prompt;
+
+  return [
+    { type: "text" as const, text: prompt },
+    ...imageReferences.map((reference) => ({
+      type: "image_url" as const,
+      image_url: { url: reference.dataUrl },
+    })),
+  ];
+}
+
+export async function generateJson(apiKey: string, prompt: string, schema?: ZodType, requestedModel?: string, options: JsonGenerationOptions = {}): Promise<JsonGenerationResult> {
+  const { client, model } = getOpenRouterClient(apiKey);
   let completion;
 
   try {
     completion = await client.chat.completions.create({
       model: requestedModel ?? model,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: buildJsonMessageContent(prompt, options.imageReferences ?? []) }],
       response_format: schema ? zodResponseFormat(schema, "star_board_draft") : { type: "json_object" },
     }, options.timeoutMs === undefined ? undefined : { signal: AbortSignal.timeout(options.timeoutMs) });
   } catch (error: unknown) {
@@ -130,15 +143,11 @@ function buildImageRequestBody(requestedModel: string, prompt: string, options: 
   return { model: requestedModel, prompt, aspect_ratio: aspectRatio, size, output_format: "png" };
 }
 
-export async function generateImage(prompt: string, requestedModel: string, options: ImageGenerationOptions = {}): Promise<ImageGenerationResult> {
+export async function generateImage(apiKey: string, prompt: string, requestedModel: string, options: ImageGenerationOptions = {}): Promise<ImageGenerationResult> {
   const env = getServerEnv();
 
-  if (!env.OPENROUTER_API_KEY) {
-    throw new Error("OpenRouter is not configured. Add OPENROUTER_API_KEY to the server environment.");
-  }
-
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+    Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
   };
   if (env.OPENROUTER_SITE_URL) headers["HTTP-Referer"] = env.OPENROUTER_SITE_URL;

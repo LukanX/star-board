@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadEnv } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -153,6 +153,252 @@ describeLocal("local Supabase RLS boundaries", () => {
 
     const unchanged = await gmClient.from("campaigns").select("description").eq("id", campaignId).single();
     expect(unchanged.data?.description).toContain("local RLS integration suite");
+  });
+
+  it("keeps visual styles GM-only and applies a ready style to the campaign snapshot", async () => {
+    const originalCampaign = await gmClient.from("campaigns").select("visual_style").eq("id", campaignId).single();
+    expect(originalCampaign.error).toBeNull();
+
+    const styleName = `RLS Visual Style ${Date.now()}`;
+    let styleId: string | null = null;
+
+    try {
+      const playerRead = await playerClient.from("campaign_visual_styles").select("id").eq("campaign_id", campaignId);
+      expect(playerRead.error).toBeNull();
+      expect(playerRead.data).toEqual([]);
+
+      const created = await gmClient.rpc("create_campaign_visual_style", {
+        p_campaign_id: campaignId,
+        p_name: styleName,
+        p_visual_style: "Crisp ink, cyan edge light, and restrained amber accents.",
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "inked-illustration" },
+      });
+      expect(created.error).toBeNull();
+      expect(created.data).toBeTruthy();
+      styleId = created.data;
+
+      const playerApply = await playerClient.rpc("apply_campaign_visual_style", { p_campaign_id: campaignId, p_style_id: styleId });
+      expect(playerApply.error).not.toBeNull();
+
+      const applied = await gmClient.rpc("apply_campaign_visual_style", { p_campaign_id: campaignId, p_style_id: styleId });
+      expect(applied.error).toBeNull();
+
+      const campaignAfterApply = await gmClient.from("campaigns").select("visual_style").eq("id", campaignId).single();
+      expect(campaignAfterApply.data?.visual_style).toBe("Crisp ink, cyan edge light, and restrained amber accents.");
+
+      const staleUpdate = await gmClient.rpc("update_campaign_visual_style", {
+        p_style_id: styleId,
+        p_name: styleName,
+        p_visual_style: "A stale update should not win.",
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "inked-illustration" },
+        p_expected_revision: 99,
+      });
+      expect(staleUpdate.error).not.toBeNull();
+    } finally {
+      if (styleId) await gmClient.rpc("delete_campaign_visual_style", { p_style_id: styleId });
+      if (originalCampaign.data?.visual_style !== undefined) {
+        await gmClient.from("campaigns").update({ visual_style: originalCampaign.data.visual_style }).eq("id", campaignId);
+      }
+    }
+  });
+
+  it("retains a completed visual style preview through the attach RPC", async () => {
+    const campaign = await gmClient.from("campaigns").select("created_by").eq("id", campaignId).single();
+    expect(campaign.error).toBeNull();
+
+    const gmUserId = campaign.data?.created_by;
+    if (!gmUserId) throw new Error("The local RLS campaign has no creator.");
+
+    const styleName = `RLS Preview Style ${Date.now()}`;
+    const previewPrompt = "A lone courier skiff crossing a luminous dust storm above a frontier moon";
+    const previewStyle = "Crisp ink, cyan edge light, and restrained amber accents.";
+    let styleId: string | null = null;
+    let generationRunId: string | null = null;
+
+    try {
+      const created = await gmClient.rpc("create_campaign_visual_style", {
+        p_campaign_id: campaignId,
+        p_name: styleName,
+        p_visual_style: previewStyle,
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "inked-illustration" },
+      });
+      expect(created.error).toBeNull();
+      expect(created.data).toBeTruthy();
+      styleId = created.data;
+
+      generationRunId = randomUUID();
+      const previewPath = `${campaignId}/${gmUserId}/style-preview-${generationRunId}.png`;
+      const generationRun = await gmClient.from("ai_generation_runs").insert({
+        id: generationRunId,
+        campaign_id: campaignId,
+        requested_by: gmUserId,
+        kind: "image",
+        mode: "create",
+        model: "test/image-model",
+        prompt_hash: createHash("sha256").update(previewPrompt).digest("hex"),
+        purpose: "style-preview",
+        visual_style_hash: createHash("sha256").update(previewStyle).digest("hex"),
+        image_subject: previewPrompt,
+        provider: "openrouter",
+        effective_model: "test/image-model",
+        target_kind: "visual-style",
+        aspect_ratio: "1:1",
+        size: "1024x1024",
+        image_path: previewPath,
+        image_media_type: "image/png",
+        status: "complete",
+      }).select("id").single();
+      expect(generationRun.error).toBeNull();
+      expect(generationRun.data?.id).toBe(generationRunId);
+
+      const attached = await gmClient.rpc("attach_campaign_visual_style_preview", {
+        p_style_id: styleId,
+        p_generation_run_id: generationRunId,
+        p_prompt: previewPrompt,
+        p_style_hash: createHash("sha256").update(previewStyle).digest("hex"),
+        p_expected_revision: 1,
+      });
+      expect(attached.error).toBeNull();
+
+      const retained = await gmClient
+        .from("campaign_visual_styles")
+        .select("revision, preview_generation_run_id, preview_path, preview_media_type, preview_prompt, preview_provider, preview_model, preview_subject, preview_aspect_ratio, preview_size, preview_style_hash")
+        .eq("id", styleId)
+        .single();
+      expect(retained.error).toBeNull();
+      expect(retained.data).toMatchObject({
+        revision: 2,
+        preview_generation_run_id: generationRunId,
+        preview_path: previewPath,
+        preview_media_type: "image/png",
+        preview_prompt: previewPrompt,
+        preview_provider: "openrouter",
+        preview_model: "test/image-model",
+        preview_subject: previewPrompt,
+        preview_aspect_ratio: "1:1",
+        preview_size: "1024x1024",
+        preview_style_hash: createHash("sha256").update(previewStyle).digest("hex"),
+      });
+    } finally {
+      if (styleId) await gmClient.rpc("delete_campaign_visual_style", { p_style_id: styleId });
+      if (generationRunId) await gmClient.from("ai_generation_runs").delete().eq("id", generationRunId);
+    }
+  });
+
+  it("saves visual style text and preview metadata atomically", async () => {
+    const campaign = await gmClient.from("campaigns").select("created_by").eq("id", campaignId).single();
+    expect(campaign.error).toBeNull();
+
+    const gmUserId = campaign.data?.created_by;
+    if (!gmUserId) throw new Error("The local RLS campaign has no creator.");
+
+    const firstStyle = "Crisp ink, cyan edge light, and restrained amber accents.";
+    const firstPrompt = "A first generated style preview";
+    const secondStyle = "Painterly nebula haze, bright hull highlights, and controlled amber accents.";
+    const secondPrompt = "A replacement generated style preview";
+    const failedStyle = "This update must roll back when preview attachment fails.";
+    const failedPrompt = "A failed generated style preview";
+    const firstRunId = randomUUID();
+    const secondRunId = randomUUID();
+    const failedRunId = randomUUID();
+    const firstPath = `${campaignId}/${gmUserId}/style-preview-${firstRunId}.png`;
+    const secondPath = `${campaignId}/${gmUserId}/style-preview-${secondRunId}.png`;
+    const failedPath = `${campaignId}/${gmUserId}/style-preview-${failedRunId}.png`;
+    let styleId: string | null = null;
+
+    const insertPreviewRun = async (runId: string, path: string, prompt: string, style: string) => {
+      const result = await gmClient.from("ai_generation_runs").insert({
+        id: runId,
+        campaign_id: campaignId,
+        requested_by: gmUserId,
+        kind: "image",
+        mode: "create",
+        model: "test/image-model",
+        prompt_hash: createHash("sha256").update(prompt).digest("hex"),
+        purpose: "style-preview",
+        visual_style_hash: createHash("sha256").update(style).digest("hex"),
+        image_subject: prompt,
+        provider: "openrouter",
+        effective_model: "test/image-model",
+        target_kind: "visual-style",
+        aspect_ratio: "1:1",
+        size: "1024x1024",
+        image_path: path,
+        image_media_type: "image/png",
+        status: "complete",
+      }).select("id").single();
+      expect(result.error).toBeNull();
+    };
+
+    try {
+      await insertPreviewRun(firstRunId, firstPath, firstPrompt, firstStyle);
+      const created = await gmClient.rpc("create_campaign_visual_style_with_preview", {
+        p_campaign_id: campaignId,
+        p_name: `Atomic Preview Style ${Date.now()}`,
+        p_visual_style: firstStyle,
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "inked-illustration" },
+        p_generation_run_id: firstRunId,
+        p_prompt: firstPrompt,
+      });
+      expect(created.error).toBeNull();
+      expect(created.data).toBeTruthy();
+      styleId = created.data;
+
+      const createdRow = await gmClient.from("campaign_visual_styles")
+        .select("revision, visual_style, preview_generation_run_id, preview_path")
+        .eq("id", styleId)
+        .single();
+      expect(createdRow.error).toBeNull();
+      expect(createdRow.data).toMatchObject({ revision: 2, visual_style: firstStyle, preview_generation_run_id: firstRunId, preview_path: firstPath });
+
+      await insertPreviewRun(secondRunId, secondPath, secondPrompt, secondStyle);
+      const updated = await gmClient.rpc("update_campaign_visual_style_with_preview", {
+        p_style_id: styleId,
+        p_name: "Atomic Preview Style Updated",
+        p_visual_style: secondStyle,
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "painterly" },
+        p_expected_revision: 2,
+        p_generation_run_id: secondRunId,
+        p_prompt: secondPrompt,
+      });
+      expect(updated.error).toBeNull();
+
+      const updatedRow = await gmClient.from("campaign_visual_styles")
+        .select("revision, visual_style, preview_generation_run_id, preview_path")
+        .eq("id", styleId)
+        .single();
+      expect(updatedRow.error).toBeNull();
+      expect(updatedRow.data).toMatchObject({ revision: 4, visual_style: secondStyle, preview_generation_run_id: secondRunId, preview_path: secondPath });
+
+      await insertPreviewRun(failedRunId, failedPath, failedPrompt, firstStyle);
+      const failedUpdate = await gmClient.rpc("update_campaign_visual_style_with_preview", {
+        p_style_id: styleId,
+        p_name: "Should Roll Back",
+        p_visual_style: failedStyle,
+        p_status: "ready",
+        p_wizard_inputs: { artDirection: "painterly" },
+        p_expected_revision: 4,
+        p_generation_run_id: failedRunId,
+        p_prompt: failedPrompt,
+      });
+      expect(failedUpdate.error).not.toBeNull();
+      expect(failedUpdate.error?.code).toBe("22023");
+
+      const unchanged = await gmClient.from("campaign_visual_styles")
+        .select("revision, visual_style, preview_generation_run_id, preview_path")
+        .eq("id", styleId)
+        .single();
+      expect(unchanged.error).toBeNull();
+      expect(unchanged.data).toMatchObject({ revision: 4, visual_style: secondStyle, preview_generation_run_id: secondRunId, preview_path: secondPath });
+    } finally {
+      if (styleId) await gmClient.rpc("delete_campaign_visual_style", { p_style_id: styleId });
+      await gmClient.from("ai_generation_runs").delete().in("id", [firstRunId, secondRunId, failedRunId]);
+    }
   });
 
   it("keeps unrevealed enemy details private and saves parent/detail rows atomically", async () => {
@@ -714,5 +960,187 @@ describeLocal("local Supabase RLS boundaries", () => {
       .single();
     expect(gmUpdate.error).toBeNull();
     expect(gmUpdate.data?.name).toBe("GM Renamed Player Character");
+  });
+
+  it("scopes character portrait AI runs to GMs and the saved character owner", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    if (!gmUser) throw new Error("The local RLS GM session has no user.");
+
+    const membership = await playerClient
+      .from("campaign_members")
+      .select("role")
+      .eq("campaign_id", campaignId)
+      .eq("user_id", playerId)
+      .maybeSingle();
+    expect(membership.error).toBeNull();
+
+    if (!membership.data) {
+      const token = `portrait-${randomUUID()}-local-rls-token`;
+      const tokenHash = createHash("sha256").update(token).digest("hex");
+      const link = await gmClient.from("campaign_join_links").insert({
+        campaign_id: campaignId,
+        created_by: gmUser.id,
+        token_hash: tokenHash,
+        max_uses: 1,
+      });
+      expect(link.error).toBeNull();
+
+      const redeemed = await playerClient.rpc("redeem_campaign_join_link", { join_token_hash: tokenHash });
+      expect(redeemed.error).toBeNull();
+    }
+
+    let ownerCharacterId: string | null = null;
+    let gmCharacterId: string | null = null;
+    let foreignCampaignId: string | null = null;
+    let foreignCharacterId: string | null = null;
+    const runIds: string[] = [];
+    const runBase = {
+      kind: "image",
+      mode: "create",
+      model: "test/image-model",
+      prompt_hash: "a".repeat(64),
+      purpose: "entity-art",
+      target_kind: "character",
+      aspect_ratio: "1:1",
+      size: "1024x1024",
+      image_subject: "A saved character portrait.",
+      status: "pending",
+    };
+
+    try {
+      const ownerCharacter = await playerClient.from("characters").insert({
+        campaign_id: campaignId,
+        owner_id: playerId,
+        name: "Portrait Owner Character",
+      }).select("id").single();
+      expect(ownerCharacter.error).toBeNull();
+      ownerCharacterId = ownerCharacter.data?.id ?? null;
+      if (!ownerCharacterId) throw new Error("The portrait owner character was not created.");
+
+      const ownerRun = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: ownerCharacterId,
+        ...runBase,
+      }).select("id, requested_by, target_character_id").single();
+      expect(ownerRun.error).toBeNull();
+      const ownerRunId = ownerRun.data?.id;
+      if (!ownerRunId) throw new Error("The GM-created portrait run was not created.");
+      runIds.push(ownerRunId);
+
+      const ownerRead = await playerClient
+        .from("ai_generation_runs")
+        .select("id, requested_by, target_character_id")
+        .eq("id", ownerRunId)
+        .single();
+      expect(ownerRead.error).toBeNull();
+      expect(ownerRead.data).toMatchObject({ id: ownerRunId, requested_by: gmUser.id, target_character_id: ownerCharacterId });
+
+      const forgedRequester = await playerClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: ownerCharacterId,
+        ...runBase,
+      });
+      expect(forgedRequester.error).not.toBeNull();
+
+      const disabledPlayerRun = await playerClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: playerId,
+        target_character_id: ownerCharacterId,
+        ...runBase,
+      });
+      expect(disabledPlayerRun.error).not.toBeNull();
+
+      const gmCharacter = await gmClient.from("characters").insert({
+        campaign_id: campaignId,
+        owner_id: gmUser.id,
+        name: "GM Portrait Character",
+      }).select("id").single();
+      expect(gmCharacter.error).toBeNull();
+      gmCharacterId = gmCharacter.data?.id ?? null;
+      if (!gmCharacterId) throw new Error("The GM portrait character was not created.");
+
+      const gmTargetRun = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: gmCharacterId,
+        ...runBase,
+      }).select("id").single();
+      expect(gmTargetRun.error).toBeNull();
+      const gmTargetRunId = gmTargetRun.data?.id;
+      if (!gmTargetRunId) throw new Error("The GM-targeted portrait run was not created.");
+      runIds.push(gmTargetRunId);
+
+      const hiddenFromOtherPlayer = await playerClient
+        .from("ai_generation_runs")
+        .select("id")
+        .eq("id", gmTargetRunId);
+      expect(hiddenFromOtherPlayer.error).toBeNull();
+      expect(hiddenFromOtherPlayer.data).toEqual([]);
+
+      const blockedUpdate = await playerClient
+        .from("ai_generation_runs")
+        .update({ status: "failed" })
+        .eq("id", ownerRunId)
+        .select("id");
+      expect(blockedUpdate.error).toBeNull();
+      expect(blockedUpdate.data).toEqual([]);
+
+      const stylePreviewTarget = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: ownerCharacterId,
+        ...runBase,
+        purpose: "style-preview",
+      });
+      expect(stylePreviewTarget.error).not.toBeNull();
+
+      const foreignCampaign = await gmClient.rpc("create_campaign", {
+        campaign_name: `RLS Portrait Boundary ${Date.now()}`,
+        campaign_description: "Used to verify portrait target boundaries.",
+      });
+      expect(foreignCampaign.error).toBeNull();
+      foreignCampaignId = foreignCampaign.data as string;
+
+      const foreignCharacter = await gmClient.from("characters").insert({
+        campaign_id: foreignCampaignId,
+        owner_id: gmUser.id,
+        name: "Foreign Portrait Character",
+      }).select("id").single();
+      expect(foreignCharacter.error).toBeNull();
+      foreignCharacterId = foreignCharacter.data?.id ?? null;
+      if (!foreignCharacterId) throw new Error("The foreign portrait character was not created.");
+
+      const crossCampaignTarget = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: foreignCharacterId,
+        ...runBase,
+      });
+      expect(crossCampaignTarget.error).not.toBeNull();
+
+      const deletedOwner = await playerClient
+        .from("characters")
+        .delete()
+        .eq("id", ownerCharacterId)
+        .eq("campaign_id", campaignId)
+        .select("id")
+        .single();
+      expect(deletedOwner.error).toBeNull();
+
+      const hiddenAfterDelete = await playerClient
+        .from("ai_generation_runs")
+        .select("id")
+        .eq("id", ownerRunId);
+      expect(hiddenAfterDelete.error).toBeNull();
+      expect(hiddenAfterDelete.data).toEqual([]);
+    } finally {
+      if (runIds.length) await gmClient.from("ai_generation_runs").delete().in("id", runIds);
+      if (ownerCharacterId) await gmClient.from("characters").delete().eq("id", ownerCharacterId);
+      if (gmCharacterId) await gmClient.from("characters").delete().eq("id", gmCharacterId);
+      if (foreignCharacterId) await gmClient.from("characters").delete().eq("id", foreignCharacterId);
+      if (foreignCampaignId) await gmClient.from("campaigns").delete().eq("id", foreignCampaignId);
+    }
   });
 });

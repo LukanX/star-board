@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getImageJobStaleMessage } from "@/lib/ai/image-job-lifecycle";
-import { getAuthenticatedUser } from "@/lib/auth/permissions";
+import { loadCharacterPortraitAccess } from "@/lib/ai/character-portrait-access";
+import { getAuthenticatedUser, getCampaignRole } from "@/lib/auth/permissions";
 import { createCampaignArtSignedUrl } from "@/lib/storage/campaign-art";
 
 type RouteContext = { params: Promise<{ generationRunId: string }> };
@@ -25,13 +26,35 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const { data: run, error } = await context.supabase
       .from("ai_generation_runs")
-      .select("id, campaign_id, requested_by, kind, mode, target_kind, aspect_ratio, size, model, effective_model, image_path, image_media_type, created_at, status, status_updated_at, error_message")
+      .select("id, campaign_id, requested_by, kind, mode, purpose, target_kind, target_character_id, aspect_ratio, size, model, effective_model, image_path, image_media_type, created_at, status, status_updated_at, error_message")
       .eq("id", generationRunId)
       .eq("kind", "image")
       .maybeSingle();
 
     if (error || !run) {
       return noStoreJson({ error: "Image generation job was not found." }, { status: 404 });
+    }
+
+    if (run.target_kind === "character") {
+      if (run.target_character_id) {
+        const access = await loadCharacterPortraitAccess(
+          context.supabase,
+          run.campaign_id,
+          run.target_character_id,
+          context.user.id,
+        );
+        if (access.failure === "membership") {
+          return noStoreJson({ error: "Campaign membership is required to read this image job." }, { status: 403 });
+        }
+        if (access.failure === "not-found") {
+          return noStoreJson({ error: "The saved character for this image job was not found." }, { status: 404 });
+        }
+        if (access.failure === "forbidden" || !access.access) {
+          return noStoreJson({ error: "You are not allowed to read this character image job." }, { status: 403 });
+        }
+      } else if (await getCampaignRole(context.supabase, run.campaign_id, context.user.id) !== "gm") {
+        return noStoreJson({ error: "You are not allowed to read this legacy character image job." }, { status: 403 });
+      }
     }
 
     if (run.status === "pending" || run.status === "running") {
@@ -61,12 +84,14 @@ export async function GET(_request: Request, { params }: RouteContext) {
         generationRunId: run.id,
         status: "complete",
         targetKind: run.target_kind,
+        purpose: run.purpose,
         mode: run.mode,
         aspectRatio: run.aspect_ratio,
         size: run.size,
         model: run.effective_model ?? run.model,
         createdAt: new Date(run.created_at).toISOString(),
         temporaryPath: run.image_path,
+        ...(run.target_kind === "character" && run.target_character_id ? { characterId: run.target_character_id } : {}),
         image: { base64: null, url: signedUrl, mediaType: run.image_media_type },
       },
     });
