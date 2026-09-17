@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   generateJson: vi.fn(),
   getServerEnv: vi.fn(),
   getAuthenticatedUser: vi.fn(),
-  getCampaignMembership: vi.fn(),
+  loadCharacterPortraitAccess: vi.fn(),
   loadCampaignAiContext: vi.fn(),
   recordAiGeneration: vi.fn(),
   buildCharacterPrompt: vi.fn(() => "character-prompt"),
@@ -15,7 +15,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/ai/client", () => ({ generateJson: mocks.generateJson }));
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
-vi.mock("@/lib/auth/permissions", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser, getCampaignMembership: mocks.getCampaignMembership }));
+vi.mock("@/lib/auth/permissions", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
+vi.mock("@/lib/ai/character-portrait-access", () => ({ loadCharacterPortraitAccess: mocks.loadCharacterPortraitAccess }));
 vi.mock("@/lib/ai/assistance", () => ({ loadCampaignAiContext: mocks.loadCampaignAiContext, recordAiGeneration: mocks.recordAiGeneration }));
 vi.mock("@/lib/ai/prompts", () => ({ buildCharacterPrompt: mocks.buildCharacterPrompt }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
@@ -40,7 +41,23 @@ describe("character portrait prompt route", () => {
     vi.clearAllMocks();
     mocks.getServerEnv.mockReturnValue({ OPENROUTER_TEXT_MODEL: "openai/gpt-4o-mini" });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase: {}, user: { id: userId } });
-    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Nova" });
+    mocks.loadCharacterPortraitAccess.mockResolvedValue({
+      access: {
+        character: {
+          id: "00000000-0000-4000-8000-000000000003",
+          campaign_id: campaignId,
+          owner_id: userId,
+          name: "Nova",
+          species: "Android",
+          class_name: "Mechanic",
+          level: 3,
+          backstory_markdown: "A survivor of a derelict ship.",
+          physical_description: "Tall with silver eyes.",
+        },
+        role: "player",
+        isOwner: true,
+      },
+    });
     mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Retro-futurist" } });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true }] });
@@ -59,7 +76,7 @@ describe("character portrait prompt route", () => {
     const draft = { visualPrompt: "A silver-eyed android mechanic in a patched flight jacket." };
     mocks.generateJson.mockResolvedValue({ data: draft, model: "openrouter/fallback", generationId: "character-run-1", usage: { inputTokens: 12, outputTokens: 18, cost: 0.001 } });
 
-    const response = await generateCharacterPrompt(request({ campaignId, mode: "create", name: "Nova", species: "Android", className: "Mechanic", backstoryMarkdown: "A survivor of a derelict ship.", physicalDescription: "Tall with silver eyes." }));
+    const response = await generateCharacterPrompt(request({ campaignId, characterId: "00000000-0000-4000-8000-000000000003", mode: "create", name: "Nova", species: "Android", className: "Mechanic", backstoryMarkdown: "A survivor of a derelict ship.", physicalDescription: "Tall with silver eyes." }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -70,9 +87,9 @@ describe("character portrait prompt route", () => {
   });
 
   it("rejects a user without campaign membership", async () => {
-    mocks.getCampaignMembership.mockResolvedValue(null);
+    mocks.loadCharacterPortraitAccess.mockResolvedValue({ failure: "membership" });
 
-    const response = await generateCharacterPrompt(request({ campaignId, mode: "create", physicalDescription: "Tall with silver eyes." }));
+    const response = await generateCharacterPrompt(request({ campaignId, characterId: "00000000-0000-4000-8000-000000000003", mode: "create", physicalDescription: "Tall with silver eyes." }));
     const payload = await response.json();
 
     expect(response.status).toBe(403);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
+import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
 import { loadCampaignAiContext, loadMissionAiReferences, recordAiGeneration } from "@/lib/ai/assistance";
 import { generateJson } from "@/lib/ai/client";
 import { buildMissionPrompt } from "@/lib/ai/prompts";
@@ -8,7 +9,7 @@ import { getServerEnv } from "@/lib/env";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
-import { missionDraftSchema, missionGenerationInputSchema } from "@/lib/validation/ai";
+import { missionDraftSchema, missionGenerationInputSchema, missionReviewDraftSchema } from "@/lib/validation/ai";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 
@@ -93,11 +94,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The AI response did not match the mission draft format." }, { status: 502 });
     }
 
+    const reviewedDraft = missionReviewDraftSchema.safeParse(
+      mergeProtectedDraftFields(
+        draft.data,
+        input.data.currentDraft as Record<string, unknown> | undefined,
+        input.data.protectedFields,
+      ),
+    );
+
+    if (!reviewedDraft.success) {
+      await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "mission", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult?.model ?? selectedModel.id, generationId: providerResult?.generationId, inputTokens: providerResult?.usage?.inputTokens, outputTokens: providerResult?.usage?.outputTokens, costUsd: providerResult?.usage?.cost, status: "failed" });
+      return NextResponse.json({ error: "The reviewed mission draft is outside the allowed field limits." }, { status: 502 });
+    }
+
     const { error: auditError } = await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "mission", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult?.model ?? selectedModel.id, generationId: providerResult?.generationId, inputTokens: providerResult?.usage?.inputTokens, outputTokens: providerResult?.usage?.outputTokens, costUsd: providerResult?.usage?.cost, status: "complete" });
 
     if (auditError) return NextResponse.json({ error: "Job draft metadata could not be saved." }, { status: 503 });
 
-    return NextResponse.json({ draft: draft.data, model: providerResult?.model ?? selectedModel.id });
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult?.model ?? selectedModel.id });
   } catch {
     return NextResponse.json({ error: "Mission assistance is temporarily unavailable." }, { status: 503 });
   }

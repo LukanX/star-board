@@ -18,6 +18,11 @@ export default function CharacterDetailRouteView({ campaignId, initialCharacter 
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const openEditor = () => {
+    setError(null);
+    setEditorOpen(true);
+  };
+
   const deleteCharacter = async () => {
     if (isDeleting || !window.confirm(`Delete ${character.name} from this campaign?`)) return;
 
@@ -35,11 +40,19 @@ export default function CharacterDetailRouteView({ campaignId, initialCharacter 
 
   return <>
     <CampaignArtEditorSlot />
-    {editorOpen ? <CharacterEditor campaignId={campaignId} character={character} onCancel={() => setEditorOpen(false)} onSaved={(savedCharacter) => { setCharacter(savedCharacter); setEditorOpen(false); }} /> : <>
+    {editorOpen ? <CharacterEditor campaignId={campaignId} character={character} onCancel={() => setEditorOpen(false)} onSaved={(savedCharacter) => {
+      const saved = {
+        ...savedCharacter,
+        can_generate_portrait: character.can_generate_portrait,
+        portrait_ai_role: character.portrait_ai_role,
+      };
+      setCharacter(saved);
+      setEditorOpen(false);
+    }} /> : <>
       <CharacterPublicRecord
         campaignId={campaignId}
         character={mapApiCharacter(character, 0)}
-        actions={character.can_edit ? <RecordEditAction recordName={character.name} disabled={isDeleting} onClick={() => { setError(null); setEditorOpen(true); }} /> : null}
+        actions={<>{character.can_edit ? <RecordEditAction recordName={character.name} disabled={isDeleting} onClick={openEditor} /> : null}</>}
       />
       {character.can_edit ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap">
         <RecordDeleteAction recordName={character.name} disabled={isDeleting} onClick={() => void deleteCharacter()} />

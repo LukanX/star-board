@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
 import { NextResponse } from "next/server";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
@@ -75,10 +76,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The AI response did not match the enemy brief format." }, { status: 502 });
     }
 
+    const reviewedDraft = enemyBriefDraftSchema.safeParse(
+      mergeProtectedDraftFields(
+        draft.data,
+        input.data.currentDraft as Record<string, unknown> | undefined,
+        input.data.protectedFields,
+      ),
+    );
+
+    if (!reviewedDraft.success) {
+      await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "enemy", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult.model ?? selectedModel.id, generationId: providerResult.generationId, inputTokens: providerResult.usage?.inputTokens, outputTokens: providerResult.usage?.outputTokens, costUsd: providerResult.usage?.cost, status: "failed" });
+      return NextResponse.json({ error: "The reviewed enemy brief is outside the allowed field limits." }, { status: 502 });
+    }
+
     const { error: auditError } = await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "enemy", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult.model ?? selectedModel.id, generationId: providerResult.generationId, inputTokens: providerResult.usage?.inputTokens, outputTokens: providerResult.usage?.outputTokens, costUsd: providerResult.usage?.cost, status: "complete" });
     if (auditError) return NextResponse.json({ error: "Enemy brief metadata could not be saved." }, { status: 503 });
 
-    return NextResponse.json({ draft: draft.data, model: providerResult.model ?? selectedModel.id });
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult.model ?? selectedModel.id });
   } catch {
     return NextResponse.json({ error: "Enemy brief assistance is temporarily unavailable." }, { status: 503 });
   }

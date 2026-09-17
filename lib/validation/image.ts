@@ -10,6 +10,7 @@ export const imageGenerationInputSchema = z.object({
   campaignId: z.string().uuid(),
   mode: z.enum(["create", "refine"]),
   targetKind: z.enum(imageTargetKinds),
+  characterId: z.string().uuid().optional(),
   purpose: z.enum(imagePurposes).default("entity-art"),
   model: z.string().trim().min(1).max(160).optional(),
   subject: z.string().trim().min(1).max(1200),
@@ -20,12 +21,18 @@ export const imageGenerationInputSchema = z.object({
   size: z.enum(imageSizeValues).default(defaultImageSize),
   refinement: z.string().trim().max(600).optional(),
   currentPrompt: z.string().trim().max(imagePromptMaxLength).optional(),
-}).superRefine(({ aspectRatio, size, targetKind, parentPlaceId, purpose, visualStyleId, visualStyleOverride }, context) => {
+}).superRefine(({ aspectRatio, size, targetKind, characterId, parentPlaceId, purpose, visualStyleId, visualStyleOverride }, context) => {
   if (!imageSizeOptions[aspectRatio].some((option) => option.value === size)) {
     context.addIssue({ code: "custom", path: ["size"], message: `Size ${size} does not match aspect ratio ${aspectRatio}.` });
   }
   if (targetKind !== "place" && parentPlaceId) {
     context.addIssue({ code: "custom", path: ["parentPlaceId"], message: "Parent context is only valid for Place artwork." });
+  }
+  if (targetKind === "character" && !characterId) {
+    context.addIssue({ code: "custom", path: ["characterId"], message: "A saved character is required for character artwork." });
+  }
+  if (targetKind !== "character" && characterId) {
+    context.addIssue({ code: "custom", path: ["characterId"], message: "Character context is only valid for character artwork." });
   }
   if (purpose === "style-preview" && targetKind !== "visual-style") {
     context.addIssue({ code: "custom", path: ["targetKind"], message: "Style previews must use the visual-style target." });
@@ -59,6 +66,7 @@ export type ImageBackgroundJob = z.input<typeof imageBackgroundJobSchema>;
 export const imageDraftSchema = z.object({
   generationRunId: z.string().uuid(),
   targetKind: z.enum(imageTargetKinds),
+  characterId: z.string().uuid().optional(),
   purpose: z.enum(imagePurposes).default("entity-art"),
   mode: z.enum(["create", "refine"]),
   subject: z.string().trim().min(1).max(1200),
@@ -76,6 +84,13 @@ export const imageDraftSchema = z.object({
   model: z.string().min(1),
   createdAt: z.string().datetime(),
   temporaryPath: z.string().optional(),
+}).superRefine(({ targetKind, characterId }, context) => {
+  if (targetKind === "character" && !characterId) {
+    context.addIssue({ code: "custom", path: ["characterId"], message: "A saved character is required for character artwork." });
+  }
+  if (targetKind !== "character" && characterId) {
+    context.addIssue({ code: "custom", path: ["characterId"], message: "Character context is only valid for character artwork." });
+  }
 });
 
 export type ImageGenerationInput = z.infer<typeof imageGenerationInputSchema>;

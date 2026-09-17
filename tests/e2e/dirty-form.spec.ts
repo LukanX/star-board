@@ -11,7 +11,7 @@ test("guards internal navigation after a character edit", async ({ page, campaig
   await expect(editorTitle).toHaveClass(/text-\[19px\]/);
   await expect(editorTitle).toHaveCSS("margin-top", "6px");
   await expect(editorTitle).toHaveCSS("font-size", "19px");
-  await page.getByLabel("Name").fill("Unsaved Crew Record");
+  await page.locator("form.character-form").getByLabel("Name").fill("Unsaved Crew Record");
 
   const dialogPromise = page.waitForEvent("dialog");
   const navigationPromise = page.getByRole("link", { name: "Job board", exact: true }).click();
@@ -97,11 +97,11 @@ test("guards internal navigation after a job edit", async ({ page, campaign }) =
   await saveButton.hover();
   await expect(saveButton).toHaveCSS("background-color", "rgb(140, 238, 255)");
   await editorButton.click();
-  const aiButton = page.getByRole("button", { name: "GENERATE CANDIDATE", exact: true });
-  await expect(aiButton).toHaveClass(/!border-\[rgba\(255,92,154,\.34\)\]/);
+  const aiButton = page.locator("[data-ai-draft-assistant]").getByRole("button", { name: "GENERATE DRAFT", exact: true });
+  await expect(aiButton).toHaveClass(/border-\[rgba\(255,92,154,\.34\)\]/);
   await expect(aiButton).toHaveClass(/bg-\[rgba\(255,92,154,\.08\)\]/);
-  await expect(aiButton).toHaveClass(/!text-\[var\(--pink\)\]/);
-  await expect(aiButton).toHaveClass(/hover:!border-\[var\(--pink\)\]/);
+  await expect(aiButton).toHaveClass(/text-\[var\(--pink\)\]/);
+  await expect(aiButton).toHaveClass(/hover:border-\[var\(--pink\)\]/);
   await expect(aiButton).toHaveClass(/hover:bg-\[rgba\(255,92,154,\.14\)\]/);
   await expect(aiButton).toHaveCSS("border-top-color", "rgba(255, 92, 154, 0.34)");
   await expect(aiButton).toHaveCSS("background-color", "rgba(255, 92, 154, 0.08)");
@@ -110,13 +110,14 @@ test("guards internal navigation after a job edit", async ({ page, campaign }) =
   await expect(aiButton).toHaveCSS("border-top-color", "rgb(255, 92, 154)");
   await expect(aiButton).toHaveCSS("background-color", "rgba(255, 92, 154, 0.14)");
   await expect(aiButton).toHaveClass(/min-h-\[32px\]/);
-  await expect(aiButton).toHaveClass(/px-\[10px\]/);
-  await expect(aiButton).toHaveClass(/text-\[8px\]/);
+  await expect(aiButton).toHaveClass(/px-\[12px\]/);
+  await expect(aiButton).toHaveClass(/text-\[9px\]/);
   await expect(aiButton).toHaveClass(/max-\[420px\]:w-full/);
   await expect(aiButton).toHaveCSS("min-height", "32px");
-  await expect(aiButton).toHaveCSS("padding-left", "10px");
-  await expect(aiButton).toHaveCSS("padding-right", "10px");
-  await expect(aiButton).toHaveCSS("font-size", "8px");
+  await expect(aiButton).toHaveCSS("padding-left", "12px");
+  await expect(aiButton).toHaveCSS("padding-right", "12px");
+  await editorButton.click();
+  await expect(aiButton).toBeHidden();
   await expect(page.getByRole("button", { name: "CANCEL", exact: true })).toHaveClass(/inline-flex/);
   const closeEditor = page.getByRole("button", { name: "Close mission editor" });
   await expect(closeEditor).toHaveClass(/w-8/);
@@ -137,13 +138,13 @@ test("guards internal navigation after a job edit", async ({ page, campaign }) =
   await expect(characterForm).toHaveClass(/\[&_label\]:grid/);
   await expect(characterForm).toHaveClass(/\[&_input\]:w-full/);
   await expect(characterForm).toHaveClass(/\[&_textarea\]:min-h-\[110px\]/);
-  const titleInput = page.getByLabel("Title");
+  const titleInput = page.locator("form.character-form").getByLabel("Title");
   await expect(titleInput).toHaveCSS("height", "42px");
   await expect(titleInput).toHaveCSS("padding-left", "12px");
   await expect(titleInput).toHaveCSS("font-size", "11px");
   await titleInput.focus();
   await expect(titleInput).toHaveCSS("border-left-color", "rgb(98, 232, 255)");
-  const summaryInput = page.getByLabel("Summary");
+  const summaryInput = page.locator("form.character-form").getByLabel("Summary");
   await expect(summaryInput).toHaveCSS("min-height", "110px");
   await expect(summaryInput).toHaveCSS("resize", "vertical");
   await expect(page.locator(".character-form-actions").first()).toHaveClass(/flex/);
@@ -154,7 +155,7 @@ test("guards internal navigation after a job edit", async ({ page, campaign }) =
   await expect(formGrid.locator("label").first()).toHaveClass(/max-\[760px\]:\[grid-column:1\/-1\]/);
   await expect(formGrid.locator("label").first()).toHaveClass(/max-\[420px\]:\[grid-column:auto\]/);
   await expect(page.getByRole("button", { name: "CANCEL", exact: true })).toHaveClass(/max-\[420px\]:w-full/);
-  await page.getByLabel("Title").fill("Unsaved Mission");
+  await page.locator("form.character-form").getByLabel("Title").fill("Unsaved Mission");
   await page.getByRole("button", { name: "Open navigation" }).click();
 
   const dialogPromise = page.waitForEvent("dialog");
@@ -182,7 +183,7 @@ test("guards internal navigation after a place edit", async ({ page, campaign })
   await expect(privateLock).not.toHaveClass(/field-lock/);
   await expect(privateLock).toHaveCSS("gap", "4px");
   await expect(privateLock).toHaveCSS("color", "rgb(255, 92, 154)");
-  await page.getByLabel("Name").fill("Unsaved Place");
+  await page.locator("form.character-form").getByLabel("Name").fill("Unsaved Place");
 
   const dialogPromise = page.waitForEvent("dialog");
   const navigationPromise = page.getByRole("link", { name: "Job board", exact: true }).click();
@@ -202,7 +203,7 @@ test("keeps place artwork frames in route-owned utilities", async ({ page, campa
   try {
     await page.goto(`/campaigns/${campaign.campaignId}/places`);
     await page.getByRole("button", { name: "ADD ROOT PLACE", exact: true }).click();
-    await page.getByLabel("Name").fill(placeName);
+    await page.locator("form.character-form").getByLabel("Name").fill(placeName);
     const saveResponsePromise = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith(`/api/campaigns/${campaign.campaignId}/places`));
     await page.getByRole("button", { name: "SAVE PLACE", exact: true }).click();
     const saveResponse = await saveResponsePromise;
@@ -356,7 +357,7 @@ test("keeps place search results in route-owned utilities", async ({ page, campa
   try {
     await page.goto(`/campaigns/${campaign.campaignId}/places`);
     await page.getByRole("button", { name: "ADD ROOT PLACE", exact: true }).click();
-    await page.getByLabel("Name").fill(placeName);
+    await page.locator("form.character-form").getByLabel("Name").fill(placeName);
     const saveResponsePromise = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith(`/api/campaigns/${campaign.campaignId}/places`));
     await page.getByRole("button", { name: "SAVE PLACE", exact: true }).click();
     const saveResponse = await saveResponsePromise;
@@ -428,7 +429,7 @@ test("renders shared form errors with utility styling", async ({ page, campaign 
   });
   await page.goto(`/campaigns/${campaign.campaignId}/places`);
   await page.getByRole("button", { name: "ADD ROOT PLACE" }).click();
-  await page.getByLabel("Name").fill("Failed Place");
+  await page.locator("form.character-form").getByLabel("Name").fill("Failed Place");
   await page.getByRole("button", { name: "SAVE PLACE", exact: true }).click();
 
   const error = page.getByRole("alert").filter({ hasText: "Place could not be saved." });

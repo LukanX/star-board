@@ -86,7 +86,7 @@ export default function FactionEditor({
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const { setDirty, clearDirty } = useDirtyForm();
+  const { setDirty, clearDirty, confirmNavigation } = useDirtyForm();
   const setDraft = (updater: (current: FactionDraft) => FactionDraft) => {
     setDirty();
     setDraftState(updater);
@@ -109,6 +109,7 @@ export default function FactionEditor({
     }));
   };
   const onCancel = () => {
+    if (!confirmNavigation()) return;
     clearDirty();
     parentOnCancel?.();
   };
@@ -116,6 +117,7 @@ export default function FactionEditor({
   useCampaignArtEditor({
     campaignId,
     kind: "faction",
+    visible: !assistantOpen,
     value: draft.artPath,
     trackUnsavedUploads: true,
     url: draft.artUrl,
@@ -130,6 +132,7 @@ export default function FactionEditor({
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!confirmNavigation("Save this record and discard the unapplied AI draft?", "ai")) return;
     setIsSaving(true);
     setError(null);
     try {
@@ -179,7 +182,7 @@ export default function FactionEditor({
             type="button"
           >
             <Sparkles size={14} />{" "}
-            {assistantOpen ? "CLOSE ASSISTANT" : "GENERATE FACTION"}
+            {assistantOpen ? "BACK TO EDITOR" : "OPEN AI WORKSPACE"}
           </button>
           <button
             aria-label="Close faction editor"
@@ -192,22 +195,32 @@ export default function FactionEditor({
           </button>
         </div>
       </div>
-      {assistantOpen ? (
-        <AiDraftAssistant
-          campaignId={campaignId}
-          endpoint="/api/ai/faction"
-          entityLabel="faction"
-          mode={faction ? "refine" : "create"}
-          requestFields={{ name: draft.name, status: draft.status }}
-          currentDraft={{
-            name: draft.name,
-            status: draft.status,
-            description: draft.description,
-            playerNotes: draft.playerNotesMarkdown,
-            gmNotes: draft.gmNotesMarkdown,
-            visualPrompt: draft.artSubject,
-          }}
-          fields={[
+      <AiDraftAssistant
+        open={assistantOpen}
+        onBack={() => setAssistantOpen(false)}
+        onDirtyChange={(dirty) => (dirty ? setDirty("ai") : clearDirty("ai"))}
+        campaignId={campaignId}
+        endpoint="/api/ai/faction"
+        entityLabel="faction"
+        mode={faction ? "refine" : "create"}
+        requestFields={{ name: draft.name, status: draft.status }}
+        currentDraft={{
+          name: draft.name,
+          status: draft.status,
+          description: draft.description,
+          playerNotes: draft.playerNotesMarkdown,
+          gmNotes: draft.gmNotesMarkdown,
+          visualPrompt: draft.artSubject,
+        }}
+        briefFields={[
+          { key: "name", label: "Name", maxLength: 160 },
+          { key: "status", label: "Status", maxLength: 80 },
+        ]}
+        protectedFieldKeys={[
+          ...(draft.name ? ["name"] : []),
+          ...(draft.status ? ["status"] : []),
+        ]}
+        fields={[
             { key: "name", label: "Name", maxLength: 160 },
             { key: "status", label: "Status", maxLength: 80 },
             {
@@ -234,21 +247,21 @@ export default function FactionEditor({
               maxLength: 1600,
               multiline: true,
             },
-          ]}
-          onApply={(candidate) =>
-            setDraft((current) => ({
-              ...current,
-              name: candidate.name ?? current.name,
-              status: candidate.status ?? current.status,
-              description: candidate.description ?? current.description,
-              playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown,
-              gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
-              artSubject: candidate.visualPrompt ?? current.artSubject,
-            }))
-          }
-        />
-      ) : null}
+        ]}
+        onApply={(candidate) =>
+          setDraft((current) => ({
+            ...current,
+            name: candidate.name ?? current.name,
+            status: candidate.status ?? current.status,
+            description: candidate.description ?? current.description,
+            playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown,
+            gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
+            artSubject: candidate.visualPrompt ?? current.artSubject,
+          }))
+        }
+      />
       <form
+        hidden={assistantOpen}
         className="character-form grid gap-[13px] [&_label]:grid [&_label]:gap-[7px] [&_label]:text-[var(--dim)] [&_label]:font-mono [&_label]:text-[8px] [&_label]:tracking-[.12em] [&_input]:w-full [&_input]:border [&_input]:border-[rgba(139,151,169,.28)] [&_input]:outline-0 [&_input]:p-[10px_12px] [&_input]:bg-[#0a1118] [&_input]:text-[var(--ink)] [&_input]:font-mono [&_input]:text-[11px] [&_input]:h-[42px] [&_input:focus]:border-[var(--cyan)] [&_input:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_input::placeholder]:text-[#4d5a6b] [&_textarea]:w-full [&_textarea]:border [&_textarea]:border-[rgba(139,151,169,.28)] [&_textarea]:outline-0 [&_textarea]:p-[10px_12px] [&_textarea]:bg-[#0a1118] [&_textarea]:text-[var(--ink)] [&_textarea]:font-mono [&_textarea]:text-[11px] [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:leading-[1.55] [&_textarea:focus]:border-[var(--cyan)] [&_textarea:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_textarea::placeholder]:text-[#4d5a6b]"
         onSubmit={save}
       >

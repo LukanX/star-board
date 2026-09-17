@@ -487,7 +487,7 @@ test("replaces every saved detail record with its pre-populated editor", async (
       .getByRole("button", { name: `Edit ${fixture.jobTitle}`, exact: true })
       .click();
     await expect(page.locator("[data-jobs-grid]")).toHaveCount(0);
-    await expect(page.getByLabel("Title")).toHaveValue(fixture.jobTitle);
+    await expect(page.locator("form.character-form").getByLabel("Title")).toHaveValue(fixture.jobTitle);
     await expect(
       page.locator("form.character-form button[type=submit]").first(),
     ).toHaveText("SAVE MISSION");
@@ -531,7 +531,8 @@ test("focuses child-place creation and preselects the hidden parent", async ({
         exact: true,
       }),
     ).toHaveCount(0);
-    await expect(page.getByLabel("Parent")).toHaveValue(fixture.placeId);
+    const placeForm = page.locator("form.character-form");
+    await expect(placeForm.getByLabel("Parent")).toHaveValue(fixture.placeId);
     const saveButton = page.locator("form.character-form button[type=submit]").first();
     await expect(saveButton).toHaveText("SAVE PLACE");
     await expect(saveButton.locator("svg.lucide-save")).toHaveCount(1);

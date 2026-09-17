@@ -961,4 +961,186 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(gmUpdate.error).toBeNull();
     expect(gmUpdate.data?.name).toBe("GM Renamed Player Character");
   });
+
+  it("scopes character portrait AI runs to GMs and the saved character owner", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    if (!gmUser) throw new Error("The local RLS GM session has no user.");
+
+    const membership = await playerClient
+      .from("campaign_members")
+      .select("role")
+      .eq("campaign_id", campaignId)
+      .eq("user_id", playerId)
+      .maybeSingle();
+    expect(membership.error).toBeNull();
+
+    if (!membership.data) {
+      const token = `portrait-${randomUUID()}-local-rls-token`;
+      const tokenHash = createHash("sha256").update(token).digest("hex");
+      const link = await gmClient.from("campaign_join_links").insert({
+        campaign_id: campaignId,
+        created_by: gmUser.id,
+        token_hash: tokenHash,
+        max_uses: 1,
+      });
+      expect(link.error).toBeNull();
+
+      const redeemed = await playerClient.rpc("redeem_campaign_join_link", { join_token_hash: tokenHash });
+      expect(redeemed.error).toBeNull();
+    }
+
+    let ownerCharacterId: string | null = null;
+    let gmCharacterId: string | null = null;
+    let foreignCampaignId: string | null = null;
+    let foreignCharacterId: string | null = null;
+    const runIds: string[] = [];
+    const runBase = {
+      kind: "image",
+      mode: "create",
+      model: "test/image-model",
+      prompt_hash: "a".repeat(64),
+      purpose: "entity-art",
+      target_kind: "character",
+      aspect_ratio: "1:1",
+      size: "1024x1024",
+      image_subject: "A saved character portrait.",
+      status: "pending",
+    };
+
+    try {
+      const ownerCharacter = await playerClient.from("characters").insert({
+        campaign_id: campaignId,
+        owner_id: playerId,
+        name: "Portrait Owner Character",
+      }).select("id").single();
+      expect(ownerCharacter.error).toBeNull();
+      ownerCharacterId = ownerCharacter.data?.id ?? null;
+      if (!ownerCharacterId) throw new Error("The portrait owner character was not created.");
+
+      const ownerRun = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: ownerCharacterId,
+        ...runBase,
+      }).select("id, requested_by, target_character_id").single();
+      expect(ownerRun.error).toBeNull();
+      const ownerRunId = ownerRun.data?.id;
+      if (!ownerRunId) throw new Error("The GM-created portrait run was not created.");
+      runIds.push(ownerRunId);
+
+      const ownerRead = await playerClient
+        .from("ai_generation_runs")
+        .select("id, requested_by, target_character_id")
+        .eq("id", ownerRunId)
+        .single();
+      expect(ownerRead.error).toBeNull();
+      expect(ownerRead.data).toMatchObject({ id: ownerRunId, requested_by: gmUser.id, target_character_id: ownerCharacterId });
+
+      const forgedRequester = await playerClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: ownerCharacterId,
+        ...runBase,
+      });
+      expect(forgedRequester.error).not.toBeNull();
+
+      const disabledPlayerRun = await playerClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: playerId,
+        target_character_id: ownerCharacterId,
+        ...runBase,
+      });
+      expect(disabledPlayerRun.error).not.toBeNull();
+
+      const gmCharacter = await gmClient.from("characters").insert({
+        campaign_id: campaignId,
+        owner_id: gmUser.id,
+        name: "GM Portrait Character",
+      }).select("id").single();
+      expect(gmCharacter.error).toBeNull();
+      gmCharacterId = gmCharacter.data?.id ?? null;
+      if (!gmCharacterId) throw new Error("The GM portrait character was not created.");
+
+      const gmTargetRun = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: gmCharacterId,
+        ...runBase,
+      }).select("id").single();
+      expect(gmTargetRun.error).toBeNull();
+      const gmTargetRunId = gmTargetRun.data?.id;
+      if (!gmTargetRunId) throw new Error("The GM-targeted portrait run was not created.");
+      runIds.push(gmTargetRunId);
+
+      const hiddenFromOtherPlayer = await playerClient
+        .from("ai_generation_runs")
+        .select("id")
+        .eq("id", gmTargetRunId);
+      expect(hiddenFromOtherPlayer.error).toBeNull();
+      expect(hiddenFromOtherPlayer.data).toEqual([]);
+
+      const blockedUpdate = await playerClient
+        .from("ai_generation_runs")
+        .update({ status: "failed" })
+        .eq("id", ownerRunId)
+        .select("id");
+      expect(blockedUpdate.error).toBeNull();
+      expect(blockedUpdate.data).toEqual([]);
+
+      const stylePreviewTarget = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: ownerCharacterId,
+        ...runBase,
+        purpose: "style-preview",
+      });
+      expect(stylePreviewTarget.error).not.toBeNull();
+
+      const foreignCampaign = await gmClient.rpc("create_campaign", {
+        campaign_name: `RLS Portrait Boundary ${Date.now()}`,
+        campaign_description: "Used to verify portrait target boundaries.",
+      });
+      expect(foreignCampaign.error).toBeNull();
+      foreignCampaignId = foreignCampaign.data as string;
+
+      const foreignCharacter = await gmClient.from("characters").insert({
+        campaign_id: foreignCampaignId,
+        owner_id: gmUser.id,
+        name: "Foreign Portrait Character",
+      }).select("id").single();
+      expect(foreignCharacter.error).toBeNull();
+      foreignCharacterId = foreignCharacter.data?.id ?? null;
+      if (!foreignCharacterId) throw new Error("The foreign portrait character was not created.");
+
+      const crossCampaignTarget = await gmClient.from("ai_generation_runs").insert({
+        campaign_id: campaignId,
+        requested_by: gmUser.id,
+        target_character_id: foreignCharacterId,
+        ...runBase,
+      });
+      expect(crossCampaignTarget.error).not.toBeNull();
+
+      const deletedOwner = await playerClient
+        .from("characters")
+        .delete()
+        .eq("id", ownerCharacterId)
+        .eq("campaign_id", campaignId)
+        .select("id")
+        .single();
+      expect(deletedOwner.error).toBeNull();
+
+      const hiddenAfterDelete = await playerClient
+        .from("ai_generation_runs")
+        .select("id")
+        .eq("id", ownerRunId);
+      expect(hiddenAfterDelete.error).toBeNull();
+      expect(hiddenAfterDelete.data).toEqual([]);
+    } finally {
+      if (runIds.length) await gmClient.from("ai_generation_runs").delete().in("id", runIds);
+      if (ownerCharacterId) await gmClient.from("characters").delete().eq("id", ownerCharacterId);
+      if (gmCharacterId) await gmClient.from("characters").delete().eq("id", gmCharacterId);
+      if (foreignCharacterId) await gmClient.from("characters").delete().eq("id", foreignCharacterId);
+      if (foreignCampaignId) await gmClient.from("campaigns").delete().eq("id", foreignCampaignId);
+    }
+  });
 });

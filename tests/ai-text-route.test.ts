@@ -87,6 +87,45 @@ describe("structured AI assistance routes", () => {
     expect(payload.error).toBe("GM access is required for AI NPC assistance.");
   });
 
+  it("preserves protected NPC fields when a provider changes them", async () => {
+    const providerDraft = {
+      name: "Changed by AI",
+      species: "Human",
+      role: "Smuggler",
+      shortDescription: "A guarded medic with a practical streak.",
+      playerNotes: "She keeps emergency supplies close.",
+      gmNotes: "She is hiding a debt to the station boss.",
+      motivation: "Keep the clinic open.",
+      visualPrompt: "A tired medic in a patched station clinic.",
+    };
+    mocks.generateJson.mockResolvedValue({ data: providerDraft, model: "openrouter/fallback", generationId: "npc-refinement-1" });
+
+    const response = await generateNpc(request({
+      ...baseInput,
+      mode: "refine",
+      name: "Kept Name",
+      species: "Android",
+      role: "Medic",
+      feedback: "Make the character warmer without changing their identity.",
+      protectedFields: ["name", "species"],
+      currentDraft: {
+        name: "Kept Name",
+        species: "Android",
+        role: "Medic",
+        shortDescription: "A guarded medic.",
+        playerNotes: "She keeps emergency supplies close.",
+        gmNotes: "She owes the station boss.",
+        motivation: "Keep the clinic open.",
+        visualPrompt: "A medic in a station clinic.",
+      },
+    }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.draft).toMatchObject({ name: "Kept Name", species: "Android", role: "Smuggler" });
+    expect(mocks.buildNpcPrompt).toHaveBeenCalledWith(expect.objectContaining({ feedback: "Make the character warmer without changing their identity.", protectedFields: ["name", "species"] }), expect.anything());
+  });
+
   it("returns a validated faction draft and records metadata", async () => {
     const draft = { name: "The Glass Meridian", status: "active", description: "A trade consortium with a public relief arm.", playerNotes: "They offer safe passage to crews who keep their word.", gmNotes: "The relief arm is a cover for a quiet intelligence network.", visualPrompt: "A fractured glass compass over a star chart." };
     mocks.generateJson.mockResolvedValue({ data: draft, model: "openrouter/fallback", generationId: "text-run-1", usage: { inputTokens: 12, outputTokens: 34, cost: 0.001 } });

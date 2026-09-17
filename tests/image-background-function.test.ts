@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   getAiProviderFailure: vi.fn(),
   logAiProviderFailure: vi.fn(),
   getCampaignCredentialForGeneration: vi.fn(),
+  loadCharacterPortraitAccess: vi.fn(),
+  canUseCharacterPortraitAi: vi.fn((access: { role: string; isOwner: boolean }, allowPlayerAi: boolean) => access.role === "gm" || (access.isOwner && allowPlayerAi)),
 }));
 
 vi.mock("@/lib/ai/client", () => ({ generateImage: mocks.generateImage }));
@@ -22,6 +24,7 @@ vi.mock("@/lib/ai/errors", () => ({
   logAiProviderFailure: mocks.logAiProviderFailure,
 }));
 vi.mock("@/lib/ai/campaign-credentials", () => ({ getCampaignCredentialForGeneration: mocks.getCampaignCredentialForGeneration }));
+vi.mock("@/lib/ai/character-portrait-access", () => ({ loadCharacterPortraitAccess: mocks.loadCharacterPortraitAccess, canUseCharacterPortraitAi: mocks.canUseCharacterPortraitAi }));
 
 import handler, { config } from "@/netlify/functions/generate-image-background";
 
@@ -95,7 +98,7 @@ describe("generate-image-background", () => {
       SUPABASE_SECRET_KEY: secret,
       NEXT_PUBLIC_SUPABASE_URL: "https://supabase.example",
     });
-    mocks.getCampaignCredentialForGeneration.mockResolvedValue({ apiKey: "campaign-key" });
+    mocks.getCampaignCredentialForGeneration.mockResolvedValue({ apiKey: "campaign-key", status: { allowPlayerAi: true } });
     mocks.getAiProviderFailure.mockImplementation((error: unknown, fallback: string) => ({
       message: error instanceof Error ? error.message : fallback,
     }));
@@ -183,5 +186,55 @@ describe("generate-image-background", () => {
     expect(response.status).toBe(202);
     expect(mocks.generateImage).not.toHaveBeenCalled();
     expect(imageJobPendingTimeoutMs).toBe(4 * 60 * 1000);
+  });
+
+  it("fails a character job whose saved target has disappeared", async () => {
+    const { supabase, completionQuery } = createSupabaseMock({
+      claim: {
+        data: {
+          id: job.generationRunId,
+          campaign_id: "00000000-0000-4000-8000-000000000001",
+          requested_by: "00000000-0000-4000-8000-000000000002",
+          purpose: "entity-art",
+          kind: "image",
+          target_kind: "character",
+          target_character_id: "00000000-0000-4000-8000-000000000004",
+        },
+      },
+    });
+    mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
+    mocks.loadCharacterPortraitAccess.mockResolvedValue({ failure: "not-found" });
+
+    const response = await handler(createRequest());
+
+    expect(response.status).toBe(202);
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "failed", error_message: "The saved character for this image job is no longer available." }));
+  });
+
+  it("checks Player AI again before a queued owner portrait reaches the provider", async () => {
+    const characterId = "00000000-0000-4000-8000-000000000004";
+    const { supabase, completionQuery } = createSupabaseMock({
+      claim: {
+        data: {
+          id: job.generationRunId,
+          campaign_id: "00000000-0000-4000-8000-000000000001",
+          requested_by: "00000000-0000-4000-8000-000000000002",
+          purpose: "entity-art",
+          kind: "image",
+          target_kind: "character",
+          target_character_id: characterId,
+        },
+      },
+    });
+    mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
+    mocks.loadCharacterPortraitAccess.mockResolvedValue({ access: { character: { id: characterId }, role: "player", isOwner: true } });
+    mocks.getCampaignCredentialForGeneration.mockResolvedValue({ apiKey: "campaign-key", status: { allowPlayerAi: false } });
+
+    const response = await handler(createRequest());
+
+    expect(response.status).toBe(202);
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "failed", error_message: "Player AI assistance is no longer enabled for this campaign." }));
   });
 });

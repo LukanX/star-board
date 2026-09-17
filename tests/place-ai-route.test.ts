@@ -133,6 +133,39 @@ describe("AI place assistance route", () => {
     }));
   });
 
+  it("preserves pinned place fields when the provider changes them", async () => {
+    const providerDraft = {
+      name: "A Different Door",
+      kind: "room",
+      description: "A revised description.",
+      playerNotes: "Revised public notes.",
+      gmNotes: "Revised GM notes.",
+      visualPrompt: "A revised blue door.",
+    };
+    mocks.generateJson.mockResolvedValue({ data: providerDraft, model: "openai/gpt-4o-mini" });
+
+    const response = await generatePlace(request({
+      campaignId,
+      mode: "refine",
+      name: "The Blue Door",
+      kind: "room",
+      feedback: "Make the description more mysterious.",
+      protectedFields: ["name"],
+      currentDraft: {
+        name: "The Blue Door",
+        kind: "room",
+        description: "An earlier description.",
+        playerNotes: "Earlier public notes.",
+        gmNotes: "Earlier GM notes.",
+        visualPrompt: "An earlier blue door.",
+      },
+    }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.draft).toEqual({ ...providerDraft, name: "The Blue Door" });
+  });
+
   it("rejects an invalid Place parent before calling the provider", async () => {
     mocks.loadPlaceAiContext.mockResolvedValue({ error: "Place parent must belong to this campaign.", invalid: true });
 

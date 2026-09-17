@@ -218,7 +218,7 @@ export async function loadMissionAiReferences(supabase: SupabaseClient, campaign
   return { references };
 }
 
-export async function recordAiGeneration(supabase: SupabaseClient, payload: { campaignId: string; userId: string; kind: GenerationKind; mode: "create" | "refine"; model: string; promptHash: string; status: GenerationStatus; purpose?: GenerationPurpose; visualStyleHash?: string; provider?: string; effectiveModel?: string; generationId?: string; inputTokens?: number; outputTokens?: number; costUsd?: number }) {
+export async function recordAiGeneration(supabase: SupabaseClient, payload: { campaignId: string; userId: string; kind: GenerationKind; mode: "create" | "refine"; model: string; promptHash: string; status: GenerationStatus; purpose?: GenerationPurpose; visualStyleHash?: string; provider?: string; effectiveModel?: string; generationId?: string; inputTokens?: number; outputTokens?: number; costUsd?: number; targetCharacterId?: string }) {
   return supabase.from("ai_generation_runs").insert({
     campaign_id: payload.campaignId,
     requested_by: payload.userId,
@@ -234,6 +234,7 @@ export async function recordAiGeneration(supabase: SupabaseClient, payload: { ca
     ...(payload.inputTokens !== undefined ? { input_tokens: payload.inputTokens } : {}),
     ...(payload.outputTokens !== undefined ? { output_tokens: payload.outputTokens } : {}),
     ...(payload.costUsd !== undefined ? { cost_usd: payload.costUsd } : {}),
+    ...(payload.targetCharacterId ? { target_character_id: payload.targetCharacterId } : {}),
     status: payload.status,
   });
 }

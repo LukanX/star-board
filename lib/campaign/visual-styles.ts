@@ -118,6 +118,7 @@ export function visualStyleRpcStatus(error: { code?: string | null }) {
   switch (error.code) {
     case "42501": return 403;
     case "P0002": return 404;
+    case "P0001": return 409;
     case "40001": return 409;
     case "23505": return 409;
     case "22023": return 400;
@@ -128,6 +129,7 @@ export function visualStyleRpcStatus(error: { code?: string | null }) {
 export function visualStyleRpcMessage(error: { code?: string | null; message?: string | null }, fallback: string) {
   if (error.code === "42501") return "Campaign GM access is required to manage visual styles.";
   if (error.code === "P0002") return "The visual style was not found.";
+  if (error.code === "P0001") return "This visual style changed in another request. Reload it and try again.";
   if (error.code === "40001") return "This visual style changed in another request. Reload it and try again.";
   if (error.code === "23505") return "A visual style with this name already exists in the campaign.";
   if (error.code === "22023") return error.message ?? fallback;

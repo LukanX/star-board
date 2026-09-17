@@ -13,6 +13,7 @@ export type ImageJobTargetKind = "character" | "npc" | "faction" | "job" | "plac
 export type ImageDraft = {
   generationRunId: string;
   targetKind: ImageJobTargetKind;
+  characterId?: string;
   purpose: "entity-art" | "style-preview";
   mode: "create" | "refine";
   subject: string;
@@ -34,6 +35,7 @@ export type ImageBackgroundJob = {
   generationRunId: string;
   status: "pending" | "running";
   targetKind: ImageJobTargetKind;
+  characterId?: string;
   purpose?: "entity-art" | "style-preview";
   mode: "create" | "refine";
   subject: string;
@@ -167,6 +169,7 @@ export async function waitForImageBackgroundJob(
         return {
           generationRunId: job.generationRunId,
           targetKind: job.targetKind,
+          ...(job.characterId ? { characterId: job.characterId } : {}),
           purpose: job.purpose ?? "entity-art",
           mode: job.mode,
           subject: job.subject,

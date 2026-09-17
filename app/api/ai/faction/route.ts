@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
 import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
@@ -7,7 +8,7 @@ import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { buildFactionPrompt } from "@/lib/ai/prompts";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
-import { factionDraftSchema, factionGenerationInputSchema } from "@/lib/validation/ai";
+import { factionDraftSchema, factionGenerationInputSchema, factionReviewDraftSchema } from "@/lib/validation/ai";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
@@ -88,13 +89,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The AI response did not match the faction draft format." }, { status: 502 });
     }
 
+    const reviewedDraft = factionReviewDraftSchema.safeParse(
+      mergeProtectedDraftFields(
+        draft.data,
+        input.data.currentDraft as Record<string, unknown> | undefined,
+        input.data.protectedFields,
+      ),
+    );
+
+    if (!reviewedDraft.success) {
+      await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "faction", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult?.model ?? selectedModel.id, generationId: providerResult?.generationId, inputTokens: providerResult?.usage?.inputTokens, outputTokens: providerResult?.usage?.outputTokens, costUsd: providerResult?.usage?.cost, status: "failed" });
+      return NextResponse.json({ error: "The reviewed faction draft is outside the allowed field limits." }, { status: 502 });
+    }
+
     const { error: auditError } = await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "faction", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult?.model ?? selectedModel.id, generationId: providerResult?.generationId, inputTokens: providerResult?.usage?.inputTokens, outputTokens: providerResult?.usage?.outputTokens, costUsd: providerResult?.usage?.cost, status: "complete" });
 
     if (auditError) {
       return NextResponse.json({ error: "Faction draft metadata could not be saved." }, { status: 503 });
     }
 
-    return NextResponse.json({ draft: draft.data, model: providerResult?.model ?? selectedModel.id });
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult?.model ?? selectedModel.id });
   } catch {
     return NextResponse.json({ error: "Faction assistance is temporarily unavailable." }, { status: 503 });
   }

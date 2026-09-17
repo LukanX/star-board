@@ -418,7 +418,7 @@ test("keeps faction emblems in route-owned utilities", async ({
     await page
       .getByRole("button", { name: "ADD FACTION", exact: true })
       .click();
-    await page.getByLabel("Name").fill(factionName);
+    await page.locator("form.character-form").getByLabel("Name").fill(factionName);
     const saveResponsePromise = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&

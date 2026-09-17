@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { imageBackgroundJobSchema, type ImageBackgroundJob } from "@/lib/validation/image";
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/service";
 
 export const imageBackgroundFunctionName = "generate-image-background";
 
@@ -42,6 +43,33 @@ export async function dispatchImageBackgroundJob(requestUrl: string, job: ImageB
   if (!response.ok) {
     throw new Error(`Image background function returned HTTP ${response.status}.`);
   }
+}
+
+export async function markImageBackgroundDispatchFailed(input: {
+  campaignId: string;
+  generationRunId: string;
+  requestedBy: string;
+  targetCharacterId: string | null;
+}) {
+  const supabase = getSupabaseServiceRoleClient();
+  let query = supabase
+    .from("ai_generation_runs")
+    .update({
+      status: "failed",
+      status_updated_at: new Date().toISOString(),
+      error_message: "The image background worker could not be reached.",
+    })
+    .eq("id", input.generationRunId)
+    .eq("campaign_id", input.campaignId)
+    .eq("requested_by", input.requestedBy)
+    .eq("status", "pending");
+
+  query = input.targetCharacterId
+    ? query.eq("target_character_id", input.targetCharacterId)
+    : query.is("target_character_id", null);
+
+  const { error } = await query;
+  if (error) throw new Error("The image background failure could not be recorded.");
 }
 
 export function parseImageBackgroundJob(body: unknown) {

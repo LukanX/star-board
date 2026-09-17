@@ -56,6 +56,7 @@ describe("image generation schemas", () => {
       campaignId: "00000000-0000-4000-8000-000000000001",
       mode: "refine",
       targetKind: "character",
+      characterId: "00000000-0000-4000-8000-000000000003",
       subject: "A pilot with a cracked visor",
       refinement: "Make the lighting warmer and add a scar over the left eyebrow.",
       currentPrompt: "A pilot in a flight suit, portrait composition.",
@@ -129,6 +130,7 @@ describe("image generation schemas", () => {
       campaignId: "00000000-0000-4000-8000-000000000001",
       mode: "refine",
       targetKind: "character",
+      characterId: "00000000-0000-4000-8000-000000000003",
       subject: "A pilot with a cracked visor",
       currentPrompt: "x".repeat(2000),
     });

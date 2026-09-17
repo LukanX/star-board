@@ -159,6 +159,28 @@ describe("character routes", () => {
     expect(query.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
   });
 
+  it("supports artwork-only portrait updates without changing character identity", async () => {
+    const query = createQuery({ id: characterId, owner_id: userId, name: "Nova", art_path: "new-portrait.png" });
+    const supabase = { from: vi.fn().mockReturnValue(query) };
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await updateCharacter(request({
+      artSubject: "A silver-eyed mechanic in a worn flight jacket.",
+      artPath: "campaign-1/user-1/new-portrait.png",
+      artPrompt: "A cinematic portrait of Nova Vex.",
+      artProvider: "openrouter",
+    }, "PATCH"), characterParams());
+
+    expect(response.status).toBe(200);
+    expect(query.update).toHaveBeenCalledWith({
+      art_subject: "A silver-eyed mechanic in a worn flight jacket.",
+      art_path: "campaign-1/user-1/new-portrait.png",
+      art_prompt: "A cinematic portrait of Nova Vex.",
+      art_provider: "openrouter",
+      updated_by: userId,
+    });
+  });
+
   it("deletes only the requested character in the requested campaign", async () => {
     const query = createQuery({ id: characterId });
     const supabase = { from: vi.fn().mockReturnValue(query) };
