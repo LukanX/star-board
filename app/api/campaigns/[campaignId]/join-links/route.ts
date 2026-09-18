@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireCampaignGM } from "@/lib/auth/permissions";
-import { getPublicEnv } from "@/lib/env";
+import { getPublicAppOrigin } from "@/lib/app-url";
 import { createJoinLinkSchema } from "@/lib/validation/campaign";
 
 export const runtime = "nodejs";
@@ -49,8 +49,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unable to create join link." }, { status: 400 });
     }
 
-    const env = getPublicEnv();
-    const appUrl = env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+    const appUrl = getPublicAppOrigin(new URL(request.url).origin);
 
     return NextResponse.json({
       link: data,

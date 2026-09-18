@@ -52,8 +52,11 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
 3. Apply `supabase/migrations/0001_initial.sql` through `0027_visual_style_save_previews.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
-4. In Supabase Auth, add `http://localhost:3000/auth/callback` to the allowed redirect URLs.
-5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying.
+4. In Supabase Auth URL Configuration, set the Site URL to the deployed origin and add the deployed `/auth/callback` URL to the allowed redirect URLs. Keep localhost URLs only as additional development redirects.
+5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying. This public variable is embedded during the Next.js build, so changing it in Netlify requires a new deploy.
+6. In the hosted Reset Password email template, use `{{ .ConfirmationURL }}` for the action link. Do not hardcode `localhost` or construct the action link from `{{ .SiteURL }}` when the app supplies a redirect URL.
+
+Star Board campaign invitations are copyable `/join/<token>` links, not Supabase Auth invitation emails. The join-link route uses `NEXT_PUBLIC_APP_URL` and falls back to the request origin when the variable is absent.
 
 ### Netlify image generation
 

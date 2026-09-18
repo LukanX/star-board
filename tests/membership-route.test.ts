@@ -142,6 +142,21 @@ describe("membership and join-link routes", () => {
     expect(insert.token_hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("uses the request origin when no public app URL is configured", async () => {
+    const supabase = createSupabaseMock();
+    mocks.getPublicEnv.mockReturnValue({ NEXT_PUBLIC_APP_URL: undefined });
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+
+    const response = await createJoinLink(
+      request({}, `https://preview.star-board.example/api/campaigns/${campaignId}/join-links`),
+      params(),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(payload.joinUrl).toMatch(/^https:\/\/preview\.star-board\.example\/join\/[A-Za-z0-9_-]+$/);
+  });
+
   it("redeems a join token through its SHA-256 hash", async () => {
     const supabase = createSupabaseMock();
     supabase.rpc.mockResolvedValue({ data: campaignId, error: null });

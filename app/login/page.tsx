@@ -26,6 +26,7 @@ import {
   eyebrowBrightClassName,
   liveDotBrightClassName,
 } from "@/components/ui/terminalStyles";
+import { getPasswordResetRedirect } from "@/lib/app-url";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type AuthMode = "create" | "signin" | "reset";
@@ -58,7 +59,7 @@ export default function LoginPage() {
       const supabase = getSupabaseBrowserClient();
       if (isResettingPassword) {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/callback?next=/login/reset-password`,
+          redirectTo: getPasswordResetRedirect(window.location.origin),
         });
 
         if (error) {
