@@ -23,6 +23,7 @@ import { campaignNavigation } from "@/lib/campaign/navigation";
 import {
   campaignSectionPath,
   campaignsPath,
+  accountPath,
   getCampaignSectionFromPath,
   type CampaignSection,
 } from "@/lib/campaign/routes";
@@ -82,6 +83,7 @@ export default function CampaignRouteShell({
       sidebar={
         <CampaignSidebar
           activeView={activeSection}
+          accountHref={accountPath(campaignId)}
           campaignName={campaignName}
           campaignSwitchHref={campaignsPath()}
           displayName={displayName}

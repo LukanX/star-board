@@ -154,9 +154,9 @@ export default function VisualStylePreview({ campaignId, style, visualStyleOverr
             <button className={secondaryButtonClassName} disabled={isGenerating || isSaving} type="button" onClick={() => void generate()}>
               {isGenerating ? <LoaderCircle className="animate-spin" size={13} /> : <RefreshCw size={13} />} {isGenerating ? "GENERATING..." : previewUrl ? "GENERATE NEW PREVIEW" : "GENERATE PREVIEW"}
             </button>
-            {style && draft?.temporaryPath && !saved && canRetain ? <button className={primaryButtonClassName} disabled={isGenerating || isSaving} type="button" onClick={() => void savePreview()}>{isSaving ? <LoaderCircle className="animate-spin" size={13} /> : <Save size={13} />} {isSaving ? "SAVING..." : "RETAIN THIS PREVIEW"}</button> : null}
+            {style && draft?.temporaryPath && !saved && canRetain ? <button className={primaryButtonClassName} disabled={isGenerating || isSaving} type="button" onClick={() => void savePreview()}>{isSaving ? <LoaderCircle className="animate-spin" size={13} /> : <Save size={13} />} {isSaving ? "SAVING..." : "SAVE THIS PREVIEW"}</button> : null}
           </div>
-          <span className="text-[var(--dim)] font-mono text-[8px] tracking-[.06em]">{saved ? "LATEST PREVIEW RETAINED WITH THIS STYLE." : draft && !canRetain ? "GENERATED PREVIEW // SAVE THE STYLE TO RETAIN IT." : style?.preview ? "SAVED PREVIEW // GENERATE A NEW ONE TO REPLACE IT." : style ? "UNSAVED PREVIEWS ARE CLEANED UP AUTOMATICALLY." : "SAVE THE STYLE FIRST TO RETAIN THIS PREVIEW."}</span>
+          <span className="text-[var(--dim)] font-mono text-[8px] tracking-[.06em]">{saved ? "LATEST PREVIEW SAVED WITH THIS STYLE." : draft && !canRetain ? "GENERATED PREVIEW // SAVE THE STYLE TO KEEP IT." : style?.preview ? "SAVED PREVIEW // GENERATE A NEW ONE TO REPLACE IT." : style ? "UNSAVED PREVIEWS ARE CLEANED UP AUTOMATICALLY." : "SAVE THE STYLE FIRST TO KEEP THIS PREVIEW."}</span>
         </div>
       </div>
     </div>

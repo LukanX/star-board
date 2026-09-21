@@ -99,18 +99,18 @@ export default function JobsRouteView({
         error?: string;
       };
       if (!response.ok)
-        throw new Error(result.error ?? "Vote could not be synchronized.");
+        throw new Error(result.error ?? "Vote could not be saved.");
       await refreshJobs();
       setStatusMessage(
         job.voted
           ? `Vote removed from ${job.title}.`
-          : `Vote locked on ${job.title}.`,
+          : `Vote recorded for ${job.title}.`,
       );
     } catch (voteError) {
       setError(
         voteError instanceof Error
           ? voteError.message
-          : "Vote could not be synchronized.",
+          : "Vote could not be saved.",
       );
     }
   };
@@ -158,9 +158,9 @@ export default function JobsRouteView({
 
   return (
     <PageLayout
-      eyebrow={`MISSION CONTROL // ${count("open")} OPEN`}
+      eyebrow={`JOB BOARD // ${count("open")} OPEN`}
       title="Job board"
-      description="Potential missions, ranked by the crew. Choose the signal that pulls hardest."
+      description="Potential missions, ranked by the crew. Vote for the mission your group wants most."
       action={isGM && !editorOpen ? "NEW MISSION" : undefined}
       actionIcon={<CirclePlus size={16} />}
       onAction={() => openEditor()}
@@ -247,7 +247,7 @@ export default function JobsRouteView({
           title="No missions in this view."
           message={
             filter === "drafts"
-              ? "Draft the next signal when the GM is ready."
+              ? "Create the next mission when the GM is ready."
               : "The campaign board has no missions here yet."
           }
         />

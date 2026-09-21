@@ -567,10 +567,10 @@ describe("PageLayout", () => {
 
 describe("AppStatus", () => {
   it("renders the status message and action inside the status surface", () => {
-    const markup = renderToStaticMarkup(<AppStatus action={<button type="button">RETRY</button>} message="Checking campaign access." title="Loading campaign signal." />);
+    const markup = renderToStaticMarkup(<AppStatus action={<button type="button">RETRY</button>} message="Checking campaign access." title="Loading campaign..." />);
 
     expect(markup).toMatch(/class="[^\"]*\bapp-status-shell\b[^\"]*\bgrid\b[^\"]*"/);
-    expect(markup).toContain("Loading campaign signal.");
+    expect(markup).toContain("Loading campaign...");
     expect(markup).toContain("Checking campaign access.");
     expect(markup).toContain("RETRY");
   });

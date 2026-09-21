@@ -54,6 +54,21 @@ test("preserves mobile navigation and content spacing", async ({
   await expect(sidebar).toHaveClass(/max-\[760px\]:-translate-x-\[105%\]/);
 });
 
+test("opens account configuration from the campaign identity", async ({
+  page,
+  campaign,
+}) => {
+  await page.goto(`/campaigns/${campaign.campaignId}`);
+
+  await page.getByRole("link", { name: "Open account settings" }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/account\\?campaign=${campaign.campaignId}$`));
+  await expect(page.getByRole("heading", { name: "Set your account name." })).toBeVisible();
+  await expect(page.getByLabel("GLOBAL PROFILE NAME")).toBeVisible();
+  await expect(page.getByLabel("ACCOUNT EMAIL")).toBeVisible();
+  await expect(page.getByLabel("YOUR DISPLAY NAME")).toBeVisible();
+});
+
 test("preserves campaign AI settings action sizing", async ({
   page,
   campaign,
@@ -161,7 +176,7 @@ test("returns from a successful invite to the canonical campaign route", async (
     .getByRole("button", { name: "ACCEPT INVITATION", exact: true })
     .click();
   await expect(
-    page.getByText("Returning to the cockpit...", { exact: false }),
+    page.getByText("Campaign access confirmed. Returning to your campaign...", { exact: false }),
   ).toBeVisible();
 
   await expect(page).toHaveURL(

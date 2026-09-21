@@ -1,5 +1,5 @@
 import AppStatus from "@/components/ui/AppStatus";
 
 export default function EpisodesLoading() {
-  return <AppStatus title="Loading the episode log." message="Assembling the campaign record and visible notes." />;
+  return <AppStatus title="Loading episodes..." message="Loading the campaign and visible notes." />;
 }

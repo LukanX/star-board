@@ -93,7 +93,7 @@ describe("character portrait UI boundaries", () => {
       />,
     );
 
-    expect(playerMarkup).toContain("PLAYER TOOL // PORTRAIT DRAFT");
+    expect(playerMarkup).toContain("PLAYER ART // PORTRAIT DRAFT");
     expect(playerMarkup).toContain("Image description");
     expect(playerMarkup).not.toContain("VISUAL STYLE");
     expect(playerMarkup).not.toContain("IMAGE MODEL");

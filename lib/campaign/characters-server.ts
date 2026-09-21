@@ -9,9 +9,9 @@ export type CampaignCharactersResult = {
   characters: ApiCharacter[];
 };
 
-const characterColumns = "id, owner_id, name, species, class_name, level, backstory_markdown, physical_description, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
-async function portraitCapability(campaignId: string, character: { owner_id: string }, membership: { role: "gm" | "player" }, userId: string) {
+async function portraitCapability(campaignId: string, character: { owner_id: string | null }, membership: { role: "gm" | "player" }, userId: string) {
   const portraitAiRole = membership.role === "gm" ? "gm" : character.owner_id === userId ? "player" : null;
   if (!portraitAiRole) return { can_generate_portrait: false, portrait_ai_role: null } as const;
 

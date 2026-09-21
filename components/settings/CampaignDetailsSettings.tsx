@@ -94,7 +94,7 @@ export default function CampaignDetailsSettings({
     <section className={`${panelClassName} w-full min-w-0`} data-campaign-details-settings>
       <div className="panel-topline flex items-start justify-between gap-4 px-[21px] pb-3 pt-5">
         <div>
-          <p className={`${eyebrowClassName} !mb-2`}>GM CONTROL // CAMPAIGN IDENTITY</p>
+          <p className={`${eyebrowClassName} !mb-2`}>GM SETTINGS // CAMPAIGN DETAILS</p>
           <h2>Campaign details</h2>
         </div>
         <FileText className={accentIconCyanClassName} size={17} />

@@ -10,7 +10,7 @@ import type { ApiPlace } from "@/lib/campaign/types";
 export default function EpisodesRouteView({ campaignId, episodes, places }: { campaignId: string; episodes: CampaignEpisode[]; places: ApiPlace[] }) {
   const episodeRecords = episodes.map(mapApiEpisode);
 
-  return <PageLayout eyebrow="CAMPAIGN LOG // EPISODES" title="Episodes" description="The campaign record, one transmission at a time.">
-    {episodeRecords.length ? <div className={recordListClassName}>{episodeRecords.map((episode, index) => <EpisodeCard campaignId={campaignId} episode={episode} index={index} key={episode.id} places={places} />)}</div> : <EmptyState icon={FolderKanban} title="No episodes logged yet." message="Promote an open job when the crew is ready to make it part of the campaign record." />}
+  return <PageLayout eyebrow="CAMPAIGN LOG // EPISODES" title="Episodes" description="Track the campaign, one episode at a time.">
+    {episodeRecords.length ? <div className={recordListClassName}>{episodeRecords.map((episode, index) => <EpisodeCard campaignId={campaignId} episode={episode} index={index} key={episode.id} places={places} />)}</div> : <EmptyState icon={FolderKanban} title="No episodes logged yet." message="Promote an open job when the crew is ready to add it to the campaign history." />}
   </PageLayout>;
 }

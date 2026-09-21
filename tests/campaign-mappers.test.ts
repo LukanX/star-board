@@ -65,7 +65,7 @@ describe("campaign mappers", () => {
   });
 
   test("maps jobs with defaults, giver precedence, and cycling accents", () => {
-    expect(mapApiJob(job({ status: "draft", giver_npc_id: "npc-1", giver_faction_id: "faction-1" }), 0)).toMatchObject({ category: "DRAFT SIGNAL", summary: "No public mission brief recorded.", giverId: "npc-1", accent: "cyan" });
+    expect(mapApiJob(job({ status: "draft", giver_npc_id: "npc-1", giver_faction_id: "faction-1" }), 0)).toMatchObject({ category: "DRAFT JOB", summary: "No public mission brief recorded.", giverId: "npc-1", accent: "cyan" });
     expect(mapApiJob(job({ giver_faction_id: "faction-1" }), 1)).toMatchObject({ giverId: "faction-1", accent: "pink" });
     expect(mapApiJob(job(), 2).accent).toBe("amber");
   });
@@ -97,6 +97,6 @@ describe("campaign mappers", () => {
 
   test("converts a character to a draft while preserving nullable art fields", () => {
     const mapped = mapApiCharacter(character({ art_subject: null, art_path: null, art_url: null, art_prompt: null, art_provider: null }), 0);
-    expect(toCharacterDraft(mapped)).toEqual({ name: "Ari", species: "Human", className: "Pilot", level: 3, backstoryMarkdown: "Past", physicalDescription: "Tall", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null });
+    expect(toCharacterDraft(mapped)).toEqual({ name: "Ari", species: "Human", className: "Pilot", level: 3, isActive: true, backstoryMarkdown: "Past", physicalDescription: "Tall", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null });
   });
 });

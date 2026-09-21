@@ -179,7 +179,7 @@ export default function MembersRouteView({
   return (
     <PageLayout
       eyebrow="CAMPAIGN ADMIN // MEMBERS"
-      title="Crew access"
+      title="Campaign members"
       description="Manage who can see the campaign and who is trusted to shape it."
       action={isGM ? "CREATE JOIN LINK" : undefined}
       actionIcon={<CirclePlus size={16} />}
@@ -192,11 +192,11 @@ export default function MembersRouteView({
         <div>
           <p className={eyebrowClassName}>ACCESS MODEL</p>
           <h2 className="max-w-[360px] mb-[10px] text-[22px]">
-            One campaign. Two levels of clearance.
+            One campaign. Two access levels.
           </h2>
           <p className="max-w-[450px] m-0 text-[var(--muted)] text-[11px] leading-[1.65]">
             Player-visible content is shared by default. GM notes, mission
-            controls, and campaign administration stay behind the command lock.
+            controls, and campaign administration are visible only to GMs.
           </p>
         </div>
         <div>
@@ -252,7 +252,7 @@ export default function MembersRouteView({
         <EmptyState
           icon={UsersRound}
           title="No campaign members yet."
-          message="Invite a player to establish the crew manifest."
+          message="Invite a player to add them to the campaign."
         />
       )}
       {selectedMember ? (

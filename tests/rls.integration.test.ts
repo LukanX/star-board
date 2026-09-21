@@ -962,6 +962,75 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(gmUpdate.data?.name).toBe("GM Renamed Player Character");
   });
 
+  it("enforces ownership transfer through the authorized RPC", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    if (!gmUser) throw new Error("The local RLS GM session has no user.");
+
+    let characterId: string | null = null;
+
+    try {
+      const created = await playerClient.from("characters").insert({
+        campaign_id: campaignId,
+        owner_id: playerId,
+        name: "Transfer Boundary Character",
+      }).select("id, owner_id").single();
+      expect(created.error).toBeNull();
+      characterId = created.data?.id ?? null;
+      if (!characterId) throw new Error("The ownership boundary character was not created.");
+
+      const forgedOwnerUpdate = await playerClient
+        .from("characters")
+        .update({ owner_id: gmUser.id })
+        .eq("id", characterId)
+        .eq("campaign_id", campaignId);
+      expect(forgedOwnerUpdate.error).not.toBeNull();
+
+      const transferred = await playerClient.rpc("reassign_character_owner", {
+        target_campaign_id: campaignId,
+        target_character_id: characterId,
+        new_owner_id: gmUser.id,
+      });
+      expect(transferred.error).toBeNull();
+      expect(transferred.data?.owner_id).toBe(gmUser.id);
+
+      const formerOwnerUpdate = await playerClient
+        .from("characters")
+        .update({ name: "Former Owner Cannot Edit" })
+        .eq("id", characterId)
+        .eq("campaign_id", campaignId)
+        .select("name");
+      expect(formerOwnerUpdate.error).toBeNull();
+      expect(formerOwnerUpdate.data).toEqual([]);
+
+      const unassigned = await gmClient.rpc("reassign_character_owner", {
+        target_campaign_id: campaignId,
+        target_character_id: characterId,
+        new_owner_id: null,
+      });
+      expect(unassigned.error).toBeNull();
+      expect(unassigned.data?.owner_id).toBeNull();
+
+      const formerOwnerDelete = await playerClient
+        .from("characters")
+        .delete()
+        .eq("id", characterId)
+        .eq("campaign_id", campaignId)
+        .select("id");
+      expect(formerOwnerDelete.error).toBeNull();
+      expect(formerOwnerDelete.data).toEqual([]);
+
+      const reassigned = await gmClient.rpc("reassign_character_owner", {
+        target_campaign_id: campaignId,
+        target_character_id: characterId,
+        new_owner_id: playerId,
+      });
+      expect(reassigned.error).toBeNull();
+      expect(reassigned.data?.owner_id).toBe(playerId);
+    } finally {
+      if (characterId) await gmClient.from("characters").delete().eq("id", characterId);
+    }
+  });
+
   it("scopes character portrait AI runs to GMs and the saved character owner", async () => {
     const gmUser = (await gmClient.auth.getUser()).data.user;
     if (!gmUser) throw new Error("The local RLS GM session has no user.");

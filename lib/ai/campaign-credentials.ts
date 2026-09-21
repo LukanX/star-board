@@ -95,6 +95,10 @@ function configuration() {
   }
 }
 
+export function assertCampaignCredentialEncryptionConfigured() {
+  configuration();
+}
+
 function storedCredentialProjection() {
   return "campaign_id, ciphertext, initialization_vector, authentication_tag, encryption_key_id, key_hash, key_label, key_limit_usd, key_remaining_usd, key_usage_usd, is_unlimited, verification_status, verification_error, connected_by, connected_at, last_verified_at, allow_player_ai, updated_at";
 }

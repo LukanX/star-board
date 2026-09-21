@@ -106,7 +106,7 @@ export default function CampaignVisualStyles({ campaignId }: { campaignId: strin
         <section className={`${panelClassName} w-full min-w-0`} data-campaign-visual-styles>
           <div className="panel-topline flex items-start justify-between gap-4 px-[21px] pb-3 pt-5">
             <div>
-              <p className={`${eyebrowClassName} !mb-2`}>GM CONTROL // VISUAL LANGUAGE</p>
+              <p className={`${eyebrowClassName} !mb-2`}>GM SETTINGS // VISUAL STYLES</p>
               <h2>Campaign visual styles</h2>
             </div>
             <Sparkles size={17} className="text-[var(--pink)]" />
@@ -114,7 +114,7 @@ export default function CampaignVisualStyles({ campaignId }: { campaignId: strin
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--line)] px-[21px] pb-4">
             <div className="grid gap-[6px]">
               <p className="m-0 text-[var(--muted)] text-[11px] leading-[1.5]">Build a small library of reusable visual directions for campaign art.</p>
-              <span className="text-[var(--dim)] font-mono text-[8px] tracking-[.06em]">THE APPLIED CAMPAIGN STYLE REMAINS THE AUTHORITATIVE DEFAULT SNAPSHOT.</span>
+              <span className="text-[var(--dim)] font-mono text-[8px] tracking-[.06em]">THE APPLIED CAMPAIGN STYLE IS THE DEFAULT USED FOR NEW ARTWORK.</span>
             </div>
             <button className={primaryButtonClassName} type="button" onClick={openNew}><Plus size={14} /> NEW STYLE</button>
           </div>

@@ -64,9 +64,9 @@ describe("campaign navigation metadata", () => {
     expect(getCampaignNavigationItem("enemies")).toEqual({ id: "enemies", label: "Enemies", group: "Archive" });
   });
 
-  it("includes Crew access in Control and returns it from lookup", () => {
-    expect(campaignNavigation).toContainEqual({ id: "members", label: "Crew access", group: "Control" });
-    expect(getCampaignNavigationItem("members")).toEqual({ id: "members", label: "Crew access", group: "Control" });
+  it("includes Campaign members in Control and returns it from lookup", () => {
+    expect(campaignNavigation).toContainEqual({ id: "members", label: "Campaign members", group: "Control" });
+    expect(getCampaignNavigationItem("members")).toEqual({ id: "members", label: "Campaign members", group: "Control" });
   });
 
   it("returns undefined for an invalid runtime section", () => {

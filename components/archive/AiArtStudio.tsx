@@ -325,8 +325,8 @@ function AiArtStudioContent({
     <section className="grid gap-[10px] p-[13px] border border-[rgba(255,92,154,.3)] bg-[linear-gradient(120deg,rgba(255,92,154,.07),rgba(185,146,255,.035))]">
       <div className="flex items-start justify-between gap-3 text-[var(--pink)]">
         <div>
-          <p className={`${eyebrowClassName} !mb-[5px] text-[var(--pink)]`}>{isCharacterPortrait ? `${portraitAiRole === "player" ? "PLAYER TOOL" : "GM TOOL"} // PORTRAIT DRAFT` : "GM TOOL // IMAGE DRAFT"}</p>
-          <h3 className="m-0 text-[14px]">{isCharacterPortrait ? "Shape the saved character portrait" : "Shape the visual signal"}</h3>
+          <p className={`${eyebrowClassName} !mb-[5px] text-[var(--pink)]`}>{isCharacterPortrait ? `${portraitAiRole === "player" ? "PLAYER ART" : "GM ART"} // PORTRAIT DRAFT` : "ARTWORK DRAFT"}</p>
+          <h3 className="m-0 text-[14px]">{isCharacterPortrait ? "Edit the saved character portrait" : "Create or refine campaign artwork"}</h3>
         </div>
         <Sparkles size={17} />
       </div>

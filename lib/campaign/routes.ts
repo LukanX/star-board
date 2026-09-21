@@ -23,6 +23,10 @@ export function campaignsPath(): string {
   return "/campaigns";
 }
 
+export function accountPath(campaignId?: string): string {
+  return campaignId ? `/account?${new URLSearchParams({ campaign: campaignId }).toString()}` : "/account";
+}
+
 export function campaignPath(campaignId: string): string {
   return `${campaignsPath()}/${encodedSegment(campaignId)}`;
 }

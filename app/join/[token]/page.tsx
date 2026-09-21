@@ -55,7 +55,7 @@ export default function JoinCampaignPage({ params }: { params: Promise<{ token: 
         throw new Error(result.error ?? "Unable to join campaign.");
       }
 
-      setMessage("You are cleared for campaign access. Returning to the cockpit...");
+      setMessage("Campaign access confirmed. Returning to your campaign...");
       window.setTimeout(() => {
         router.push(campaignPath(result.campaignId));
       }, 700);
@@ -72,11 +72,11 @@ export default function JoinCampaignPage({ params }: { params: Promise<{ token: 
       <div className={`${authSignalClassName} ${authSignalOneClassName}`} />
       <div className={`${authSignalClassName} ${authSignalTwoClassName}`} />
       <section className={authPanelClassName}>
-        <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN OPERATIONS</small></span></div>
-        <div className={`${authHeadingClassName} ${joinHeadingClassName}`}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> CREW INVITATION</p><h1>Join the campaign.</h1><p>A GM has opened a secure berth for you. Confirm your access to enter the campaign cockpit.</p></div>
+        <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN MANAGER</small></span></div>
+        <div className={`${authHeadingClassName} ${joinHeadingClassName}`}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> CAMPAIGN INVITATION</p><h1>Join the campaign.</h1><p>A GM invited you to this campaign. Accept to join.</p></div>
         <button className={`${authSubmitClassName} ${joinSubmitClassName}`} disabled={isJoining} onClick={redeem} type="button"><Radio size={16} /> {isJoining ? "VERIFYING..." : "ACCEPT INVITATION"} <ArrowUpRight size={15} /></button>
         {message ? <div className={authStatusClassName}><ShieldCheck size={15} /> <span>{message}</span></div> : null}
-        <div className={authFooterClassName}><span className={authFooterItemClassName}><Link2 size={13} /> PRIVATE JOIN CHANNEL</span><span>PLAYER ACCESS ONLY</span></div>
+        <div className={authFooterClassName}><span className={authFooterItemClassName}><Link2 size={13} /> PRIVATE INVITATION</span><span>FOR PLAYERS</span></div>
       </section>
     </main>
   );

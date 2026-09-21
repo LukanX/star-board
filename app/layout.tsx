@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Star Board // Campaign Operations",
-  description: "A campaign command center for Starfinder 2e crews.",
+  title: "Star Board // Campaign Manager",
+  description: "A campaign manager for Starfinder 2e groups.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [

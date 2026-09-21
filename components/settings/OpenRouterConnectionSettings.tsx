@@ -10,8 +10,10 @@ import {
   RefreshCw,
   ShieldCheck,
   Unplug,
+  X,
 } from "lucide-react";
 import { panelClassName, recordActionButtonClassName, recordDeleteActionClassName } from "@/components/ui/recordStyles";
+import type { OpenRouterCallbackOutcome } from "@/components/settings/openRouterOutcome";
 import { accentIconCyanClassName, eyebrowClassName, liveDotClassName } from "@/components/ui/terminalStyles";
 
 type CredentialStatus = {
@@ -37,6 +39,7 @@ type ConnectionAction = "connect" | "refresh" | "reconnect" | "disconnect" | "pl
 
 type CredentialResponse = { credential?: CredentialStatus; authorizationUrl?: string; error?: string };
 type CredentialState = { campaignId: string | null; credential: CredentialStatus | null; error: string | null };
+type CallbackFeedback = { message: string; tone: "error" | "notice" | "status" };
 
 const primaryButtonClassName =
   "h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--cyan)] bg-[var(--cyan)] text-[#061017] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background] duration-[200ms] whitespace-nowrap hover:-translate-y-px hover:bg-[#8ceeff] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0";
@@ -67,7 +70,44 @@ function actionLabel(action: ConnectionAction) {
   return "UPDATING...";
 }
 
-export default function OpenRouterConnectionSettings({ campaignId }: { campaignId: string }) {
+function callbackErrorMessage(reason: Extract<OpenRouterCallbackOutcome, { status: "error" }>['reason']) {
+  if (reason === "configuration") return "Secure campaign key storage is not configured on the server. Ask the site administrator to configure it before connecting OpenRouter.";
+  if (reason === "invalid_state") return "The OpenRouter connection could not be verified. Start the connection again.";
+  if (reason === "authentication") return "Your Star Board session changed during the connection. Sign in again and retry.";
+  if (reason === "forbidden") return "Only the connecting GM or campaign creator can manage this connection.";
+  if (reason === "storage") return "Star Board could not save the campaign key. Ask the site administrator to check server storage, then retry.";
+  if (reason === "missing_code") return "OpenRouter did not return an authorization code. Start the connection again.";
+  if (reason === "provider_unavailable") return "OpenRouter was unavailable while completing the connection. Check the provider status and retry.";
+  if (reason === "provider") return "OpenRouter could not complete the authorization. Start the connection again.";
+  return "The OpenRouter connection could not be completed. Start the connection again.";
+}
+
+function getCallbackFeedback(
+  outcome: OpenRouterCallbackOutcome | null | undefined,
+  visible: boolean,
+  isLoading: boolean,
+  credential: CredentialStatus | null,
+  statusError: string | null,
+): CallbackFeedback | null {
+  if (!visible || !outcome) return null;
+  if (outcome.status === "cancelled") return { tone: "status", message: "OpenRouter authorization was cancelled. Existing campaign connection was not changed." };
+  if (outcome.status === "error") return { tone: "error", message: callbackErrorMessage(outcome.reason) };
+  if (isLoading || statusError) return null;
+  if (credential?.connected && credential.verificationStatus === "verified") return { tone: "notice", message: "OpenRouter campaign key connected and verified." };
+  return { tone: "error", message: "OpenRouter authorization completed, but Star Board did not save a verified campaign key. Check server storage before retrying." };
+}
+
+export default function OpenRouterConnectionSettings({
+  campaignId,
+  callbackOutcome,
+  callbackOutcomeDismissed = false,
+  onDismissCallbackOutcome,
+}: {
+  campaignId: string;
+  callbackOutcome?: OpenRouterCallbackOutcome | null;
+  callbackOutcomeDismissed?: boolean;
+  onDismissCallbackOutcome?: () => void;
+}) {
   const [credentialState, setCredentialState] = useState<CredentialState>({ campaignId: null, credential: null, error: null });
   const [pending, setPending] = useState<ConnectionAction | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -96,8 +136,9 @@ export default function OpenRouterConnectionSettings({ campaignId }: { campaignI
     if (action === "disconnect" && !window.confirm("Disconnect the campaign OpenRouter key? Existing generated records will remain, but new AI requests will stop.")) return;
 
     setPending(action);
-  setCredentialState((current) => ({ ...current, campaignId, error: null }));
+    setCredentialState((current) => ({ ...current, campaignId, error: null }));
     setNotice(null);
+    onDismissCallbackOutcome?.();
 
     try {
       const endpoint = action === "refresh"
@@ -139,12 +180,13 @@ export default function OpenRouterConnectionSettings({ campaignId }: { campaignI
   const exhausted = credential?.remainingUsd !== null && credential?.remainingUsd !== undefined && credential.remainingUsd <= 0;
   const statusNeedsAction = credential?.connected && !verified;
   const actionInProgress = pending ? actionLabel(pending) : null;
+  const callbackFeedback = getCallbackFeedback(callbackOutcome, Boolean(callbackOutcome) && !callbackOutcomeDismissed, isLoading, credential, error);
 
   return (
     <section className={`${panelClassName} w-full min-w-0`} data-openrouter-connection>
       <div className="panel-topline flex items-start justify-between gap-4 px-[21px] pb-3 pt-5">
         <div>
-          <p className={`${eyebrowClassName} !mb-2`}>GM CONTROL // PROVIDER CONNECTION</p>
+          <p className={`${eyebrowClassName} !mb-2`}>GM SETTINGS // PROVIDER CONNECTION</p>
           <h2>OpenRouter campaign key</h2>
         </div>
         <KeyRound size={17} className={accentIconCyanClassName} />
@@ -274,6 +316,14 @@ export default function OpenRouterConnectionSettings({ campaignId }: { campaignI
           </div>
         </>
       )}
+      {callbackFeedback ? (
+        <div className={`flex items-start justify-between gap-3 border-t px-[21px] py-[11px] text-[10px] leading-[1.5] ${callbackFeedback.tone === "error" ? "border-[var(--pink)] text-[var(--pink)]" : callbackFeedback.tone === "notice" ? "border-[var(--green)] text-[var(--green)]" : "border-[var(--line)] text-[var(--muted)]"}`} role={callbackFeedback.tone === "error" ? "alert" : "status"}>
+          <span>{callbackFeedback.message}</span>
+          <button aria-label="Dismiss OpenRouter connection message" className="shrink-0 cursor-pointer text-current opacity-75 transition-opacity hover:opacity-100" onClick={onDismissCallbackOutcome} type="button">
+            <X size={14} />
+          </button>
+        </div>
+      ) : null}
       {notice ? <p className="m-0 border-t border-[var(--line)] px-[21px] py-[11px] text-[var(--green)] text-[10px]" role="status">{notice}</p> : null}
       {error ? <p className="m-0 border-t border-[var(--line)] px-[21px] py-[11px] text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}
     </section>

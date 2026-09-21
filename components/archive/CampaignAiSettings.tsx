@@ -255,7 +255,7 @@ export default function CampaignAiSettings({
     <section data-campaign-ai-settings className={`${panelClassName} w-full min-w-0 pt-px`}>
       <div className="panel-topline flex items-start justify-between px-[21px] pb-3 pt-5">
         <div>
-          <p className={`${eyebrowClassName} !mb-2`}>GM CONTROL // AI ACCESS</p>
+          <p className={`${eyebrowClassName} !mb-2`}>GM SETTINGS // AI ACCESS</p>
           <h2>Campaign model access</h2>
         </div>
           <SlidersHorizontal size={17} className={accentIconCyanClassName} />

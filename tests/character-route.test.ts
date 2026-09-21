@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getAuthenticatedUser: vi.fn(),
   getCampaignMembership: vi.fn(),
   getCampaignRole: vi.fn(),
+  getCampaignCharacter: vi.fn(),
   addCampaignArtUrls: vi.fn(),
   removeCampaignArtIfUnreferenced: vi.fn(),
 }));
@@ -17,6 +18,7 @@ vi.mock("@/lib/storage/campaign-art", () => ({
   addCampaignArtUrls: mocks.addCampaignArtUrls,
   removeCampaignArtIfUnreferenced: mocks.removeCampaignArtIfUnreferenced,
 }));
+vi.mock("@/lib/campaign/characters-server", () => ({ getCampaignCharacter: mocks.getCampaignCharacter }));
 
 import { POST as createCharacter, GET as listCharacters } from "@/app/api/campaigns/[campaignId]/characters/route";
 import { DELETE as deleteCharacter, PATCH as updateCharacter } from "@/app/api/campaigns/[campaignId]/characters/[characterId]/route";
@@ -65,6 +67,7 @@ describe("character routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.addCampaignArtUrls.mockImplementation(async (_supabase: unknown, records: Array<Record<string, unknown>>) => records.map((record) => ({ ...record, art_url: null })));
+    mocks.getCampaignCharacter.mockResolvedValue({ id: characterId, owner_id: userId, is_active: true, name: "Nova", species: "Android", class_name: "Mechanic", level: 3, backstory_markdown: "", physical_description: "", art_subject: null, art_path: null, art_prompt: null, art_provider: null, art_url: null, can_edit: true });
   });
 
   it("requires authentication before listing campaign characters", async () => {
@@ -130,6 +133,7 @@ describe("character routes", () => {
     expect(query.insert).toHaveBeenCalledWith({
       campaign_id: campaignId,
       owner_id: userId,
+      is_active: true,
       name: "Nova",
       species: "Android",
       class_name: "Mechanic",

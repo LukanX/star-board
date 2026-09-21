@@ -5,6 +5,7 @@ const characterFieldSchema = z.object({
   species: z.string().trim().max(120),
   className: z.string().trim().max(160),
   level: z.number().int().min(1).max(20),
+  isActive: z.boolean(),
   backstoryMarkdown: z.string().max(20000),
   physicalDescription: z.string().max(4000),
   artSubject: z.string().trim().max(1600).nullable().optional(),
@@ -17,8 +18,10 @@ export const characterFieldsSchema = characterFieldSchema.extend({
   species: z.string().trim().max(120).default(""),
   className: z.string().trim().max(160).default(""),
   level: z.number().int().min(1).max(20).default(1),
+  isActive: z.boolean().default(true),
   backstoryMarkdown: z.string().max(20000).default(""),
   physicalDescription: z.string().max(4000).default(""),
+  ownerId: z.string().uuid().nullable().optional(),
 });
 
 export const createCharacterSchema = characterFieldsSchema;
@@ -26,3 +29,7 @@ export const updateCharacterSchema = characterFieldSchema.partial().refine(
   (value) => Object.keys(value).length > 0,
   { message: "At least one character field is required." },
 );
+
+export const reassignCharacterOwnerSchema = z.object({
+  ownerId: z.string().uuid().nullable(),
+}).strict();

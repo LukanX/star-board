@@ -8,7 +8,9 @@ vi.mock("@/components/settings/CampaignVisualStyles", () => ({
   default: ({ campaignId }: { campaignId: string }) => <div data-settings-child="visuals">{campaignId}</div>,
 }));
 vi.mock("@/components/settings/OpenRouterConnectionSettings", () => ({
-  default: ({ campaignId }: { campaignId: string }) => <div data-settings-child="openrouter">{campaignId}</div>,
+  default: ({ campaignId, callbackOutcome }: { campaignId: string; callbackOutcome?: { status: string } | null }) => (
+    <div data-settings-child="openrouter" data-settings-outcome={callbackOutcome?.status ?? "none"}>{campaignId}</div>
+  ),
 }));
 vi.mock("@/components/settings/CampaignAiSettings", () => ({
   default: ({ campaignId }: { campaignId: string }) => <div data-settings-child="ai">{campaignId}</div>,
@@ -33,5 +35,24 @@ describe("settings route tabs", () => {
     expect(markup).toContain('data-settings-child="details"');
     expect(markup).not.toContain('data-settings-child="visuals"');
     expect(markup).not.toContain('data-settings-child="ai"');
+  });
+
+  it("opens AI setup and forwards a safe OpenRouter callback outcome", () => {
+    const markup = renderToStaticMarkup(
+      <DirtyFormProvider>
+        <SettingsRouteView
+          campaignId="campaign-42"
+          initialCampaign={{ name: "Signal Lost", description: "A missing ship." }}
+          initialOpenRouterOutcome={{ reason: "configuration", status: "error" }}
+        />
+      </DirtyFormProvider>,
+    );
+
+    expect(markup).toContain('id="settings-tab-ai"');
+    expect(markup).toContain('aria-selected="true"');
+    expect(markup).toContain('data-settings-tab-panel="ai"');
+    expect(markup).toContain('data-settings-child="openrouter"');
+    expect(markup).toContain('data-settings-outcome="error"');
+    expect(markup).not.toContain('data-settings-child="details"');
   });
 });

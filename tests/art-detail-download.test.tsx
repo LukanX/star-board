@@ -20,6 +20,7 @@ describe("detail page artwork downloads", () => {
             character={{
               id: "character-id",
               ownerId: "owner-id",
+              isActive: true,
               name: "Nova Vex",
               species: "Human",
               className: "Envoy",
