@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/env", () => ({ getPublicEnv: mocks.getPublicEnv }));
 
-import { getPasswordResetRedirect, getPublicAppOrigin } from "@/lib/app-url";
+import { getEmailChangeRedirect, getPasswordResetRedirect, getPublicAppOrigin } from "@/lib/app-url";
 
 describe("public app URLs", () => {
   beforeEach(() => {
@@ -30,6 +30,14 @@ describe("public app URLs", () => {
 
     expect(getPasswordResetRedirect("http://localhost:3000")).toBe(
       "https://star-board.example/auth/callback?next=/login/reset-password",
+    );
+  });
+
+  it("builds the email confirmation callback on the public origin", () => {
+    mocks.getPublicEnv.mockReturnValue({ NEXT_PUBLIC_APP_URL: "https://star-board.example" });
+
+    expect(getEmailChangeRedirect("http://localhost:3000")).toBe(
+      "https://star-board.example/auth/callback?next=/account?email=confirmed",
     );
   });
 });

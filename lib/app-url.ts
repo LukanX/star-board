@@ -8,3 +8,7 @@ export function getPublicAppOrigin(fallbackOrigin: string) {
 export function getPasswordResetRedirect(fallbackOrigin: string) {
   return `${getPublicAppOrigin(fallbackOrigin)}/auth/callback?next=/login/reset-password`;
 }
+
+export function getEmailChangeRedirect(fallbackOrigin: string) {
+  return `${getPublicAppOrigin(fallbackOrigin)}/auth/callback?next=/account?email=confirmed`;
+}

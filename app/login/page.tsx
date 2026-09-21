@@ -41,8 +41,12 @@ export default function LoginPage() {
   const isResettingPassword = mode === "reset";
 
   useEffect(() => {
-    const requestedMode = new URLSearchParams(window.location.search).get("mode");
+    const searchParams = new URLSearchParams(window.location.search);
+    const requestedMode = searchParams.get("mode");
     if (requestedMode === "signin" || requestedMode === "reset") startTransition(() => setMode(requestedMode));
+    if (searchParams.get("error") === "auth_callback") {
+      startTransition(() => setStatus("This authentication link is invalid or has expired. Request a new link and try again."));
+    }
   }, []);
 
   function getNextPath() {
@@ -112,8 +116,8 @@ export default function LoginPage() {
       <div className={`${authSignalClassName} ${authSignalOneClassName}`} />
       <div className={`${authSignalClassName} ${authSignalTwoClassName}`} />
       <section className={authPanelClassName}>
-        <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN OPERATIONS</small></span></div>
-        <div className={authHeadingClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> {isCreatingAccount ? "ACCOUNT CREATION" : isResettingPassword ? "PASSWORD RESET" : "SIGN IN"}</p><h1>{isCreatingAccount ? "Create your account." : isResettingPassword ? "Reset your password." : "Sign in to Star Board."}</h1><p>{isCreatingAccount ? "Use your email address and password to access your campaign console." : isResettingPassword ? "Enter your email address and we will send you a secure password reset link." : "Enter your email address and password to open your campaign console."}</p></div>
+        <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN MANAGER</small></span></div>
+        <div className={authHeadingClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> {isCreatingAccount ? "ACCOUNT CREATION" : isResettingPassword ? "PASSWORD RESET" : "SIGN IN"}</p><h1>{isCreatingAccount ? "Create your account." : isResettingPassword ? "Reset your password." : "Sign in to Star Board."}</h1><p>{isCreatingAccount ? "Use your email address and password to access your campaigns." : isResettingPassword ? "Enter your email address and we will send you a secure password reset link." : "Enter your email address and password to open your campaigns."}</p></div>
         <form className={authFormClassName} onSubmit={handleSubmit}>
           <label htmlFor="email">Email address</label>
           <input autoComplete="email" id="email" onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" required type="email" value={email} />

@@ -7,7 +7,7 @@ type RouteContext = { params: Promise<{ campaignId: string }> };
 
 export const runtime = "nodejs";
 
-const characterColumns = "id, owner_id, name, species, class_name, level, backstory_markdown, physical_description, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId } = await params;
@@ -72,11 +72,18 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Campaign membership is required." }, { status: 403 });
     }
 
+    const ownerId = input.data.ownerId === undefined ? context.user.id : input.data.ownerId;
+
+    if (role === "player" && ownerId !== context.user.id) {
+      return NextResponse.json({ error: "Only a campaign GM can choose another character owner or leave a character unassigned." }, { status: 403 });
+    }
+
     const { data, error } = await context.supabase
       .from("characters")
       .insert({
         campaign_id: campaignId,
-        owner_id: context.user.id,
+        owner_id: ownerId,
+        is_active: input.data.isActive,
         name: input.data.name,
         species: input.data.species,
         class_name: input.data.className,
@@ -97,7 +104,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     }
 
     const [character] = await addCampaignArtUrls(context.supabase, [data]);
-    return NextResponse.json({ character: { ...character, can_edit: true } }, { status: 201 });
+    return NextResponse.json({ character: { ...character, can_edit: role === "gm" || character.owner_id === context.user.id } }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }

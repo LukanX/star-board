@@ -30,6 +30,7 @@ export type CampaignSidebarProps = {
   displayName: string;
   mobileOpen: boolean;
   campaignSwitchHref: string;
+  accountHref: string;
   onCloseMobile: () => void;
 };
 
@@ -43,6 +44,7 @@ export function CampaignSidebar({
   displayName,
   mobileOpen,
   campaignSwitchHref,
+  accountHref,
   onCloseMobile,
 }: CampaignSidebarProps) {
   return (
@@ -56,7 +58,7 @@ export function CampaignSidebar({
         </div>
         <div>
           <p className="m-0 text-[13px] font-[750] tracking-[.16em] text-[var(--ink)]">STAR BOARD</p>
-          <p className="m-[3px_0_0] text-[var(--dim)] font-mono text-[7px] tracking-[.14em]">CAMPAIGN OPERATIONS</p>
+          <p className="m-[3px_0_0] text-[var(--dim)] font-mono text-[7px] tracking-[.14em]">CAMPAIGN MANAGER</p>
         </div>
         <button
           aria-label="Close navigation"
@@ -111,9 +113,14 @@ export function CampaignSidebar({
       </nav>
       <div className="side-footer mt-auto">
         <div className="mb-[14px] ml-3 flex items-center gap-[7px] text-[#607080] font-mono text-[8px] tracking-[.11em]">
-          <span className={liveDotClassName} /> SUPABASE SYNC ACTIVE
+          <span className={liveDotClassName} /> CAMPAIGN DATA CONNECTED
         </div>
-        <div className="mt-[9px] flex items-center gap-[9px] border-t border-[var(--line)] px-[10px] pb-0 pt-[17px]">
+        <CampaignRouteLink
+          aria-label="Open account settings"
+          className="group mt-[9px] flex items-center gap-[9px] border-t border-[var(--line)] px-[10px] pb-0 pt-[17px] hover:text-[var(--ink)]"
+          href={accountHref}
+          onNavigate={onCloseMobile}
+        >
           <div className={userAvatarClassName}>
             {displayName.slice(0, 2).toUpperCase()}
           </div>
@@ -121,7 +128,7 @@ export function CampaignSidebar({
             <strong className="block text-[11px] font-semibold text-[var(--ink)]">{displayName}</strong>
             <span className="mt-[3px] block text-[var(--dim)] font-mono text-[7px] tracking-[.1em]">{isGM ? "GAME MASTER" : "PLAYER"}</span>
           </div>
-        </div>
+        </CampaignRouteLink>
         <SignOutButton className={`${navItemClassName} mt-2 text-[var(--muted)] hover:text-[var(--pink)]`} label="Sign out" />
       </div>
     </aside>

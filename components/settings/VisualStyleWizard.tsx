@@ -108,7 +108,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
 
   const save = async (status: "draft" | "ready", apply: boolean) => {
     if (!name.trim() || !visualStyle.trim()) {
-      setError("Add a style name and visual language before saving.");
+      setError("Add a style name and visual details before saving.");
       return;
     }
 
@@ -153,7 +153,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
     <section className={`${panelClassName} w-full min-w-0`} data-visual-style-wizard>
       <div className="panel-topline flex items-start justify-between gap-4 px-[21px] pb-3 pt-5">
         <div>
-          <p className={`${eyebrowClassName} !mb-2`}>GM TOOL // VISUAL STYLE BUILDER</p>
+          <p className={`${eyebrowClassName} !mb-2`}>GM SETTINGS // VISUAL STYLE BUILDER</p>
           <h2>{style ? "Edit visual style" : "Create a visual style"}</h2>
         </div>
         <WandSparkles size={17} className="text-[var(--pink)]" />
@@ -215,7 +215,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
             <input className={controlClassName} maxLength={80} value={name} onChange={(event) => { setName(event.target.value); markChanged(); }} placeholder="A memorable library name" />
           </label>
           <label className={labelClassName}>
-            REUSABLE VISUAL LANGUAGE <span className="text-[var(--dim)] tracking-normal">{visualStyle.length}/1200</span>
+            VISUAL STYLE DETAILS <span className="text-[var(--dim)] tracking-normal">{visualStyle.length}/1200</span>
             <textarea className={`${controlClassName} min-h-[180px] resize-y leading-[1.5]`} maxLength={1200} value={visualStyle} onChange={(event) => { setVisualStyle(event.target.value); markChanged(); }} placeholder="Palette, light, materials, line treatment, texture, and composition rules..." />
           </label>
           {visualStyle.trim() ? <VisualStylePreview campaignId={campaignId} style={style ?? undefined} visualStyleOverride={visualStyle} canRetain={false} onDraftChange={handlePreviewDraftChange} /> : null}

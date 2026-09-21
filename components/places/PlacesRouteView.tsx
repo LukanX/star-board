@@ -94,9 +94,9 @@ export default function PlacesRouteView({
 
   return (
     <PageLayout
-      eyebrow="ARCHIVE // PLACE ATLAS"
+      eyebrow="ARCHIVE // PLACES"
       title="Places"
-      description="A genre-neutral atlas for worlds, regions, sites, and the spaces between them."
+      description="Organize worlds, regions, sites, and other campaign locations."
       action={isGM && !editorState ? "ADD ROOT PLACE" : undefined}
       actionIcon={<CirclePlus size={16} />}
       onAction={() => openEditor()}
@@ -152,7 +152,7 @@ export default function PlacesRouteView({
           previewPanelDataAttribute="data-places-detail-panel"
           previewContentDataAttribute="data-places-detail"
           selectorEyebrow="PLACE TREE"
-          selectorTitle="Atlas structure"
+          selectorTitle="Location structure"
           selectorIcon={<Map size={17} />}
           selector={normalizedSearch ? (
             <div data-place-search-results="true" className="grid gap-[1px] p-[10px]">
@@ -177,7 +177,7 @@ export default function PlacesRouteView({
             </div>
           )}
           preview={selectedPlace ? <PlacePreview campaignId={campaignId} place={selectedPlace} places={places} isGM={isGM} /> : null}
-          emptyPreview={<ArchivePreviewEmptyState data-places-detail="true" icon={Map} eyebrow="ROUTE-OWNED PLACE FILES" title="Choose a place from the atlas." message="Open a record to inspect its public brief, notes, breadcrumb, and GM-only context where available." />}
+          emptyPreview={<ArchivePreviewEmptyState data-places-detail="true" icon={Map} eyebrow="PLACE RECORDS" title="Choose a place." message="Open a record to inspect its summary, notes, location path, and GM-only context where available." />}
         />
       ) : (
         <EmptyState
@@ -185,7 +185,7 @@ export default function PlacesRouteView({
           title="No places recorded yet."
           message={
             isGM
-              ? "Add a root place to start building the campaign atlas."
+              ? "Add a root place to start organizing campaign locations."
               : "The GM has not recorded any places yet."
           }
         />

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
+import { getCampaignCharacter } from "@/lib/campaign/characters-server";
 import { addCampaignArtUrls, removeCampaignArtIfUnreferenced } from "@/lib/storage/campaign-art";
 import { updateCharacterSchema } from "@/lib/validation/character";
 
@@ -7,7 +8,7 @@ type RouteContext = { params: Promise<{ campaignId: string; characterId: string 
 
 export const runtime = "nodejs";
 
-const characterColumns = "id, owner_id, name, species, class_name, level, backstory_markdown, physical_description, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function PATCH(request: Request, { params }: RouteContext) {
   const { campaignId, characterId } = await params;
@@ -48,6 +49,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       ...(input.data.species === undefined ? {} : { species: input.data.species }),
       ...(input.data.className === undefined ? {} : { class_name: input.data.className }),
       ...(input.data.level === undefined ? {} : { level: input.data.level }),
+      ...(input.data.isActive === undefined ? {} : { is_active: input.data.isActive }),
       ...(input.data.backstoryMarkdown === undefined ? {} : { backstory_markdown: input.data.backstoryMarkdown }),
       ...(input.data.physicalDescription === undefined ? {} : { physical_description: input.data.physicalDescription }),
       ...(input.data.artSubject === undefined ? {} : { art_subject: input.data.artSubject }),
@@ -72,8 +74,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       await removeCampaignArtIfUnreferenced(context.supabase, campaignId, previousCharacter?.art_path);
     }
 
-    const [character] = await addCampaignArtUrls(context.supabase, [data]);
-    return NextResponse.json({ character: { ...character, can_edit: true } });
+    const character = await getCampaignCharacter(campaignId, characterId);
+    if (!character) {
+      return NextResponse.json({ error: "Character could not be reloaded." }, { status: 503 });
+    }
+
+    return NextResponse.json({ character });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }

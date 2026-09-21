@@ -107,7 +107,7 @@ function AiDraftAssistantContent({
   protectedFieldKeys = [],
   open = true,
   showModelPicker = true,
-  toolLabel = "GM TOOL",
+  toolLabel = "GM ART",
   descriptionOnly = false,
   onBack,
   onDirtyChange,
@@ -431,7 +431,7 @@ function AiDraftAssistantContent({
         />
       ) : null}
       <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
-        {descriptionOnly ? "Image description direction" : toolLabel === "PLAYER TOOL" ? "Portrait direction" : "GM direction"}
+        {descriptionOnly ? "Image description direction" : toolLabel === "PLAYER ART" ? "Portrait direction" : "GM direction"}
         <textarea
           className="w-full min-h-[70px] resize-y border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] leading-[1.45] focus:border-[var(--purple)] focus:shadow-[0_0_0_2px_rgba(185,146,255,.1)] placeholder:text-[#4d5a6b]"
           maxLength={600}

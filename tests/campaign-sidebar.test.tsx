@@ -29,6 +29,7 @@ describe("CampaignSidebar route navigation", () => {
     const markup = renderToStaticMarkup(
       <DirtyFormProvider>
         <CampaignSidebar
+          accountHref="/account?campaign=campaign-42"
           activeView="npcs"
           campaignName="Signal Lost"
           campaignSwitchHref="/campaigns"
@@ -42,6 +43,7 @@ describe("CampaignSidebar route navigation", () => {
     );
 
     expect(markup).toContain('href="/campaigns/campaign-42/npcs"');
+  expect(markup).toContain('href="/account?campaign=campaign-42"');
     expect(markup).toMatch(/<a class="[^"]*bg-\[rgba\(98,232,255,\.095\)\][^"]*" href="\/campaigns\/campaign-42\/npcs"/);
     expect(markup).not.toMatch(/<button[^>]*href="\/campaigns\/campaign-42\/npcs"/);
   });

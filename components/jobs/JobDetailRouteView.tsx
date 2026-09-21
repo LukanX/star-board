@@ -69,16 +69,16 @@ export default function JobDetailRouteView({
         error?: string;
       };
       if (!response.ok)
-        throw new Error(result.error ?? "Vote could not be synchronized.");
+        throw new Error(result.error ?? "Vote could not be saved.");
       await refreshJob();
       setStatusMessage(
-        job.voted ? "Vote removed from this job." : "Vote locked on this job.",
+        job.voted ? "Vote removed from this job." : "Vote recorded for this job.",
       );
     } catch (voteError) {
       setError(
         voteError instanceof Error
           ? voteError.message
-          : "Vote could not be synchronized.",
+          : "Vote could not be saved.",
       );
     } finally {
       setIsBusy(false);

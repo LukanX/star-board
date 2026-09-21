@@ -119,7 +119,7 @@ export default function CampaignsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [displayNames, setDisplayNames] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState("Loading campaign manifest...");
+  const [status, setStatus] = useState("Loading campaigns...");
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -143,7 +143,7 @@ export default function CampaignsPage() {
         const campaign = getCampaign(membership);
         return campaign ? [[campaign.id, membership.display_name]] : [];
       })));
-      setStatus(campaignList.length ? "Choose a campaign to open the command deck." : "No campaigns yet. Create the first one.");
+      setStatus(campaignList.length ? "Choose a campaign to open." : "No campaigns yet. Create the first one.");
     }).catch((error: unknown) => {
       setStatus(error instanceof Error ? error.message : "Campaign service is unavailable.");
     });
@@ -152,7 +152,7 @@ export default function CampaignsPage() {
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsCreating(true);
-    setStatus("Registering campaign signal...");
+    setStatus("Creating campaign...");
 
     try {
       const response = await fetch("/api/campaigns", {
@@ -208,10 +208,10 @@ export default function CampaignsPage() {
       <div className={authGridClassName} />
       <section className={campaignsFrameClassName}>
         <header className={campaignsHeaderClassName}>
-          <div className={campaignsHeaderBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN OPERATIONS</small></span></div>
-          <div className={campaignsHeaderActionsClassName}><span className={campaignsClearanceClassName}><ShieldCheck size={14} /> AUTHENTICATED CREW</span><SignOutButton className={campaignsSignOutClassName} /></div>
+          <div className={campaignsHeaderBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN MANAGER</small></span></div>
+          <div className={campaignsHeaderActionsClassName}><span className={campaignsClearanceClassName}><ShieldCheck size={14} /> SIGNED IN</span><SignOutButton className={campaignsSignOutClassName} /></div>
         </header>
-        <div className={campaignsIntroClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> CAMPAIGN MANIFEST</p><h1>Choose or create a campaign.</h1><p>Anyone with an account can open a new campaign. A GM invite is only needed to join an existing one.</p></div>
+        <div className={campaignsIntroClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> CAMPAIGNS</p><h1>Choose or create a campaign.</h1><p>Anyone with an account can open a new campaign. A GM invite is only needed to join an existing one.</p></div>
         <div className={campaignsLayoutClassName}>
           <section className={campaignsSectionClassName} aria-label="Your campaigns">
             <div className={campaignsSectionHeadingClassName}><span>YOUR CAMPAIGNS</span><strong>{memberships.length.toString().padStart(2, "0")}</strong></div>
@@ -221,17 +221,17 @@ export default function CampaignsPage() {
               if (!campaign) return null;
 
               return <div className={campaignChoiceWrapClassName} key={campaign.id}><button className={campaignChoiceClassName} onClick={() => router.push(campaignPath(campaign.id))} type="button"><span className={campaignChoiceIconClassName}><Hexagon size={19} /></span><span className={campaignChoiceCopyClassName}><strong>{campaign.name}</strong><small>{campaign.system} {"//"} {membership.role === "gm" ? "GAME MASTER" : "PLAYER"}</small><span>{campaign.description || "No campaign brief recorded."}</span></span><ArrowUpRight className={campaignChoiceArrowClassName} size={17} /></button><form className={campaignDisplayFormClassName} onSubmit={(event) => { event.preventDefault(); void updateDisplayName(campaign.id); }}><label className={campaignDisplayLabelClassName} htmlFor={`display-name-${campaign.id}`}>YOUR NAME IN THIS CAMPAIGN</label><input className={campaignDisplayInputClassName} id={`display-name-${campaign.id}`} maxLength={120} onChange={(event) => setDisplayNames((current) => ({ ...current, [campaign.id]: event.target.value }))} value={displayNames[campaign.id] ?? membership.display_name} /><button aria-label={`Save display name for ${campaign.name}`} className={campaignDisplaySaveClassName} title="Save display name" type="submit"><Check size={14} /></button></form></div>;
-            }) : <div className={campaignEmptyClassName}><Radio size={20} /><p>Nothing on the manifest yet.</p><span>Your first campaign will become the crew&apos;s home signal.</span></div>}
+            }) : <div className={campaignEmptyClassName}><Radio size={20} /><p>No campaigns yet.</p><span>Create your first campaign to get started.</span></div>}
             <p className={campaignStatusClassName}><span className={liveDotClassName} /> {status}</p>
           </section>
           <section className={campaignsSectionClassName}>
             <div className={campaignsSectionHeadingClassName}><span>OPEN YOUR CAMPAIGN</span><CirclePlus size={16} /></div>
             <form className={campaignCreateFormClassName} onSubmit={createCampaign}>
               <label className={campaignCreateLabelClassName} htmlFor="campaign-name">CAMPAIGN NAME</label>
-              <input className={campaignCreateInputClassName} id="campaign-name" maxLength={120} onChange={(event) => setName(event.target.value)} placeholder="Signal / Noise" required value={name} />
-              <label className={campaignCreateLabelClassName} htmlFor="campaign-description">BRIEFING <span className={campaignCreateOptionalClassName}>OPTIONAL</span></label>
-              <textarea className={campaignCreateTextareaClassName} id="campaign-description" maxLength={2000} onChange={(event) => setDescription(event.target.value)} placeholder="A one-line signal for the crew." value={description} />
-              <button className={campaignCreateButtonClassName} disabled={isCreating} type="submit"><Radio size={15} /> {isCreating ? "REGISTERING..." : "CREATE CAMPAIGN"} <ArrowUpRight size={15} /></button>
+              <input className={campaignCreateInputClassName} id="campaign-name" maxLength={120} onChange={(event) => setName(event.target.value)} placeholder="New campaign name" required value={name} />
+              <label className={campaignCreateLabelClassName} htmlFor="campaign-description">DESCRIPTION <span className={campaignCreateOptionalClassName}>OPTIONAL</span></label>
+              <textarea className={campaignCreateTextareaClassName} id="campaign-description" maxLength={2000} onChange={(event) => setDescription(event.target.value)} placeholder="A short description of the campaign." value={description} />
+              <button className={campaignCreateButtonClassName} disabled={isCreating} type="submit"><Radio size={15} /> {isCreating ? "CREATING..." : "CREATE CAMPAIGN"} <ArrowUpRight size={15} /></button>
             </form>
           </section>
         </div>

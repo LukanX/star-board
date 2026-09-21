@@ -25,6 +25,7 @@ import {
 } from "@/lib/campaign/mappers";
 import {
   campaignPath,
+  campaignEntityPath,
   campaignSectionPath,
   loginPath,
 } from "@/lib/campaign/routes";
@@ -89,9 +90,9 @@ type OverviewMetrics = {
   openJobs: number;
   activeVotes: number;
   episodes: number;
-  members: number;
-  players: number;
-  gms: number;
+  activeCharacters: number;
+  assignedActiveCharacters: number;
+  unassignedActiveCharacters: number;
   notes: number;
   notesThisWeek: number;
   draftSignals: number;
@@ -100,7 +101,7 @@ type OverviewMetrics = {
 
 function getOverviewMetrics(
   missions: Mission[],
-  members: ApiCampaignMember[],
+  characters: Character[],
   notes: CampaignNote[],
   episodes: EpisodeRecord[],
 ): OverviewMetrics {
@@ -114,9 +115,9 @@ function getOverviewMetrics(
     openJobs: missions.filter((mission) => mission.status === "open").length,
     activeVotes: missions.filter((mission) => mission.voted).length,
     episodes: episodes.length,
-    members: members.length,
-    players: members.filter((member) => member.role === "player").length,
-    gms: members.filter((member) => member.role === "gm").length,
+    activeCharacters: characters.filter((character) => character.isActive).length,
+    assignedActiveCharacters: characters.filter((character) => character.isActive && character.ownerId !== null).length,
+    unassignedActiveCharacters: characters.filter((character) => character.isActive && character.ownerId === null).length,
     notes: notes.length,
     notesThisWeek: notesInLastSevenDays,
     draftSignals: missions.filter((mission) => mission.status === "draft")
@@ -180,14 +181,14 @@ export default function CampaignOverview({
           const result = (await response.json().catch(() => null)) as {
             error?: string;
           } | null;
-          throw new Error(result?.error ?? "Vote could not be synchronized.");
+          throw new Error(result?.error ?? "Vote could not be saved.");
         }
         const result = await fetchCampaignJobs(campaignId);
         setMissions(result.jobs.map(mapApiJob));
         notify(
           wasVoted
             ? `Vote removed from ${chosen.title}`
-            : `Vote locked on ${chosen.title}`,
+            : `Vote recorded for ${chosen.title}`,
         );
       })
       .catch((error: unknown) => {
@@ -195,7 +196,7 @@ export default function CampaignOverview({
         notify(
           error instanceof Error
             ? error.message
-            : "Vote could not be synchronized.",
+            : "Vote could not be saved.",
         );
       });
   };
@@ -217,6 +218,17 @@ export default function CampaignOverview({
       />
       <CampaignToastHost message={toast} onDismiss={() => setToast(null)} />
     </>
+  );
+}
+
+function RosterPortrait({ character, color, initials }: { character: Character; color: string; initials: string }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(character.image) && !imageFailed;
+
+  return (
+    <div className="grid h-[54px] w-[54px] flex-[0_0_54px] place-items-center overflow-hidden text-[#071017] font-mono text-[11px] font-bold" style={{ backgroundColor: color }}>
+      {showImage ? <img alt={`${character.name} portrait`} className="h-full w-full object-cover" onError={() => setImageFailed(true)} src={character.image ?? undefined} /> : initials}
+    </div>
   );
 }
 
@@ -245,12 +257,16 @@ function OverviewView({
   isGM: boolean;
   onVote: (id: string) => void;
 }) {
-  const metrics = getOverviewMetrics(missions, members, notes, episodes);
-  const roster = members.map((member, index) => ({
-    ...member,
-    initials: member.displayName.slice(0, 2).toUpperCase(),
+  const metrics = getOverviewMetrics(missions, characters, notes, episodes);
+  const roster = characters.filter((character) => character.isActive).map((character, index) => {
+    const owner = members.find((member) => member.userId === character.ownerId);
+    return {
+    character,
+    ownerName: owner ? `${owner.displayName}${owner.role === "gm" ? " (GM)" : ""}` : "Unassigned",
+    initials: character.name.trim().slice(0, 1).toUpperCase() || "?",
     color: ["#f5b84b", "#ff5c9a", "#62e8ff", "#b992ff"][index % 4],
-  }));
+    };
+  });
 
   return (
     <>
@@ -267,8 +283,8 @@ function OverviewView({
         </div>
         <div className="flex items-center gap-[23px] max-[760px]:w-full max-[760px]:justify-between">
           <div className="border-l border-[var(--line)] pl-[17px] max-[420px]:hidden [&_span]:mb-[5px] [&_span]:block [&_span]:text-[8px] [&_strong]:block [&_strong]:text-[var(--muted)] [&_strong]:font-mono [&_strong]:text-[10px] [&_strong]:font-medium">
-            <span className={microLabelClassName}>CAMPAIGN RECORDS</span>
-            <strong>LIVE</strong>
+            <span className={microLabelClassName}>CAMPAIGN DATA</span>
+            <strong>READY</strong>
           </div>
           <CampaignRouteLink
             className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px !border-[var(--cyan)] bg-[var(--cyan)] !text-[#061017] shadow-[0_0_20px_rgba(98,232,255,.16)] hover:bg-[#8ceeff]"
@@ -315,9 +331,9 @@ function OverviewView({
       </div>
       <div className="grid grid-cols-4 gap-[11px] mb-[19px] max-[1100px]:grid-cols-2 max-[760px]:gap-2">
         <MetricCard
-          label="Crew roster"
-          value={String(metrics.members).padStart(2, "0")}
-          detail={`${metrics.players} players / ${metrics.gms} GM${metrics.gms === 1 ? "" : "s"}`}
+          label="Character roster"
+          value={String(metrics.activeCharacters).padStart(2, "0")}
+          detail={`${metrics.assignedActiveCharacters} assigned / ${metrics.unassignedActiveCharacters} unassigned`}
           icon={UsersRound}
           accent="cyan"
         />
@@ -336,7 +352,7 @@ function OverviewView({
           accent="amber"
         />
         <MetricCard
-          label="GM signals"
+          label="Job drafts"
           value={String(metrics.draftSignals).padStart(2, "0")}
           detail={`${metrics.draftSignals} drafts / ${metrics.openJobs} open`}
           icon={Bot}
@@ -347,7 +363,7 @@ function OverviewView({
         <section className={`${panelClassName} min-w-0`}>
           <div className="panel-topline flex items-start justify-between px-[21px] pb-4 pt-5">
             <div>
-              <p className={`${eyebrowClassName} !mb-2`}>MISSION CONTROL</p>
+              <p className={`${eyebrowClassName} !mb-2`}>JOB BOARD</p>
               <h2>Job board</h2>
             </div>
           </div>
@@ -371,7 +387,7 @@ function OverviewView({
               title="No jobs recorded yet."
               message={
                 isGM
-                  ? "Open the job board to create the campaign's first signal."
+                  ? "Open the job board to create the campaign's first job."
                   : "The GM has not posted a job yet."
               }
             />
@@ -387,42 +403,41 @@ function OverviewView({
           <section className={`${panelClassName} pt-px`}>
             <div className="p-[19px_19px_15px]">
               <SectionHeading
-                eyebrow="CREW MANIFEST"
-                title="On the roster"
+                eyebrow="CHARACTER ROSTER"
+                title="Active characters"
                 action="Manage"
-                actionHref={campaignSectionPath(campaign.id, "members")}
+                actionHref={campaignSectionPath(campaign.id, "characters")}
                 actionIcon={<ArrowUpRight size={14} />}
               />
             </div>
             {roster.length ? (
-              <div className="border-t border-[var(--line)] px-[19px] py-1">
-                {roster.map((member) => (
-                  <div
+              <div className="border-t border-[var(--line)] px-[19px] py-1" data-campaign-roster="characters">
+                {roster.map(({ character, color, initials, ownerName }) => (
+                  <CampaignRouteLink
                     className="flex items-center gap-[10px] border-b border-[rgba(139,151,169,.1)] py-[10px] last:border-b-0"
-                    key={member.userId}
+                    href={campaignEntityPath(campaign.id, "characters", character.id)}
+                    key={character.id}
                   >
-                    <div
-                      className="grid h-7 w-7 flex-[0_0_28px] place-items-center text-[#071017] font-mono text-[8px] font-bold"
-                      style={{ backgroundColor: member.color }}
-                    >
-                      {member.initials}
-                    </div>
+                    <RosterPortrait character={character} color={color} initials={initials} />
                     <div className="min-w-0 flex-1">
                       <strong className="block text-[#d9e1eb] text-[11px] font-[550]">
-                        {member.displayName}
+                        {character.name}
                       </strong>
                       <span className="mt-[3px] block text-[var(--dim)] text-[9px]">
-                        {member.role === "gm" ? "GAME MASTER" : "PLAYER"}
+                        Level {character.level} {character.className || "Unassigned class"}
+                      </span>
+                      <span className="mt-[3px] block truncate text-[var(--muted)] text-[9px]">
+                        {ownerName}
                       </span>
                     </div>
-                  </div>
+                  </CampaignRouteLink>
                 ))}
               </div>
             ) : (
               <EmptyState
                 icon={UsersRound}
-                title="No crew members yet."
-                message="Campaign access has not been established."
+                title="No active characters yet."
+                message={characters.length ? "Every saved character is currently inactive." : "Add a character to start the roster."}
               />
             )}
           </section>

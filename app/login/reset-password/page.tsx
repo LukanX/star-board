@@ -67,8 +67,8 @@ export default function ResetPasswordPage() {
       <div className={`${authSignalClassName} ${authSignalOneClassName}`} />
       <div className={`${authSignalClassName} ${authSignalTwoClassName}`} />
       <section className={authPanelClassName}>
-        <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN OPERATIONS</small></span></div>
-        <div className={authHeadingClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> PASSWORD RESET</p><h1>Choose a new password.</h1><p>Set a new password to regain access to your campaign console.</p></div>
+        <div className={authBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN MANAGER</small></span></div>
+        <div className={authHeadingClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> PASSWORD RESET</p><h1>Choose a new password.</h1><p>Set a new password to regain access to your campaigns.</p></div>
         <form className={authFormClassName} onSubmit={handleSubmit}>
           <label htmlFor="password">New password</label>
           <input autoComplete="new-password" id="password" minLength={8} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" required type="password" value={password} />

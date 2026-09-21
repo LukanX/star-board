@@ -8,13 +8,14 @@ import { markCampaignArtPersisted, useCampaignArtEditor } from "@/components/arc
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
-import type { ApiCharacter, CharacterDraft } from "@/lib/campaign/types";
+import type { ApiCampaignMember, ApiCharacter, CharacterDraft } from "@/lib/campaign/types";
 
 const emptyDraft: CharacterDraft = {
   name: "",
   species: "",
   className: "",
   level: 1,
+  isActive: true,
   backstoryMarkdown: "",
   physicalDescription: "",
   artSubject: "",
@@ -27,11 +28,17 @@ const emptyDraft: CharacterDraft = {
 export default function CharacterEditor({
   campaignId,
   character,
+  currentUserId,
+  members = [],
+  role = "player",
   onSaved,
   onCancel: parentOnCancel,
 }: {
   campaignId: string;
   character?: ApiCharacter;
+  currentUserId?: string;
+  members?: ApiCampaignMember[];
+  role?: "gm" | "player";
   onSaved?: (character: ApiCharacter) => void;
   onCancel?: () => void;
 }) {
@@ -42,6 +49,7 @@ export default function CharacterEditor({
           species: character.species,
           className: character.class_name,
           level: character.level,
+          isActive: character.is_active !== false,
           backstoryMarkdown: character.backstory_markdown,
           physicalDescription: character.physical_description,
           artSubject: character.art_subject ?? "",
@@ -52,6 +60,7 @@ export default function CharacterEditor({
         }
       : emptyDraft,
   );
+  const [ownerId, setOwnerId] = useState<string | null>(character?.owner_id ?? currentUserId ?? null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -60,7 +69,7 @@ export default function CharacterEditor({
   const canGeneratePortrait = Boolean(character?.id && character.can_generate_portrait);
   const update = (
     field: keyof CharacterDraft,
-    value: string | number | null,
+    value: string | number | boolean | null,
   ) => {
     setDirty();
     setDraft((current) => ({ ...current, [field]: value }));
@@ -101,7 +110,7 @@ export default function CharacterEditor({
         {
           method: character ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(draft),
+          body: JSON.stringify({ ...draft, ...(!character && role === "gm" ? { ownerId } : {}) }),
         },
       );
       const result = (await response.json()) as {
@@ -168,7 +177,7 @@ export default function CharacterEditor({
           currentDraft={{ visualPrompt: draft.artSubject }}
           fields={[{ key: "visualPrompt", label: "Image description", maxLength: 1200, multiline: true }]}
           showModelPicker={character?.portrait_ai_role === "gm"}
-          toolLabel={character?.portrait_ai_role === "player" ? "PLAYER TOOL" : "GM TOOL"}
+          toolLabel={character?.portrait_ai_role === "player" ? "PLAYER ART" : "GM ART"}
           onApply={(candidate) => update("artSubject", candidate.visualPrompt ?? "")}
         />
       ) : null}
@@ -210,7 +219,36 @@ export default function CharacterEditor({
               onChange={(event) => update("level", Number(event.target.value))}
             />
           </label>
+          {!character && role === "gm" ? (
+            <label className="max-[760px]:[grid-column:1/-1] max-[420px]:[grid-column:auto]">
+              ASSIGN TO
+              <select
+                className="w-full h-[42px] border border-[rgba(139,151,169,.28)] outline-0 px-[10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[11px] focus:border-[var(--cyan)]"
+                onChange={(event) => {
+                  setDirty();
+                  setOwnerId(event.target.value || null);
+                }}
+                value={ownerId ?? ""}
+              >
+                <option value="">Unassigned</option>
+                {members.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.displayName}{member.role === "gm" ? " (GM)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
+        <label className="flex items-center gap-2 !text-[var(--muted)]">
+          <input
+            checked={draft.isActive}
+            className="!h-4 !w-4 !w-auto"
+            onChange={(event) => update("isActive", event.target.checked)}
+            type="checkbox"
+          />
+          ACTIVE RECORD
+        </label>
         <label>
           Backstory
           <textarea

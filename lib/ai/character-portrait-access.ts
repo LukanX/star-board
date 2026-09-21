@@ -5,7 +5,7 @@ export type CharacterPortraitAccessFailure = "membership" | "not-found" | "forbi
 export type CharacterPortraitRecord = {
   id: string;
   campaign_id: string;
-  owner_id: string;
+  owner_id: string | null;
   name: string;
   species: string;
   class_name: string;

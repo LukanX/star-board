@@ -186,7 +186,7 @@ export default function OpenRouterConnectionSettings({
     <section className={`${panelClassName} w-full min-w-0`} data-openrouter-connection>
       <div className="panel-topline flex items-start justify-between gap-4 px-[21px] pb-3 pt-5">
         <div>
-          <p className={`${eyebrowClassName} !mb-2`}>GM CONTROL // PROVIDER CONNECTION</p>
+          <p className={`${eyebrowClassName} !mb-2`}>GM SETTINGS // PROVIDER CONNECTION</p>
           <h2>OpenRouter campaign key</h2>
         </div>
         <KeyRound size={17} className={accentIconCyanClassName} />
