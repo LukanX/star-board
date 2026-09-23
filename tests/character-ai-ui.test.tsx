@@ -64,7 +64,7 @@ describe("character portrait UI boundaries", () => {
   });
 
   it("keeps character detail editing on the normal save boundary", () => {
-    const markup = render(<CharacterDetailRouteView campaignId={campaignId} initialCharacter={character} />);
+    const markup = render(<CharacterDetailRouteView campaignId={campaignId} initialCharacter={character} entityNotes={{ role: "player", displayName: "Pilot", notes: [] }} />);
 
     expect(markup).not.toContain("GENERATE PORTRAIT");
     expect(markup).not.toContain("SAVE PORTRAIT");

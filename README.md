@@ -169,3 +169,9 @@ The suite creates or signs into two local test accounts, creates a temporary cam
 ## Product direction
 
 The interface uses a synthwave starship-terminal visual language. Persistence covers job-board voting, campaign notes, characters/NPCs/factions, faction player/GM notes, optional NPC faction membership, the arbitrary-depth Places archive, the campaign-scoped Enemies archive, one primary Place link on NPCs/factions/jobs/episodes, episode promotion, image uploads, and review-before-save AI text, image, and source-import drafts.
+
+Campaign notes use a visual Markdown editor for headings, emphasis, lists, links, and GFM tables/task lists. Notes remain Markdown in Postgres; unsupported legacy Markdown opens in source mode until it can round-trip safely. Type `@` followed by at least two characters to search campaign entities and insert a canonical internal link. Public-note suggestions and saved links exclude draft jobs and unrevealed enemies.
+
+Player-visible global and episode notes can be edited by any campaign member, while only the author or a GM can delete a note or change its episode assignment. Entity-attached notes are separate from entity description and GM-only note fields; the note author or a GM may edit/delete them, and player-visible notes are readable only when the parent entity is visible. Overlapping saves use a database revision check and return a conflict instead of silently overwriting newer content. This detects conflicts but does not provide live simultaneous editing.
+
+Apply the forward migrations locally with `supabase migration up --local`. The note revision and entity-scope schema are in `0032_campaign_note_shared_edits.sql` and `0033_campaign_note_entity_subjects.sql`. Verify the entity visibility and authorship rules with the loopback-only RLS suite described above.

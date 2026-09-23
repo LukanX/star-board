@@ -6,12 +6,14 @@ import { Plus } from "lucide-react";
 import { CampaignArtEditorSlot } from "@/components/archive/CampaignArtField";
 import PlaceEditor from "@/components/places/PlaceEditor";
 import PlacePublicRecord from "@/components/places/PlacePublicRecord";
+import EntityNotesPanel from "@/components/notes/EntityNotesPanel";
 import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import type { ApiPlace } from "@/lib/campaign/types";
 import type { CampaignPlaceResult } from "@/lib/campaign/places-server";
+import type { CampaignNotesResult } from "@/lib/campaign/notes-server";
 
-export default function PlaceDetailRouteView({ campaignId, initialResult, initialPlaces }: { campaignId: string; initialResult: CampaignPlaceResult; initialPlaces: ApiPlace[] }) {
+export default function PlaceDetailRouteView({ campaignId, initialResult, initialPlaces, entityNotes }: { campaignId: string; initialResult: CampaignPlaceResult; initialPlaces: ApiPlace[]; entityNotes: CampaignNotesResult }) {
   const router = useRouter();
   const [place, setPlace] = useState(initialResult.place);
   const [places, setPlaces] = useState(initialPlaces);
@@ -44,5 +46,5 @@ export default function PlaceDetailRouteView({ campaignId, initialResult, initia
 
   const actions = isGM ? <><RecordEditAction recordName={place.name} disabled={isDeleting} onClick={() => { setError(null); setEditorMode("edit"); }} /><button aria-label={`Add child under ${place.name}`} className="w-8 h-8 inline-grid place-items-center border border-transparent bg-transparent text-[var(--muted)] cursor-pointer p-0 hover:text-[var(--ink)] hover:border-[var(--line)] hover:bg-[rgba(255,255,255,.035)]" onClick={() => { setError(null); setEditorMode("child"); }} title={`Add child under ${place.name}`} type="button"><Plus aria-hidden="true" size={15} /></button></> : null;
 
-  return <><CampaignArtEditorSlot />{editorMode ? null : <><PlacePublicRecord campaignId={campaignId} place={place} places={places} isGM={isGM} actions={actions} related={initialResult.related} />{isGM ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap"><RecordDeleteAction recordName={place.name} disabled={isDeleting} onClick={() => void deletePlace()} /></div> : null}</>}{error ? <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}{editorMode ? <PlaceEditor key={`${editorMode}:${place.id}`} campaignId={campaignId} places={places} place={editorMode === "edit" ? place : undefined} parentPlaceId={editorMode === "child" ? place.id : null} onCancel={() => setEditorMode(null)} onSaved={savePlace} onDeleted={() => router.push(campaignSectionPath(campaignId, "places"))} /> : null}</>;
+  return <><CampaignArtEditorSlot />{editorMode ? null : <><PlacePublicRecord campaignId={campaignId} place={place} places={places} isGM={isGM} actions={actions} related={initialResult.related} />{isGM ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap"><RecordDeleteAction recordName={place.name} disabled={isDeleting} onClick={() => void deletePlace()} /></div> : null}<EntityNotesPanel campaignId={campaignId} entity={{ type: "place", id: place.id }} entityLabel={place.name} initialResult={entityNotes} /></>}{error ? <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}{editorMode ? <PlaceEditor key={`${editorMode}:${place.id}`} campaignId={campaignId} places={places} place={editorMode === "edit" ? place : undefined} parentPlaceId={editorMode === "child" ? place.id : null} onCancel={() => setEditorMode(null)} onSaved={savePlace} onDeleted={() => router.push(campaignSectionPath(campaignId, "places"))} /> : null}</>;
 }

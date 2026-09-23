@@ -6,15 +6,17 @@ import { useRouter } from "next/navigation";
 import { CampaignArtEditorSlot } from "@/components/archive/CampaignArtField";
 import EnemyEditor from "@/components/enemies/EnemyEditor";
 import EnemyPublicRecord from "@/components/enemies/EnemyPublicRecord";
+import EntityNotesPanel from "@/components/notes/EntityNotesPanel";
 import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import type { ApiEnemy } from "@/lib/campaign/types";
 import type { CampaignEnemyResult } from "@/lib/campaign/enemies-server";
+import type { CampaignNotesResult } from "@/lib/campaign/notes-server";
 import { enemyImportPreviewSchema, type EnemyImportPreview } from "@/lib/validation/enemy";
 
 const actionClassName = "h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px bg-[rgba(255,255,255,.035)] text-[var(--muted)] hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]";
 
-export default function EnemyDetailRouteView({ campaignId, initialResult }: { campaignId: string; initialResult: CampaignEnemyResult }) {
+export default function EnemyDetailRouteView({ campaignId, initialResult, entityNotes }: { campaignId: string; initialResult: CampaignEnemyResult; entityNotes: CampaignNotesResult }) {
   const router = useRouter();
   const [enemy, setEnemy] = useState<ApiEnemy>(initialResult.enemy);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -66,5 +68,5 @@ export default function EnemyDetailRouteView({ campaignId, initialResult }: { ca
 
   const actions = isGM ? <div className="flex flex-wrap items-center justify-end gap-2"><RecordEditAction recordName={enemy.name} disabled={isDeleting} onClick={() => { setError(null); setReimportPreview(null); setEditorOpen(true); }} />{enemy.source_provider === "aon" ? <button className={actionClassName} disabled={isReimporting} onClick={() => void previewReimport()} type="button"><FileSearch aria-hidden="true" size={15} /> {isReimporting ? "PREVIEWING..." : "REVIEW SOURCE UPDATE"}</button> : null}</div> : undefined;
 
-  return <><CampaignArtEditorSlot />{editorOpen ? <EnemyEditor key={`${enemy.id}:${reimportPreview?.sourceSnapshot.contentHash ?? "manual"}`} campaignId={campaignId} enemy={enemy} initialImportPreview={reimportPreview} onCancel={() => { setEditorOpen(false); setReimportPreview(null); }} onSaved={(saved) => { setEnemy(saved); setEditorOpen(false); setReimportPreview(null); }} /> : <><EnemyPublicRecord campaignId={campaignId} enemy={enemy} isGM={isGM} actions={actions} />{isGM ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap"><RecordDeleteAction recordName={enemy.name} disabled={isDeleting} onClick={() => void deleteEnemy()} /></div> : null}</>}{error ? <p className="m-0 mt-3 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}</>;
+  return <><CampaignArtEditorSlot />{editorOpen ? <EnemyEditor key={`${enemy.id}:${reimportPreview?.sourceSnapshot.contentHash ?? "manual"}`} campaignId={campaignId} enemy={enemy} initialImportPreview={reimportPreview} onCancel={() => { setEditorOpen(false); setReimportPreview(null); }} onSaved={(saved) => { setEnemy(saved); setEditorOpen(false); setReimportPreview(null); }} /> : <><EnemyPublicRecord campaignId={campaignId} enemy={enemy} isGM={isGM} actions={actions} />{isGM ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap"><RecordDeleteAction recordName={enemy.name} disabled={isDeleting} onClick={() => void deleteEnemy()} /></div> : null}<EntityNotesPanel campaignId={campaignId} entity={{ type: "enemy", id: enemy.id }} entityLabel={enemy.name} initialResult={entityNotes} /></>}{error ? <p className="m-0 mt-3 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}</>;
 }

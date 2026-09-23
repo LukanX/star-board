@@ -46,6 +46,7 @@ const note = {
   created_at: "2026-08-21T00:00:00.000Z",
   updated_at: "2026-08-21T00:00:00.000Z",
   updated_by: authorId,
+  revision: 1,
 };
 
 describe("campaign Notes server reads", () => {
@@ -75,7 +76,7 @@ describe("campaign Notes server reads", () => {
     const result = await getCampaignNotes(campaignId);
 
     expect(result?.notes).toHaveLength(1);
-    expect(result?.notes[0]).toMatchObject({ id: noteId, author: { id: authorId, displayName: "Archivist" }, permissions: { canEdit: false, canDelete: false } });
+    expect(result?.notes[0]).toMatchObject({ id: noteId, author: { id: authorId, displayName: "Archivist" }, permissions: { canEdit: true, canDelete: false, canChangeEpisode: false, canChangeVisibility: false } });
     expect(result?.notes).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: "gm-note" })]));
     expect(notesQuery.eq).toHaveBeenCalledWith("campaign_id", campaignId);
   });
@@ -101,7 +102,7 @@ describe("campaign Notes server reads", () => {
 
     const result = await getCampaignNotes(campaignId);
 
-    expect(result?.notes[0].permissions).toEqual({ canEdit: true, canDelete: true });
+    expect(result?.notes[0].permissions).toEqual({ canEdit: true, canDelete: true, canChangeEpisode: true, canChangeVisibility: false });
   });
 
   it("scopes detail reads to both note and campaign and hides private notes from players", async () => {

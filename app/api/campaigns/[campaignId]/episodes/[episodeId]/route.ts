@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { validateCampaignPlace } from "@/lib/places";
+import { maskHiddenNoteEntityLinksBatch } from "@/lib/campaign/note-links";
 import { updateEpisodeSchema } from "@/lib/validation/episode";
 
 type RouteContext = { params: Promise<{ campaignId: string; episodeId: string }> };
@@ -47,7 +48,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const { data: notes, error: notesError } = await context.supabase
       .from("campaign_notes")
-      .select("id, title, body_markdown, visibility, author_id, created_at, updated_at")
+      .select("id, title, body_markdown, visibility, author_id, created_at, updated_at, revision")
       .eq("campaign_id", campaignId)
       .eq("episode_id", episodeId)
       .order("updated_at", { ascending: false });
@@ -67,11 +68,17 @@ export async function GET(_request: Request, { params }: RouteContext) {
     }
 
     const authors = new Map((authorsResult.data ?? []).map((author) => [author.id, author.display_name]));
-    const episodeNotes = visibleNotes.map((note) => ({
+    const maskedBodies = await maskHiddenNoteEntityLinksBatch(
+      context.supabase,
+      campaignId,
+      visibleNotes.map((note) => ({ markdown: note.body_markdown, visibility: note.visibility })),
+    );
+    const episodeNotes = visibleNotes.map((note, index) => ({
       ...note,
+      body_markdown: maskedBodies[index] ?? note.body_markdown,
       author: { id: note.author_id, displayName: authors.get(note.author_id) ?? "Crew member" },
       permissions: {
-        canEdit: note.author_id === context.user.id || membership.role === "gm",
+        canEdit: note.visibility === "player" || membership.role === "gm",
         canDelete: note.author_id === context.user.id || membership.role === "gm",
       },
     }));

@@ -1,4 +1,5 @@
 import type { PlaceRecord } from "@/lib/places";
+import type { NoteEntityType } from "@/lib/campaign/note-subject";
 import type { EnemyOrigin, EnemyRarity, EnemySize, EnemyStatBlockV1 } from "@/lib/enemies/types";
 
 export type CampaignRecord = { id: string; name: string; system: string; description: string; visual_style: string; created_by: string };
@@ -25,11 +26,11 @@ export type ApiFaction = { id: string; author_id: string; name: string; descript
 export type FactionRecord = ApiFaction & { color: "pink" | "cyan" | "amber" };
 export type ApiEpisode = { id: string; campaign_id: string; source_job_id: string | null; place_id: string | null; created_by: string; title: string; summary: string; player_context_markdown: string; status: "planned" | "active" | "complete" | "archived"; started_at: string | null; completed_at: string | null; created_at: string; updated_at: string; noteCount: number };
 export type EpisodeRecord = ApiEpisode & { accent: "cyan" | "pink" | "amber" };
-export type EpisodeNote = { id: string; title: string; body_markdown: string; visibility: "player" | "gm"; author_id: string; created_at: string; updated_at: string; author: { id: string; displayName: string }; permissions: { canEdit: boolean; canDelete: boolean } };
+export type EpisodeNote = { id: string; title: string; body_markdown: string; visibility: "player" | "gm"; author_id: string; created_at: string; updated_at: string; revision: number; author: { id: string; displayName: string }; permissions: { canEdit: boolean; canDelete: boolean } };
 export type ApiCampaignMember = { userId: string; role: "gm" | "player"; displayName: string; joinedAt: string };
 export type NoteVisibility = "player" | "gm";
 export type NoteAccent = "cyan" | "pink" | "amber" | "purple";
-export type ApiCampaignNote = { id: string; campaign_id: string; episode_id: string | null; author_id: string; title: string; body_markdown: string; visibility: NoteVisibility; created_at: string; updated_at: string; updated_by: string | null; author: { id: string; displayName: string }; permissions: { canEdit: boolean; canDelete: boolean } };
+export type ApiCampaignNote = { id: string; campaign_id: string; episode_id: string | null; entity_type: NoteEntityType | null; entity_id: string | null; author_id: string; title: string; body_markdown: string; visibility: NoteVisibility; created_at: string; updated_at: string; updated_by: string | null; revision: number; author: { id: string; displayName: string }; permissions: { canEdit: boolean; canDelete: boolean; canChangeEpisode: boolean; canChangeVisibility: boolean } };
 export type CampaignNote = ApiCampaignNote & { accent: NoteAccent; age?: string };
 export type CampaignNoteEpisode = { id: string; title: string; status: string };
 export type ApiPlace = PlaceRecord & { author_id: string; description: string; player_notes_markdown: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; created_at: string; updated_at: string; gm_notes_markdown?: string };
