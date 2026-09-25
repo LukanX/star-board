@@ -1,5 +1,5 @@
 import { getAuthenticatedUser, getCampaignMembership, type CampaignMembership } from "@/lib/auth/permissions";
-import { maskHiddenNoteEntityLinksBatch } from "@/lib/campaign/note-links";
+import { maskHiddenNoteEntityLinksBatch, maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { ApiEpisode, EpisodeNote } from "@/lib/campaign/types";
 
 export type CampaignEpisode = ApiEpisode;
@@ -64,7 +64,13 @@ export async function getCampaignEpisodes(campaignId: string): Promise<CampaignE
     }
   }
 
-  const episodes = (episodesResult.data ?? []) as EpisodeRow[];
+  let episodes = (episodesResult.data ?? []) as EpisodeRow[];
+  if (context.membership.role !== "gm") {
+    episodes = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, episodes, (episode) => [
+      { key: "summary", markdown: episode.summary },
+      { key: "player_context_markdown", markdown: episode.player_context_markdown },
+    ]);
+  }
   return {
     role: context.membership.role,
     displayName: context.membership.displayName,
@@ -121,7 +127,13 @@ export async function getCampaignEpisode(campaignId: string, episodeId: string):
     },
   }));
 
-  const episode = episodeData as EpisodeRow;
+  let episode = episodeData as EpisodeRow;
+  if (context.membership.role !== "gm") {
+    [episode] = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [episode], (record) => [
+      { key: "summary", markdown: record.summary },
+      { key: "player_context_markdown", markdown: record.player_context_markdown },
+    ]);
+  }
   return {
     role: context.membership.role,
     displayName: context.membership.displayName,

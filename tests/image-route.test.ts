@@ -103,14 +103,24 @@ function createSupabaseMock() {
     eq: vi.fn().mockResolvedValue({ error: null }),
   };
   generationUpdate.update.mockReturnValue(generationUpdate);
+  const upload = vi.fn().mockResolvedValue({ error: null });
+  const remove = vi.fn().mockResolvedValue({ error: null });
+  const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl: "https://storage.example/image.png" }, error: null });
+  const storageFrom = vi.fn().mockReturnValue({ upload, remove, createSignedUrl });
+  const attachImage = vi.fn().mockResolvedValue({ data: true, error: null });
 
   return {
     from: vi.fn()
       .mockReturnValueOnce(campaignQuery)
       .mockReturnValueOnce(generationInsert)
       .mockReturnValue(generationUpdate),
+    storage: { from: storageFrom },
+    rpc: attachImage,
     generationInsert,
     generationUpdate,
+    upload,
+    remove,
+    attachImage,
   };
 }
 
@@ -166,9 +176,18 @@ describe("POST /api/ai/image", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toMatchObject({ targetKind: "character", characterId: savedCharacterAccess.access.character.id });
+    expect(payload.draft).toMatchObject({
+      temporaryPath: `${campaignId}/${userId}/image-00000000-0000-4000-8000-000000000003.png`,
+      image: { base64: null, url: "https://storage.example/image.png", mediaType: "image/png" },
+    });
     expect(mocks.generateImage.mock.calls[0][1]).toContain("Saved character: Nova Vex, Android, Mechanic, level 3.");
     expect(mocks.generateImage.mock.calls[0][1]).toContain("blue circuit scar");
     expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({ target_character_id: savedCharacterAccess.access.character.id }));
+    expect(supabase.attachImage).toHaveBeenCalledWith("attach_ai_generation_image", {
+      p_generation_run_id: "00000000-0000-4000-8000-000000000003",
+      p_image_path: `${campaignId}/${userId}/image-00000000-0000-4000-8000-000000000003.png`,
+      p_image_media_type: "image/png",
+    });
   });
 
   it("rejects a player portrait when Player AI is disabled", async () => {
@@ -252,7 +271,8 @@ describe("POST /api/ai/image", () => {
       generationRunId: "00000000-0000-4000-8000-000000000003",
       aspectRatio: "16:9",
       size: "3840x2160",
-      image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" },
+      temporaryPath: `${campaignId}/${userId}/image-00000000-0000-4000-8000-000000000003.png`,
+      image: { base64: null, url: "https://storage.example/image.png", mediaType: "image/png" },
       createdAt: "2026-08-03T12:34:56.000Z",
     });
     expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({
@@ -287,6 +307,26 @@ describe("POST /api/ai/image", () => {
     expect(mocks.loadPlaceAiContext).toHaveBeenCalledWith(supabase, campaignId, parentId);
     expect(mocks.generateImage.mock.calls[0][1]).toContain("Immediate parent description: A crowded district beneath the orbital ring.");
     expect(mocks.generateImage.mock.calls[0][1]).toContain("keep the child place as the focal subject");
+  });
+
+  it("removes a temporary image when its generation metadata cannot be attached", async () => {
+    const supabase = createSupabaseMock();
+    supabase.attachImage.mockResolvedValue({ data: false, error: null });
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+
+    const response = await POST(createRequest({
+      campaignId,
+      mode: "create",
+      targetKind: "npc",
+      subject: "A masked station broker",
+      model: "openai/gpt-image-1",
+    }));
+
+    expect(response.status).toBe(503);
+    expect(supabase.remove).toHaveBeenCalledWith([`${campaignId}/${userId}/image-00000000-0000-4000-8000-000000000003.png`]);
   });
 
   it("queues image generation for the Netlify background worker", async () => {

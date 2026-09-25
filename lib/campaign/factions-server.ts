@@ -1,5 +1,6 @@
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { CampaignAffiliationContext } from "@/lib/campaign/affiliations-server";
 import type { FactionRelatedRecords, RelatedJobSummary, RelatedPlaceSummary } from "@/lib/campaign/detail-types";
 import type { CampaignPlacesContext } from "@/lib/campaign/places-server";
@@ -20,7 +21,7 @@ export type CampaignFactionResult = {
   related: FactionRelatedRecords;
 };
 
-const factionColumns = "id, author_id, name, description, status, player_notes_markdown, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const factionColumns = "id, author_id, name, description, description_is_markdown, status, player_notes_markdown, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 function toPlaceSummary(place: Pick<ApiPlace, "id" | "name" | "kind">): RelatedPlaceSummary {
   return { id: place.id, name: place.name, kind: place.kind };
@@ -76,7 +77,11 @@ export async function getCampaignFactions(campaignId: string): Promise<CampaignF
 
   const factionsWithArt = await addCampaignArtUrls(context.supabase, data ?? []);
   if (membership.role !== "gm") {
-    return { role: membership.role, displayName: membership.displayName, factions: factionsWithArt };
+    const factions = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, factionsWithArt, (faction) => [
+      ...(faction.description_is_markdown ? [{ key: "description", markdown: faction.description }] : []),
+      { key: "player_notes_markdown", markdown: faction.player_notes_markdown },
+    ]);
+    return { role: membership.role, displayName: membership.displayName, factions };
   }
 
   const factionIds = (data ?? []).map((faction) => faction.id);
@@ -127,6 +132,11 @@ export async function getCampaignFaction(
 
     if (notesError) throw new Error(`Unable to read faction private notes: ${notesError.message}`);
     faction = { ...factionWithArt, gm_notes_markdown: notes?.body_markdown ?? "" };
+  } else {
+    [faction] = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [factionWithArt], (record) => [
+      ...(record.description_is_markdown ? [{ key: "description", markdown: record.description }] : []),
+      { key: "player_notes_markdown", markdown: record.player_notes_markdown },
+    ]);
   }
 
   const placesResult = await placesResultPromise;

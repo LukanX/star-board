@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import { validateCampaignPlace } from "@/lib/places";
 import { createFactionSchema } from "@/lib/validation/faction";
 
@@ -8,7 +10,7 @@ type RouteContext = { params: Promise<{ campaignId: string }> };
 
 export const runtime = "nodejs";
 
-const factionColumns = "id, author_id, name, description, status, player_notes_markdown, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const factionColumns = "id, author_id, name, description, description_is_markdown, status, player_notes_markdown, place_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId } = await params;
@@ -38,7 +40,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const factionsWithArt = await addCampaignArtUrls(context.supabase, data ?? []);
     if (membership.role !== "gm") {
-      return NextResponse.json({ role: membership.role, displayName: membership.displayName, factions: factionsWithArt });
+      const factions = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, factionsWithArt, (faction) => [
+        ...(faction.description_is_markdown ? [{ key: "description", markdown: faction.description }] : []),
+        { key: "player_notes_markdown", markdown: faction.player_notes_markdown },
+      ]);
+      return NextResponse.json({ role: membership.role, displayName: membership.displayName, factions });
     }
 
     const factionIds = (data ?? []).map((faction) => faction.id);
@@ -90,6 +96,15 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
     }
 
+    const narrativeFields = [
+      ...(input.data.descriptionIsMarkdown ? [{ markdown: input.data.description, audience: "player" as const }] : []),
+      { markdown: input.data.playerNotesMarkdown, audience: "player" as const },
+      { markdown: input.data.gmNotesMarkdown, audience: "gm" as const },
+    ];
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, narrativeFields))) {
+      return NextResponse.json({ error: "Faction details link to an inaccessible or invalid campaign record." }, { status: 400 });
+    }
+
     const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);
 
     if (placeResult.unavailable) {
@@ -105,6 +120,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       p_public: {
         name: input.data.name,
         description: input.data.description,
+        descriptionIsMarkdown: input.data.descriptionIsMarkdown,
         status: input.data.status,
         playerNotesMarkdown: input.data.playerNotesMarkdown,
         placeId: input.data.placeId ?? null,

@@ -41,6 +41,7 @@ const publicEnemy = {
   author_id: "00000000-0000-4000-8000-000000000003",
   name: "Void Stalker",
   player_description: "A silent shape moving between the stars.",
+  player_description_is_markdown: false,
   is_revealed: true,
   art_path: "campaign-1/gm-1/enemy-art.png",
   created_at: "2026-08-23T12:00:00.000Z",

@@ -6,6 +6,7 @@ import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
 import { buildNpcPrompt } from "@/lib/ai/prompts";
+import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
 import { npcDraftSchema, npcGenerationInputSchema, npcReviewDraftSchema } from "@/lib/validation/ai";
@@ -65,7 +66,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: aiContext.error }, { status: aiContext.notFound ? 404 : 503 });
     }
 
-    const prompt = buildNpcPrompt(input.data, aiContext.campaign);
+    const linkedContext = await loadLinkedEntityContext(context.supabase, input.data.campaignId, input.data, "gm");
+    if ("error" in linkedContext) {
+      const failure = linkedEntityContextFailure(linkedContext.error);
+      return NextResponse.json({ error: failure.message }, { status: failure.status });
+    }
+
+    const prompt = buildNpcPrompt(input.data, aiContext.campaign, linkedContext.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let rawDraft: unknown;
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;

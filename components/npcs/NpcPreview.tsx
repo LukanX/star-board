@@ -1,6 +1,7 @@
 import { ArrowUpRight, BookOpen, LockKeyhole, Map, Network, UserRound } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import NarrativeContent from "@/components/markdown/NarrativeContent";
 import RecordPortrait from "@/components/ui/RecordPortrait";
 import { archivePreviewArtworkClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
@@ -26,9 +27,9 @@ export default function NpcPreview({ campaignId, npc, faction, places, isGM }: {
     <div data-npc-preview-copy="true" className="grid gap-[14px]">
       {faction ? <CampaignRouteLink data-npc-preview-faction="true" className="m-0 flex w-fit max-w-full items-center gap-[6px] text-[var(--cyan)] font-mono text-[8px] tracking-[.07em] [overflow-wrap:anywhere] hover:text-[var(--ink)]" href={campaignEntityPath(campaignId, "factions", faction.id)}><Network size={13} /> FACTION // {faction.name}</CampaignRouteLink> : null}
       <p className="m-0 flex flex-wrap items-center gap-[6px] text-[var(--cyan)] font-mono text-[8px] tracking-[.07em] leading-[1.5] [overflow-wrap:anywhere]"><Map size={13} /> {getPlaceBreadcrumb(places, npc.place_id) || "NO PRIMARY PLACE"}</p>
-      <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">{npc.description || "No public description recorded yet."}</p></div>
-      <MarkdownPreview data-npc-preview-notes="true"><MarkdownPreviewToolbar><BookOpen size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><p>{npc.player_notes_markdown || "No player notes recorded yet."}</p></MarkdownPreview>
-      {isGM ? <MarkdownPreview data-npc-preview-private="true" className="border-[rgba(255,92,154,.25)]"><MarkdownPreviewToolbar className="text-[var(--pink)]"><LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span></MarkdownPreviewToolbar><p>{npc.gm_notes_markdown || "No private notes recorded yet."}</p></MarkdownPreview> : null}
+      <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><NarrativeContent source={npc.description || "No public description recorded yet."} isMarkdown={npc.description_is_markdown ?? false} suppressAutolinkLiterals className="m-0 text-[11px] leading-[1.65] [overflow-wrap:anywhere]" /></div>
+      <MarkdownPreview data-npc-preview-notes="true"><MarkdownPreviewToolbar><BookOpen size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><NarrativeContent source={npc.player_notes_markdown || "No player notes recorded yet."} isMarkdown /></MarkdownPreview>
+      {isGM ? <MarkdownPreview data-npc-preview-private="true" className="border-[rgba(255,92,154,.25)]"><MarkdownPreviewToolbar className="text-[var(--pink)]"><LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span></MarkdownPreviewToolbar><NarrativeContent source={npc.gm_notes_markdown || "No private notes recorded yet."} isMarkdown /></MarkdownPreview> : null}
     </div>
   </div>;
 }

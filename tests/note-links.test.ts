@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { maskHiddenNoteEntityLinks, validateNoteEntityLinks } from "@/lib/campaign/note-links";
+import { maskHiddenNoteEntityLinks, maskPlayerFacingEntityMarkdownBatch, validateCampaignEntityLinkFields, validateNoteEntityLinks } from "@/lib/campaign/note-links";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const enemyId = "00000000-0000-4000-8000-000000000002";
@@ -66,6 +66,24 @@ describe("campaign note entity links", () => {
     await expect(validateNoteEntityLinks(supabase, campaignId, markdown)).resolves.toBe(false);
   });
 
+  it("allows private fields to reference hidden targets but rejects them in player fields", async () => {
+    const supabase = createSupabase({
+      enemies: { data: [{ id: enemyId, is_revealed: false }] },
+      jobs: { data: [{ id: jobId, status: "draft" }] },
+    });
+    const enemyMarkdown = `[@Shade](/campaigns/${campaignId}/enemies/${enemyId})`;
+    const jobMarkdown = `[@Secret](/campaigns/${campaignId}/jobs/${jobId})`;
+
+    await expect(validateCampaignEntityLinkFields(supabase, campaignId, [
+      { markdown: enemyMarkdown, audience: "gm" },
+      { markdown: jobMarkdown, audience: "gm" },
+    ])).resolves.toBe(true);
+    await expect(validateCampaignEntityLinkFields(supabase, campaignId, [
+      { markdown: enemyMarkdown, audience: "gm" },
+      { markdown: jobMarkdown, audience: "player" },
+    ])).resolves.toBe(false);
+  });
+
   it("masks stale links without changing surrounding Markdown", async () => {
     const supabase = createSupabase({
       enemies: { data: [{ id: enemyId, is_revealed: false }] },
@@ -74,5 +92,17 @@ describe("campaign note entity links", () => {
 
     await expect(maskHiddenNoteEntityLinks(supabase, campaignId, markdown, "player"))
       .resolves.toBe("The crew saw Unavailable campaign record **near the relay**.");
+  });
+
+  it("masks inaccessible internal links from player entity fields before serializing records", async () => {
+    const supabase = createSupabase({
+      enemies: { data: [{ id: enemyId, is_revealed: false }] },
+    });
+    const source = `[@Sentinel](/campaigns/${campaignId}/enemies/${enemyId}) triggered the beacon.`;
+    const [record] = await maskPlayerFacingEntityMarkdownBatch(supabase, campaignId, [{ description: source }], (item) => [
+      { key: "description", markdown: item.description },
+    ]);
+
+    expect(record.description).toBe("Unavailable campaign record triggered the beacon.");
   });
 });

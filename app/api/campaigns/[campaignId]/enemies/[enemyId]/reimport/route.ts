@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignRole } from "@/lib/auth/permissions";
 import { readCampaignEnemyForRole } from "@/lib/campaign/enemies-server";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { fetchAonCreatureHtml, AonFetchError } from "@/lib/enemies/aon-fetch";
 import { parseAonCreatureHtml, AonParseError } from "@/lib/enemies/aon-parser";
 import { parseAonCreatureUrl } from "@/lib/enemies/aon-url";
@@ -42,6 +43,16 @@ export async function POST(request: Request, { params }: RouteContext) {
     const current = await readCampaignEnemyForRole(context.supabase, campaignId, enemyId, "gm");
     if (!current) return NextResponse.json({ error: "Enemy not found." }, { status: 404 });
     if (input.data.expectedUpdatedAt !== current.updated_at) return NextResponse.json({ error: "The enemy changed after this preview was created." }, { status: 409 });
+
+    const playerDescription = input.data.preserved?.playerDescription ?? current.player_description;
+    const playerDescriptionIsMarkdown = input.data.preserved?.playerDescriptionIsMarkdown ?? current.player_description_is_markdown ?? false;
+    const gmNotesMarkdown = input.data.preserved?.gmNotesMarkdown ?? current.gm_notes_markdown ?? "";
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, [
+      ...(playerDescriptionIsMarkdown ? [{ markdown: playerDescription, audience: "player" as const }] : []),
+      { markdown: gmNotesMarkdown, audience: "gm" },
+    ]))) {
+      return NextResponse.json({ error: "Enemy details link to an inaccessible or invalid campaign record." }, { status: 400 });
+    }
     if (!input.data.reviewedSource) return NextResponse.json({ error: "An Archives of Nethys preview must be reviewed before saving." }, { status: 400 });
     if (current.source_provider === "aon") {
       if (!current.source_content_hash) return NextResponse.json({ error: "This enemy has incomplete Archives of Nethys provenance." }, { status: 409 });
@@ -115,7 +126,8 @@ export async function POST(request: Request, { params }: RouteContext) {
       p_source: payload,
       p_expected_updated_at: input.data.expectedUpdatedAt,
       p_authored: {
-        playerDescription: preserved?.playerDescription ?? current.player_description,
+        playerDescription,
+        playerDescriptionIsMarkdown,
         isRevealed: preserved?.isRevealed ?? current.is_revealed,
         artPath: nextArtPath,
         gmNotesMarkdown: preserved?.gmNotesMarkdown ?? current.gm_notes_markdown ?? "",

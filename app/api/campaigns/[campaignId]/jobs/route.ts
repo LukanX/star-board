@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls, removeCampaignArtIfUnreferenced } from "@/lib/storage/campaign-art";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { validateCampaignPlace } from "@/lib/places";
 import { createJobSchema } from "@/lib/validation/job";
 
@@ -71,7 +73,14 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return { ...publicJob, giver, votes: votes.count, voted: votes.voted, ...(membership.role === "gm" ? { hook, gm_notes_markdown: notesByJob.get(job.id) ?? "" } : {}) };
     });
 
-    return NextResponse.json({ role: membership.role, displayName: membership.displayName, jobs });
+    const visibleJobs = membership.role === "gm"
+      ? jobs
+      : await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, jobs, (job) => [
+        { key: "summary", markdown: job.summary },
+        { key: "player_notes_markdown", markdown: job.player_notes_markdown },
+      ]);
+
+    return NextResponse.json({ role: membership.role, displayName: membership.displayName, jobs: visibleJobs });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
@@ -104,6 +113,15 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     if (role !== "gm") {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
+    }
+
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, [
+      { markdown: input.data.summary, audience: "player" },
+      { markdown: input.data.playerNotesMarkdown, audience: "player" },
+      { markdown: input.data.hook, audience: "gm" },
+      { markdown: input.data.gmNotesMarkdown, audience: "gm" },
+    ]))) {
+      return NextResponse.json({ error: "Job details link to an inaccessible or invalid campaign record." }, { status: 400 });
     }
 
     const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);
@@ -186,6 +204,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     if (role !== "gm") {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
+    }
+
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, [
+      { markdown: input.data.summary, audience: "player" },
+      { markdown: input.data.playerNotesMarkdown, audience: "player" },
+      { markdown: input.data.hook, audience: "gm" },
+      { markdown: input.data.gmNotesMarkdown, audience: "gm" },
+    ]))) {
+      return NextResponse.json({ error: "Job details link to an inaccessible or invalid campaign record." }, { status: 400 });
     }
 
     const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);

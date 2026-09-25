@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import { createPlaceSchema } from "@/lib/validation/place";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 
 export const runtime = "nodejs";
 
-const placeColumns = "id, campaign_id, author_id, parent_place_id, name, kind, description, player_notes_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const placeColumns = "id, campaign_id, author_id, parent_place_id, name, kind, description, description_is_markdown, player_notes_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 async function getParentPlaceError(supabase: Awaited<ReturnType<typeof getAuthenticatedUser>> extends infer Context ? Context extends { supabase: infer Client } ? Client : never : never, campaignId: string, parentPlaceId: string | null | undefined) {
   if (!parentPlaceId) return null;
@@ -51,6 +53,13 @@ export async function GET(_request: Request, { params }: RouteContext) {
     }
 
     const placesWithArt = await addCampaignArtUrls(context.supabase, data ?? []);
+    if (membership.role !== "gm") {
+      const places = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, placesWithArt, (place) => [
+        ...(place.description_is_markdown ? [{ key: "description", markdown: place.description }] : []),
+        { key: "player_notes_markdown", markdown: place.player_notes_markdown },
+      ]);
+      return NextResponse.json({ role: membership.role, displayName: membership.displayName, places });
+    }
     const placeIds = (data ?? []).map((place) => place.id);
     const { data: notes, error: notesError } = membership.role === "gm" && placeIds.length
       ? await context.supabase.from("place_gm_notes").select("place_id, body_markdown").in("place_id", placeIds)
@@ -61,9 +70,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     }
 
     const notesByPlace = new Map((notes ?? []).map((note) => [note.place_id, note.body_markdown]));
-    const places = placesWithArt.map((place) => membership.role === "gm"
-      ? { ...place, gm_notes_markdown: notesByPlace.get(place.id) ?? "" }
-      : place);
+    const places = placesWithArt.map((place) => ({ ...place, gm_notes_markdown: notesByPlace.get(place.id) ?? "" }));
 
     return NextResponse.json({ role: membership.role, displayName: membership.displayName, places });
   } catch {
@@ -100,6 +107,15 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
     }
 
+    const narrativeFields = [
+      ...(input.data.descriptionIsMarkdown ? [{ markdown: input.data.description, audience: "player" as const }] : []),
+      { markdown: input.data.playerNotesMarkdown, audience: "player" as const },
+      { markdown: input.data.gmNotesMarkdown, audience: "gm" as const },
+    ];
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, narrativeFields))) {
+      return NextResponse.json({ error: "Place details link to an inaccessible or invalid campaign record." }, { status: 400 });
+    }
+
     const parentError = await getParentPlaceError(context.supabase, campaignId, input.data.parentPlaceId);
 
     if (parentError) {
@@ -115,6 +131,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         name: input.data.name,
         kind: input.data.kind,
         description: input.data.description,
+        description_is_markdown: input.data.descriptionIsMarkdown,
         player_notes_markdown: input.data.playerNotesMarkdown,
         art_subject: input.data.artSubject ?? null,
         art_path: input.data.artPath ?? null,

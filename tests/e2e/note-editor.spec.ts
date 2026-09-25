@@ -18,15 +18,16 @@ test("formats a campaign note and inserts a canonical entity link with @ search"
       });
     });
     await page.goto(`/campaigns/${campaignId}/notes`);
+    const appOrigin = new URL(page.url()).origin;
     const npcResponse = await page.request.post(
-      new URL(`/api/campaigns/${campaignId}/npcs`, page.url()).toString(),
+      new URL(`/api/campaigns/${campaignId}/npcs`, appOrigin).toString(),
       { data: { name: npcName, description: "A weathered contact stationed at the outer relay.", artPath: npcImageUrl } },
     );
     expect(npcResponse.ok()).toBeTruthy();
     const npcPayload = (await npcResponse.json()) as { npc?: { id?: string } };
     npcId = npcPayload.npc?.id ?? null;
     expect(npcId).toBeTruthy();
-    const searchUrl = new URL(`/api/campaigns/${campaignId}/entities/search`, page.url());
+    const searchUrl = new URL(`/api/campaigns/${campaignId}/entities/search`, appOrigin);
     searchUrl.searchParams.set("q", npcName);
     searchUrl.searchParams.set("audience", "player");
     const searchResponse = await page.request.get(searchUrl.toString());
@@ -105,10 +106,10 @@ test("formats a campaign note and inserts a canonical entity link with @ search"
     await expect(page.locator(".markdown-content")).toContainText("follow-up text");
   } finally {
     if (noteId) {
-      await page.request.delete(new URL(`/api/campaigns/${campaignId}/notes/${noteId}`, page.url()).toString());
+      await page.request.delete(new URL(`/api/campaigns/${campaignId}/notes/${noteId}`, "http://127.0.0.1:3100").toString(), { timeout: 10000 });
     }
     if (npcId) {
-      await page.request.delete(new URL(`/api/campaigns/${campaignId}/npcs/${npcId}`, page.url()).toString());
+      await page.request.delete(new URL(`/api/campaigns/${campaignId}/npcs/${npcId}`, "http://127.0.0.1:3100").toString(), { timeout: 10000 });
     }
   }
 });

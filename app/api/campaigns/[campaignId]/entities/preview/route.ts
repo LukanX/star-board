@@ -5,6 +5,7 @@ import { unified } from "unified";
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { createCampaignArtSignedUrl } from "@/lib/storage/campaign-art";
 import { campaignEntityPath, type EntitySection } from "@/lib/campaign/routes";
+import { maskHiddenNoteEntityLinks } from "@/lib/campaign/note-links";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 type PreviewSection = "characters" | "npcs" | "places" | "factions" | "jobs" | "enemies" | "episodes";
@@ -35,9 +36,11 @@ function markdownText(markdown: string): string {
   return collect(tree).replace(/\s+/g, " ").trim();
 }
 
-function briefDescription(value: string | null | undefined, fallback: string): string {
-  const normalized = markdownText(value?.trim() || fallback).slice(0, 280).trim();
-  if (normalized.length < markdownText(value?.trim() || fallback).length) return `${normalized}...`;
+function briefDescription(value: string | null | undefined, fallback: string, isMarkdown = true): string {
+  const source = value?.trim() || fallback;
+  const plain = isMarkdown ? markdownText(source) : source.replace(/\s+/g, " ").trim();
+  const normalized = plain.slice(0, 280).trim();
+  if (normalized.length < plain.length) return `${normalized}...`;
   return normalized;
 }
 
@@ -46,38 +49,45 @@ async function readPreviewRecord(
   campaignId: string,
   section: PreviewSection,
   id: string,
+  audience: "gm" | "player",
 ): Promise<{ record: PreviewRecord | null; unavailable: boolean }> {
   if (section === "characters") {
     const { data, error } = await supabase.from("characters")
-      .select("id, name, species, class_name, level, physical_description, art_path")
+      .select("id, name, species, class_name, level, physical_description, physical_description_is_markdown, art_path")
       .eq("campaign_id", campaignId).eq("id", id).maybeSingle();
     if (error) return { record: null, unavailable: true };
     if (!data) return { record: null, unavailable: false };
-    return { record: { id: data.id, name: data.name, description: briefDescription(data.physical_description, [data.species, data.class_name ? `Level ${data.level} ${data.class_name}` : ""].filter(Boolean).join(" // ")), artPath: data.art_path }, unavailable: false };
+    const fallback = [data.species, data.class_name ? `Level ${data.level} ${data.class_name}` : ""].filter(Boolean).join(" // ");
+    const description = await audienceBrief(supabase, campaignId, data.physical_description, fallback, data.physical_description_is_markdown, audience);
+    return { record: { id: data.id, name: data.name, description, artPath: data.art_path }, unavailable: false };
   }
   if (section === "npcs") {
     const { data, error } = await supabase.from("npcs")
-      .select("id, name, species, role, description, art_path")
+      .select("id, name, species, role, description, description_is_markdown, art_path")
       .eq("campaign_id", campaignId).eq("id", id).maybeSingle();
     if (error) return { record: null, unavailable: true };
     if (!data) return { record: null, unavailable: false };
-    return { record: { id: data.id, name: data.name, description: briefDescription(data.description, [data.species, data.role].filter(Boolean).join(" // ")), artPath: data.art_path }, unavailable: false };
+    const fallback = [data.species, data.role].filter(Boolean).join(" // ");
+    const description = await audienceBrief(supabase, campaignId, data.description, fallback, data.description_is_markdown, audience);
+    return { record: { id: data.id, name: data.name, description, artPath: data.art_path }, unavailable: false };
   }
   if (section === "places") {
     const { data, error } = await supabase.from("places")
-      .select("id, name, kind, description, art_path")
+      .select("id, name, kind, description, description_is_markdown, art_path")
       .eq("campaign_id", campaignId).eq("id", id).maybeSingle();
     if (error) return { record: null, unavailable: true };
     if (!data) return { record: null, unavailable: false };
-    return { record: { id: data.id, name: data.name, description: briefDescription(data.description, data.kind), artPath: data.art_path }, unavailable: false };
+    const description = await audienceBrief(supabase, campaignId, data.description, data.kind, data.description_is_markdown, audience);
+    return { record: { id: data.id, name: data.name, description, artPath: data.art_path }, unavailable: false };
   }
   if (section === "factions") {
     const { data, error } = await supabase.from("factions")
-      .select("id, name, status, description, art_path")
+      .select("id, name, status, description, description_is_markdown, art_path")
       .eq("campaign_id", campaignId).eq("id", id).maybeSingle();
     if (error) return { record: null, unavailable: true };
     if (!data) return { record: null, unavailable: false };
-    return { record: { id: data.id, name: data.name, description: briefDescription(data.description, data.status), artPath: data.art_path }, unavailable: false };
+    const description = await audienceBrief(supabase, campaignId, data.description, data.status, data.description_is_markdown, audience);
+    return { record: { id: data.id, name: data.name, description, artPath: data.art_path }, unavailable: false };
   }
   if (section === "jobs") {
     const { data, error } = await supabase.from("jobs")
@@ -85,15 +95,17 @@ async function readPreviewRecord(
       .eq("campaign_id", campaignId).eq("id", id).maybeSingle();
     if (error) return { record: null, unavailable: true };
     if (!data) return { record: null, unavailable: false };
-    return { record: { id: data.id, name: data.title, description: briefDescription(data.summary, `${data.status} job`), artPath: data.art_path }, unavailable: false };
+    const description = await audienceBrief(supabase, campaignId, data.summary, `${data.status} job`, true, audience);
+    return { record: { id: data.id, name: data.title, description, artPath: data.art_path }, unavailable: false };
   }
   if (section === "enemies") {
     const { data, error } = await supabase.from("enemies")
-      .select("id, name, player_description, art_path")
+      .select("id, name, player_description, player_description_is_markdown, art_path")
       .eq("campaign_id", campaignId).eq("id", id).maybeSingle();
     if (error) return { record: null, unavailable: true };
     if (!data) return { record: null, unavailable: false };
-    return { record: { id: data.id, name: data.name, description: briefDescription(data.player_description, "Enemy record"), artPath: data.art_path, isEnemy: true }, unavailable: false };
+    const description = await audienceBrief(supabase, campaignId, data.player_description, "Enemy record", data.player_description_is_markdown, audience);
+    return { record: { id: data.id, name: data.name, description, artPath: data.art_path, isEnemy: true }, unavailable: false };
   }
 
   const { data, error } = await supabase.from("episodes")
@@ -101,7 +113,23 @@ async function readPreviewRecord(
     .eq("campaign_id", campaignId).eq("id", id).maybeSingle();
   if (error) return { record: null, unavailable: true };
   if (!data) return { record: null, unavailable: false };
-  return { record: { id: data.id, name: data.title, description: briefDescription(data.summary || data.player_context_markdown, "Episode record"), artPath: null }, unavailable: false };
+  const description = await audienceBrief(supabase, campaignId, data.summary || data.player_context_markdown, "Episode record", true, audience);
+  return { record: { id: data.id, name: data.title, description, artPath: null }, unavailable: false };
+}
+
+async function audienceBrief(
+  supabase: NonNullable<Awaited<ReturnType<typeof getAuthenticatedUser>>>["supabase"],
+  campaignId: string,
+  value: string | null | undefined,
+  fallback: string,
+  isMarkdown: boolean | null | undefined,
+  audience: "gm" | "player",
+) {
+  const source = value?.trim() || fallback;
+  const visibleSource = audience === "player" && isMarkdown
+    ? await maskHiddenNoteEntityLinks(supabase, campaignId, source, "player")
+    : source;
+  return briefDescription(visibleSource, fallback, Boolean(isMarkdown));
 }
 
 export async function GET(request: Request, { params }: RouteContext) {
@@ -120,7 +148,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     const membership = await getCampaignMembership(context.supabase, campaignId, context.user.id);
     if (!membership) return NextResponse.json({ error: "Campaign membership is required." }, { status: 403 });
 
-    const { record, unavailable } = await readPreviewRecord(context.supabase, campaignId, section as PreviewSection, id);
+    const { record, unavailable } = await readPreviewRecord(context.supabase, campaignId, section as PreviewSection, id, membership.role);
     if (unavailable) return NextResponse.json({ error: "Unable to load entity preview." }, { status: 503 });
     if (!record) return NextResponse.json({ error: "Campaign entity not found." }, { status: 404 });
 

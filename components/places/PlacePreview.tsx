@@ -1,6 +1,7 @@
 import { ArrowUpRight, FileText, LockKeyhole, Map } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import NarrativeContent from "@/components/markdown/NarrativeContent";
 import { PlaceArt } from "@/components/places/PlaceCard";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { campaignEntityPath } from "@/lib/campaign/routes";
@@ -19,9 +20,9 @@ export default function PlacePreview({ campaignId, place, places, isGM }: { camp
     </div>
     <PlaceArt place={place} variant="detail" />
     <div data-place-preview-copy="true" className="grid gap-[14px]">
-      <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">{place.description || "No public description recorded yet."}</p></div>
-      <MarkdownPreview data-place-preview-notes="true"><MarkdownPreviewToolbar><FileText size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><p>{place.player_notes_markdown || "No player notes recorded yet."}</p></MarkdownPreview>
-      {isGM ? <MarkdownPreview data-place-preview-private="true" className="border-[rgba(255,92,154,.25)]"><MarkdownPreviewToolbar className="text-[var(--pink)]"><LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span></MarkdownPreviewToolbar><p>{place.gm_notes_markdown || "No private notes recorded yet."}</p></MarkdownPreview> : null}
+      <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><NarrativeContent source={place.description || "No public description recorded yet."} isMarkdown={place.description_is_markdown ?? false} suppressAutolinkLiterals className="m-0 text-[11px] leading-[1.65] [overflow-wrap:anywhere]" /></div>
+      <MarkdownPreview data-place-preview-notes="true"><MarkdownPreviewToolbar><FileText size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><NarrativeContent source={place.player_notes_markdown || "No player notes recorded yet."} isMarkdown /></MarkdownPreview>
+      {isGM ? <MarkdownPreview data-place-preview-private="true" className="border-[rgba(255,92,154,.25)]"><MarkdownPreviewToolbar className="text-[var(--pink)]"><LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span></MarkdownPreviewToolbar><NarrativeContent source={place.gm_notes_markdown || "No private notes recorded yet."} isMarkdown /></MarkdownPreview> : null}
     </div>
   </div>;
 }

@@ -10,6 +10,7 @@ import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { buildCharacterPrompt } from "@/lib/ai/prompts";
+import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
 import { getServerEnv } from "@/lib/env";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 import { characterDraftSchema, characterGenerationInputSchema, characterReviewDraftSchema } from "@/lib/validation/ai";
@@ -108,7 +109,22 @@ export async function POST(request: Request) {
         ? { visualPrompt: input.data.currentDraft.visualPrompt }
         : undefined,
     };
-    const prompt = buildCharacterPrompt(promptInput, aiContext.campaign);
+    const linkedContext = await loadLinkedEntityContext(
+      context.supabase,
+      input.data.campaignId,
+      input.data,
+      access.role === "gm" ? "gm" : "player",
+      [
+        access.character.backstory_markdown,
+        ...(access.character.physical_description_is_markdown ? [access.character.physical_description] : []),
+      ],
+    );
+    if ("error" in linkedContext) {
+      const failure = linkedEntityContextFailure(linkedContext.error);
+      return NextResponse.json({ error: failure.message }, { status: failure.status });
+    }
+
+    const prompt = buildCharacterPrompt(promptInput, aiContext.campaign, linkedContext.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
     let rawDraft: unknown;

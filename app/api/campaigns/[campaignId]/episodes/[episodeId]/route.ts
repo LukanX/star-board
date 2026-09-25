@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { validateCampaignPlace } from "@/lib/places";
-import { maskHiddenNoteEntityLinksBatch } from "@/lib/campaign/note-links";
+import { maskHiddenNoteEntityLinksBatch, maskPlayerFacingEntityMarkdownBatch, validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { updateEpisodeSchema } from "@/lib/validation/episode";
 
 type RouteContext = { params: Promise<{ campaignId: string; episodeId: string }> };
@@ -83,7 +83,13 @@ export async function GET(_request: Request, { params }: RouteContext) {
       },
     }));
 
-    return NextResponse.json({ role: membership.role, displayName: membership.displayName, episode: { ...episode, noteCount: episodeNotes.length }, notes: episodeNotes });
+    const [visibleEpisode] = membership.role === "gm"
+      ? [episode]
+      : await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [episode], (record) => [
+        { key: "summary", markdown: record.summary },
+        { key: "player_context_markdown", markdown: record.player_context_markdown },
+      ]);
+    return NextResponse.json({ role: membership.role, displayName: membership.displayName, episode: { ...visibleEpisode, noteCount: episodeNotes.length }, notes: episodeNotes });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
@@ -120,6 +126,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     if (membership.role !== "gm") {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
+    }
+
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, [
+      ...(input.data.summary === undefined ? [] : [{ markdown: input.data.summary, audience: "player" as const }]),
+      ...(input.data.playerContextMarkdown === undefined ? [] : [{ markdown: input.data.playerContextMarkdown, audience: "player" as const }]),
+    ]))) {
+      return NextResponse.json({ error: "Episode details link to an inaccessible or invalid campaign record." }, { status: 400 });
     }
 
     const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);

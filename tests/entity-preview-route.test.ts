@@ -31,6 +31,21 @@ function createQuery(data: unknown, error: unknown = null) {
   return query;
 }
 
+function createReferenceQuery(data: unknown[], error: unknown = null) {
+  const query = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    in: vi.fn().mockResolvedValue({ data, error }),
+  };
+  query.select.mockReturnValue(query);
+  query.eq.mockReturnValue(query);
+  query.in.mockReturnValue(query);
+  Object.assign(query, {
+    then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data, error }).then(resolve),
+  });
+  return query;
+}
+
 function createSupabase(table: string, query: ReturnType<typeof createQuery>) {
   const from = vi.fn((requestedTable: string) => {
     if (requestedTable !== table) throw new Error(`Unexpected table query: ${requestedTable}`);
@@ -78,7 +93,7 @@ describe("campaign entity preview route", () => {
       imageUrl: "https://signed.example.test/portrait.png",
       href: `/campaigns/${campaignId}/npcs/${entityId}`,
     });
-    expect(query.select).toHaveBeenCalledWith("id, name, species, role, description, art_path");
+    expect(query.select).toHaveBeenCalledWith("id, name, species, role, description, description_is_markdown, art_path");
     expect(mocks.createCampaignArtSignedUrl).toHaveBeenCalledWith(supabase, `${campaignId}/${userId}/mara.png`, 600, false);
   });
 
@@ -93,6 +108,31 @@ describe("campaign entity preview route", () => {
     expect(response.status).toBe(404);
     expect(payload.error).toBe("Campaign entity not found.");
     expect(mocks.createCampaignArtSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("masks newly inaccessible linked targets before returning an entity preview", async () => {
+    const secretJobId = "00000000-0000-4000-8000-000000000004";
+    const npcQuery = createQuery({
+      id: entityId,
+      name: "Mara Venn",
+      species: "Human",
+      role: "Relay keeper",
+      description: `See [@Hidden Job](/campaigns/${campaignId}/jobs/${secretJobId}).`,
+      description_is_markdown: true,
+      art_path: null,
+    });
+    const jobsQuery = createReferenceQuery([{ id: secretJobId, status: "draft" }]);
+    const supabase = {
+      from: vi.fn((table: string) => table === "npcs" ? npcQuery : jobsQuery),
+    };
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await GET(request("npcs"), routeContext());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.entity.description).toBe("See Unavailable campaign record.");
+    expect(JSON.stringify(payload)).not.toContain("Hidden Job");
   });
 
   it("rejects malformed section and identifiers before querying the database", async () => {

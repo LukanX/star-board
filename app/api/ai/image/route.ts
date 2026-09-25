@@ -28,7 +28,7 @@ type ImageRequestContext = {
   role: "gm" | "player";
 };
 
-async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSignedUrl>[0], campaignId: string, userId: string, generationRunId: string, image: Awaited<ReturnType<typeof generateImage>>["image"]) {
+async function storeTemporaryImage(supabase: Parameters<typeof createCampaignArtSignedUrl>[0], campaignId: string, userId: string, generationRunId: string, image: Awaited<ReturnType<typeof generateImage>>["image"], prefix: "image" | "style-preview") {
   const mediaType = image.mediaType in imageMediaTypes ? image.mediaType as keyof typeof imageMediaTypes : null;
   if (!mediaType) throw new Error("The AI provider returned an unsupported image type.");
 
@@ -45,7 +45,7 @@ async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSi
 
   if (!body) throw new Error("The AI provider returned no image data.");
 
-  const path = `${campaignId}/${userId}/style-preview-${generationRunId}.${imageMediaTypes[mediaType]}`;
+  const path = `${campaignId}/${userId}/${prefix}-${generationRunId}.${imageMediaTypes[mediaType]}`;
   const { error: uploadError } = await supabase.storage.from(campaignArtBucket).upload(path, body, {
     cacheControl: "3600",
     contentType: mediaType,
@@ -54,7 +54,16 @@ async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSi
 
   if (uploadError) throw new Error("The generated style preview could not be stored.");
 
-  return { path, mediaType, signedUrl: await createCampaignArtSignedUrl(supabase, path) };
+  try {
+    return { path, mediaType, signedUrl: await createCampaignArtSignedUrl(supabase, path) };
+  } catch (error) {
+    await supabase.storage.from(campaignArtBucket).remove([path]);
+    throw error;
+  }
+}
+
+async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSignedUrl>[0], campaignId: string, userId: string, generationRunId: string, image: Awaited<ReturnType<typeof generateImage>>["image"]) {
+  return storeTemporaryImage(supabase, campaignId, userId, generationRunId, image, "style-preview");
 }
 
 export const runtime = "nodejs";
@@ -395,6 +404,26 @@ export async function POST(request: Request) {
       } catch {
         await supabase.from("ai_generation_runs").update({ status: "failed", error_message: "The style preview could not be stored." }).eq("id", generationRun.id);
         return NextResponse.json({ error: "The style preview could not be stored." }, { status: 503 });
+      }
+    } else {
+      let storedImage: Awaited<ReturnType<typeof storeTemporaryImage>> | null = null;
+      try {
+        storedImage = await storeTemporaryImage(supabase, input.data.campaignId, context.user.id, generationRun.id, image, "image");
+        const { data: attached, error: metadataError } = await supabase.rpc("attach_ai_generation_image", {
+          p_generation_run_id: generationRun.id,
+          p_image_path: storedImage.path,
+          p_image_media_type: storedImage.mediaType,
+        });
+        if (metadataError || !attached) {
+          throw new Error("The generated image metadata could not be saved.");
+        }
+        temporaryPath = storedImage.path;
+        imageDraft = { base64: null, url: storedImage.signedUrl, mediaType: storedImage.mediaType };
+      } catch {
+        if (storedImage) {
+          await supabase.storage.from(campaignArtBucket).remove([storedImage.path]);
+        }
+        return NextResponse.json({ error: "The generated image could not be stored for review." }, { status: 503 });
       }
     }
 

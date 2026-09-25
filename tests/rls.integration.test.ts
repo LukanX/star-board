@@ -1145,6 +1145,29 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(gmUpdate.data?.name).toBe("GM Renamed Player Character");
   });
 
+  it("defaults legacy appearance to plain text and lets an authorized owner mark it rich", async () => {
+    const created = await playerClient.from("characters").insert({
+      campaign_id: campaignId,
+      owner_id: playerId,
+      name: "Rich Appearance Marker Character",
+      physical_description: "Tall\nSilver-eyed",
+    }).select("id, physical_description, physical_description_is_markdown").single();
+    expect(created.error).toBeNull();
+    expect(created.data?.physical_description).toBe("Tall\nSilver-eyed");
+    expect(created.data?.physical_description_is_markdown).toBe(false);
+
+    const marked = await playerClient.from("characters")
+      .update({ physical_description_is_markdown: true })
+      .eq("id", created.data?.id)
+      .eq("campaign_id", campaignId)
+      .select("physical_description, physical_description_is_markdown")
+      .single();
+    expect(marked.error).toBeNull();
+    expect(marked.data?.physical_description).toBe("Tall\nSilver-eyed");
+    expect(marked.data?.physical_description_is_markdown).toBe(true);
+
+  });
+
   it("enforces ownership transfer through the authorized RPC", async () => {
     const gmUser = (await gmClient.auth.getUser()).data.user;
     if (!gmUser) throw new Error("The local RLS GM session has no user.");
@@ -1245,6 +1268,7 @@ describeLocal("local Supabase RLS boundaries", () => {
     let gmCharacterId: string | null = null;
     let foreignCampaignId: string | null = null;
     let foreignCharacterId: string | null = null;
+    let temporaryPortraitPath: string | null = null;
     const runIds: string[] = [];
     const runBase = {
       kind: "image",
@@ -1331,6 +1355,46 @@ describeLocal("local Supabase RLS boundaries", () => {
       expect(hiddenFromOtherPlayer.error).toBeNull();
       expect(hiddenFromOtherPlayer.data).toEqual([]);
 
+      const completedTargetRun = await gmClient
+        .from("ai_generation_runs")
+        .update({ status: "complete" })
+        .eq("id", gmTargetRunId)
+        .select("id")
+        .single();
+      expect(completedTargetRun.error).toBeNull();
+
+      temporaryPortraitPath = `${campaignId}/${gmUser.id}/image-${gmTargetRunId}.png`;
+      const portraitUpload = await gmClient.storage.from("campaign-art").upload(
+        temporaryPortraitPath,
+        new Blob(["generated portrait"], { type: "image/png" }),
+        { contentType: "image/png", upsert: false },
+      );
+      expect(portraitUpload.error).toBeNull();
+
+      const mismatchedPath = await gmClient.rpc("attach_ai_generation_image", {
+        p_generation_run_id: gmTargetRunId,
+        p_image_path: `${campaignId}/${gmUser.id}/not-the-run.png`,
+        p_image_media_type: "image/png",
+      });
+      expect(mismatchedPath.error).toBeNull();
+      expect(mismatchedPath.data).toBe(false);
+
+      const attachedPortrait = await gmClient.rpc("attach_ai_generation_image", {
+        p_generation_run_id: gmTargetRunId,
+        p_image_path: temporaryPortraitPath,
+        p_image_media_type: "image/png",
+      });
+      expect(attachedPortrait.error).toBeNull();
+      expect(attachedPortrait.data).toBe(true);
+
+      const foreignPlayerAttach = await playerClient.rpc("attach_ai_generation_image", {
+        p_generation_run_id: gmTargetRunId,
+        p_image_path: temporaryPortraitPath,
+        p_image_media_type: "image/png",
+      });
+      expect(foreignPlayerAttach.error).toBeNull();
+      expect(foreignPlayerAttach.data).toBe(false);
+
       const blockedUpdate = await playerClient
         .from("ai_generation_runs")
         .update({ status: "failed" })
@@ -1389,6 +1453,7 @@ describeLocal("local Supabase RLS boundaries", () => {
       expect(hiddenAfterDelete.data).toEqual([]);
     } finally {
       if (runIds.length) await gmClient.from("ai_generation_runs").delete().in("id", runIds);
+      if (temporaryPortraitPath) await gmClient.storage.from("campaign-art").remove([temporaryPortraitPath]);
       if (ownerCharacterId) await gmClient.from("characters").delete().eq("id", ownerCharacterId);
       if (gmCharacterId) await gmClient.from("characters").delete().eq("id", gmCharacterId);
       if (foreignCharacterId) await gmClient.from("characters").delete().eq("id", foreignCharacterId);

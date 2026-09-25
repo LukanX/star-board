@@ -1,5 +1,6 @@
 import { getAuthenticatedUser, getCampaignMembership, type CampaignMembership } from "@/lib/auth/permissions";
 import type { ApiJob } from "@/lib/campaign/types";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
 
 export type CampaignJob = Omit<ApiJob, "giver"> & {
@@ -87,7 +88,7 @@ async function enrichJobs(
   const notes = Array.isArray(notesResult.data) ? notesResult.data : notesResult.data ? [notesResult.data] : [];
   const notesByJob = new Map(notes.map((note) => [note.job_id, note.body_markdown]));
 
-  return jobsWithArt.map((job) => {
+  const enrichedJobs = jobsWithArt.map((job) => {
     const votes = votesByJob.get(job.id) ?? { count: 0, voted: false };
     const giverId = job.giver_npc_id ?? job.giver_faction_id;
     const giver = job.giver_npc_id
@@ -103,6 +104,12 @@ async function enrichJobs(
       ...(membership.role === "gm" ? { hook, gm_notes_markdown: notesByJob.get(job.id) ?? "" } : {}),
     };
   });
+
+  if (membership.role === "gm") return enrichedJobs;
+  return maskPlayerFacingEntityMarkdownBatch(supabase, campaignId, enrichedJobs, (job) => [
+    { key: "summary", markdown: job.summary },
+    { key: "player_notes_markdown", markdown: job.player_notes_markdown },
+  ]);
 }
 
 export async function getCampaignJobs(campaignId: string): Promise<CampaignJobsResult | null> {

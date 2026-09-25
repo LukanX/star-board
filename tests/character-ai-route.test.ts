@@ -82,7 +82,7 @@ describe("character portrait prompt route", () => {
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
     expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "character-prompt", expect.anything(), "openai/gpt-4o-mini");
-    expect(mocks.buildCharacterPrompt).toHaveBeenCalledWith(expect.objectContaining({ backstoryMarkdown: "A survivor of a derelict ship.", physicalDescription: "Tall with silver eyes." }), expect.objectContaining({ system: "Starfinder 2e" }));
+    expect(mocks.buildCharacterPrompt).toHaveBeenCalledWith(expect.objectContaining({ backstoryMarkdown: "A survivor of a derelict ship.", physicalDescription: "Tall with silver eyes." }), expect.objectContaining({ system: "Starfinder 2e" }), "");
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "character", status: "complete", model: "openai/gpt-4o-mini", provider: "openrouter", effectiveModel: "openrouter/fallback", generationId: "character-run-1" }));
   });
 

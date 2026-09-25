@@ -220,7 +220,8 @@ export const completeEnemyStatBlockSchema = z.object({
 
 const enemyPublicFields = {
   name: shortText(160).min(1),
-  playerDescription: shortText(4000),
+  playerDescription: z.string().max(4000),
+  playerDescriptionIsMarkdown: z.boolean().default(false),
   isRevealed: z.boolean().default(false),
   artPath: nullableText(500).optional(),
   artUrl: z.string().url().nullable().optional(),
@@ -347,6 +348,7 @@ export const createEnemySchema = z.object({
 export const updateEnemySchema = z.object({
   name: enemyPublicFields.name.optional(),
   playerDescription: enemyPublicFields.playerDescription.optional(),
+  playerDescriptionIsMarkdown: z.boolean().optional(),
   isRevealed: z.boolean().optional(),
   artPath: enemyPublicFields.artPath,
   artUrl: enemyPublicFields.artUrl,
@@ -451,7 +453,8 @@ export const enemyReimportRequestSchema = z.object({
   url: aonSourceUrlField.optional(),
   sourceUrl: aonSourceUrlField.optional(),
   preserved: z.object({
-    playerDescription: shortText(4000),
+    playerDescription: z.string().max(4000),
+    playerDescriptionIsMarkdown: z.boolean().optional(),
     isRevealed: z.boolean(),
     artPath: enemyPublicFields.artPath,
     gmNotesMarkdown: z.string().max(20000),

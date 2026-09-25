@@ -7,6 +7,15 @@ import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { waitForImageBackgroundJob, type ImageBackgroundJob, type ImageDraft } from "@/lib/ai/image-job-polling";
 import { imageGenerationRequestTimeoutMs } from "@/lib/ai/image-job-lifecycle";
 import {
+  artStudioSessionEvent,
+  artStudioSessionKey,
+  draftMetadataForSession,
+  emptyArtStudioSession,
+  readArtStudioSession,
+  writeArtStudioSession,
+  type ArtStudioDraftMetadata,
+} from "@/components/archive/artStudioSession";
+import {
   defaultImageAspectRatio,
   defaultImageSize,
   imageAspectRatioValues,
@@ -33,6 +42,7 @@ type ArtStyleOption = {
 type AiArtStudioProps = {
   campaignId: string | null;
   kind: ArtKind;
+  entityId?: string;
   characterId?: string;
   portraitAiRole?: "gm" | "player";
   parentPlaceId?: string | null;
@@ -47,6 +57,8 @@ type ImageValidationIssue = { path?: (string | number)[]; message?: string };
 type ImageValidationIssues =
   | ImageValidationIssue[]
   | { formErrors?: string[]; fieldErrors?: Record<string, string[]> };
+
+type GalleryDraft = { draft: ImageDraft; styleId: string | null; contextPlaceId: string | null };
 
 function formatImageValidationIssues(
   issues: ImageValidationIssues | undefined,
@@ -71,21 +83,49 @@ function formatImageValidationIssues(
   );
 }
 
-async function removeTemporaryArt(
-  campaignId: string,
-  path: string | undefined,
-) {
-  if (!path) return;
-  await fetch(
-    `/api/campaigns/${encodeURIComponent(campaignId)}/art?path=${encodeURIComponent(path)}`,
-    { method: "DELETE" },
-  );
+async function restoreDraft(metadata: ArtStudioDraftMetadata): Promise<GalleryDraft | null> {
+  const response = await fetch(`/api/ai/image/${encodeURIComponent(metadata.generationRunId)}`, {
+    cache: "no-store",
+  });
+  const result = (await response.json().catch(() => ({}))) as {
+    job?: {
+      status?: string;
+      model?: string;
+      createdAt?: string;
+      temporaryPath?: string;
+      image?: ImageDraft["image"];
+    };
+  };
+  if (!response.ok || result.job?.status !== "complete" || !result.job.image) return null;
+  const { styleId, ...storedDraft } = metadata;
+  const { contextPlaceId, ...draftMetadata } = storedDraft;
+  return {
+    styleId,
+    contextPlaceId,
+    draft: {
+      ...draftMetadata,
+      model: result.job.model ?? metadata.model,
+      createdAt: result.job.createdAt ?? metadata.createdAt,
+      temporaryPath: result.job.temporaryPath ?? metadata.temporaryPath,
+      image: result.job.image,
+    },
+  };
+}
+
+async function restoreArtStudioSession(identity: Parameters<typeof readArtStudioSession>[0]) {
+  const session = readArtStudioSession(identity);
+  const restored = await Promise.all(session.drafts.map((metadata) => restoreDraft(metadata).catch(() => null)));
+  const gallery = restored.filter((entry): entry is GalleryDraft => entry !== null);
+  const selectedDraft = gallery.find((entry) => entry.draft.generationRunId === session.selectedGenerationRunId)
+    ?? gallery.at(-1)
+    ?? null;
+  return { session, gallery, selectedDraft };
 }
 
 export default function AiArtStudio(props: AiArtStudioProps) {
   return (
     <AiArtStudioContent
-      key={`${props.campaignId ?? "none"}:${props.kind}:${props.characterId ?? "none"}:${props.portraitAiRole ?? "default"}:${props.parentPlaceId ?? "root"}`}
+      key={`${props.campaignId ?? "none"}:${props.kind}:${props.entityId ?? props.characterId ?? "new"}:${props.portraitAiRole ?? "default"}`}
       {...props}
     />
   );
@@ -94,6 +134,7 @@ export default function AiArtStudio(props: AiArtStudioProps) {
 function AiArtStudioContent({
   campaignId,
   kind,
+  entityId,
   characterId,
   portraitAiRole,
   parentPlaceId,
@@ -104,6 +145,8 @@ function AiArtStudioContent({
   onApproved,
 }: AiArtStudioProps) {
   const [draft, setDraft] = useState<ImageDraft | null>(null);
+  const [gallery, setGallery] = useState<GalleryDraft[]>([]);
+  const [isSessionReady, setIsSessionReady] = useState(!campaignId);
   const [styles, setStyles] = useState<ArtStyleOption[]>([]);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
   const [styleSelectionChanged, setStyleSelectionChanged] = useState(false);
@@ -119,11 +162,23 @@ function AiArtStudioContent({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const activeGenerationRef = useRef<AbortController | null>(null);
+  const refreshingRunIdsRef = useRef(new Set<string>());
+  const sessionDisabledRef = useRef(false);
 
   const subjectDraft = onSubjectChange ? (subject ?? "") : localSubjectDraft;
   const availableSizes = imageSizeOptions[aspectRatio];
   const isCharacterPortrait = kind === "character" && Boolean(characterId);
   const canCustomizePortrait = !isCharacterPortrait || portraitAiRole === "gm";
+  const sessionKey = campaignId
+    ? artStudioSessionKey({ campaignId, kind, entityId: entityId ?? characterId ?? null })
+    : null;
+  const selectedEntry = gallery.find((entry) => entry.draft.generationRunId === draft?.generationRunId) ?? null;
+  const generationContextPlaceId = kind === "place" ? parentPlaceId ?? null : null;
+  const canRefineSelectedDraft = Boolean(
+    selectedEntry
+    && selectedEntry.styleId === selectedStyleId
+    && selectedEntry.contextPlaceId === generationContextPlaceId,
+  );
 
   useEffect(() => {
     if (!campaignId || (isCharacterPortrait && portraitAiRole !== "gm")) return;
@@ -147,6 +202,70 @@ function AiArtStudioContent({
   useEffect(() => {
     return () => activeGenerationRef.current?.abort();
   }, []);
+
+  useEffect(() => {
+    if (!campaignId) return;
+
+    let cancelled = false;
+    sessionDisabledRef.current = false;
+    const identity = { campaignId, kind, entityId: entityId ?? characterId ?? null };
+    void restoreArtStudioSession(identity)
+      .then(({ session, gallery: restoredGallery, selectedDraft }) => {
+        if (cancelled) return;
+        setRefinement(session.refinement);
+        setSelectedStyleId(session.selectedStyleId);
+        setStyleSelectionChanged(session.styleSelectionChanged);
+        setGallery(restoredGallery);
+        setDraft(selectedDraft?.draft ?? null);
+        setIsSessionReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId, kind, entityId, characterId]);
+
+  useEffect(() => {
+    if (!campaignId || !isSessionReady || sessionDisabledRef.current) return;
+    writeArtStudioSession(
+      { campaignId, kind, entityId: entityId ?? characterId ?? null },
+      {
+        version: 1,
+        refinement,
+        selectedStyleId,
+        styleSelectionChanged,
+        selectedGenerationRunId: draft?.generationRunId ?? null,
+        drafts: gallery.map((entry) => draftMetadataForSession(entry.draft, entry.styleId, entry.contextPlaceId)),
+      },
+    );
+  }, [campaignId, kind, entityId, characterId, isSessionReady, refinement, selectedStyleId, styleSelectionChanged, draft, gallery]);
+
+  useEffect(() => {
+    const handleSessionChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ key: string | null }>).detail;
+      if (detail?.key !== null && detail?.key !== sessionKey) return;
+      if (detail?.key === null) {
+        sessionDisabledRef.current = true;
+        const empty = emptyArtStudioSession();
+        setRefinement(empty.refinement);
+        setSelectedStyleId(empty.selectedStyleId);
+        setStyleSelectionChanged(empty.styleSelectionChanged);
+        setDraft(null);
+        setGallery([]);
+        return;
+      }
+      if (!campaignId) return;
+      const updated = readArtStudioSession({ campaignId, kind, entityId: entityId ?? characterId ?? null });
+      setRefinement(updated.refinement);
+      setSelectedStyleId(updated.selectedStyleId);
+      setStyleSelectionChanged(updated.styleSelectionChanged);
+      setDraft(null);
+      setGallery([]);
+    };
+
+    window.addEventListener(artStudioSessionEvent, handleSessionChange);
+    return () => window.removeEventListener(artStudioSessionEvent, handleSessionChange);
+  }, [sessionKey, campaignId, kind, entityId, characterId]);
 
   useEffect(() => {
     onBusyChange?.(isGenerating || isApproving);
@@ -178,11 +297,20 @@ function AiArtStudioContent({
     );
   };
 
-  const generate = async (mode: "create" | "refine") => {
+  const generate = async () => {
     if (!campaignId) {
       setError("Select a campaign before using the AI art studio.");
       return;
     }
+
+    if (!isSessionReady) return;
+
+    const requestedStyleId = selectedStyleId;
+    const requestedContextPlaceId = generationContextPlaceId;
+    const requestedMode = canRefineSelectedDraft ? "refine" : "create";
+    const requestedPrompt = selectedEntry
+      ? (canRefineSelectedDraft ? selectedEntry.draft.prompt : undefined)
+      : (styleSelectionChanged ? undefined : currentPrompt ?? undefined);
 
     if (subjectDraft.length > 1200) {
       setError("Visual direction must be 1200 characters or fewer.");
@@ -211,7 +339,7 @@ function AiArtStudioContent({
         signal: generationController.signal,
         body: JSON.stringify({
           campaignId,
-          mode,
+          mode: requestedMode,
           targetKind: kind,
           characterId: characterId ?? undefined,
           visualStyleId: canCustomizePortrait ? selectedStyleId ?? undefined : undefined,
@@ -221,7 +349,7 @@ function AiArtStudioContent({
           aspectRatio,
           size,
           refinement: refinement.trim() || undefined,
-          currentPrompt: draft?.prompt ?? (styleSelectionChanged ? undefined : currentPrompt) ?? undefined,
+          currentPrompt: requestedPrompt,
         }),
       });
       const result = (await response.json()) as {
@@ -235,8 +363,10 @@ function AiArtStudioContent({
 
       if (response.status === 202 && result.job) {
         const nextDraft = await waitForImageBackgroundJob(result.job, { signal: generationController.signal });
-        if (draft?.temporaryPath)
-          void removeTemporaryArt(campaignId, draft.temporaryPath);
+        setGallery((current) => [
+          ...current.filter((entry) => entry.draft.generationRunId !== nextDraft.generationRunId),
+          { draft: nextDraft, styleId: requestedStyleId, contextPlaceId: requestedContextPlaceId },
+        ]);
         setDraft(nextDraft);
         return;
       }
@@ -254,6 +384,10 @@ function AiArtStudioContent({
         );
       }
 
+      setGallery((current) => [
+        ...current.filter((entry) => entry.draft.generationRunId !== result.draft!.generationRunId),
+        { draft: result.draft!, styleId: requestedStyleId, contextPlaceId: requestedContextPlaceId },
+      ]);
       setDraft(result.draft);
     } catch (generationError: unknown) {
       if (generationController.signal.aborted && !generationRequestTimedOut) return;
@@ -270,6 +404,37 @@ function AiArtStudioContent({
         if (!generationController.signal.aborted || generationRequestTimedOut) setIsGenerating(false);
       }
       window.clearTimeout(generationRequestTimeoutId);
+    }
+  };
+
+  const refreshDraftImage = async (generationRunId: string) => {
+    if (refreshingRunIdsRef.current.has(generationRunId)) return;
+    refreshingRunIdsRef.current.add(generationRunId);
+    try {
+      const response = await fetch(`/api/ai/image/${encodeURIComponent(generationRunId)}`, { cache: "no-store" });
+      const result = (await response.json().catch(() => ({}))) as {
+        job?: {
+          status?: string;
+          image?: ImageDraft["image"];
+          model?: string;
+          createdAt?: string;
+          temporaryPath?: string;
+        };
+      };
+      if (!response.ok || result.job?.status !== "complete" || !result.job.image) return;
+      const updatedDraft = (current: ImageDraft): ImageDraft => ({
+        ...current,
+        image: result.job!.image!,
+        model: result.job!.model ?? current.model,
+        createdAt: result.job!.createdAt ?? current.createdAt,
+        temporaryPath: result.job!.temporaryPath ?? current.temporaryPath,
+      });
+      setGallery((current) => current.map((entry) => entry.draft.generationRunId === generationRunId
+        ? { ...entry, draft: updatedDraft(entry.draft) }
+        : entry));
+      setDraft((current) => current?.generationRunId === generationRunId ? updatedDraft(current) : current);
+    } finally {
+      refreshingRunIdsRef.current.delete(generationRunId);
     }
   };
 
@@ -298,7 +463,6 @@ function AiArtStudioContent({
         );
       }
 
-      await removeTemporaryArt(campaignId, draft.temporaryPath);
       onApproved({
         ...result.asset,
         prompt: draft.prompt,
@@ -340,11 +504,8 @@ function AiArtStudioContent({
             onChange={(event) => {
               const nextStyleId = event.target.value || null;
               if (nextStyleId === selectedStyleId) return;
-              if (draft?.temporaryPath && campaignId) void removeTemporaryArt(campaignId, draft.temporaryPath);
               setSelectedStyleId(nextStyleId);
               setStyleSelectionChanged(true);
-              setDraft(null);
-              setRefinement("");
               setError(null);
             }}
           >
@@ -402,29 +563,65 @@ function AiArtStudioContent({
           </label>
         </div>
       </div>
-      {previewUrl ? (
-        <button
-          className="w-full max-w-[420px] p-0 border-0 bg-transparent cursor-zoom-in focus-visible:outline-2 focus-visible:outline-[var(--pink)] focus-visible:outline-offset-3"
-          type="button"
-          onClick={() => setIsPreviewOpen(true)}
-          aria-label="Open generated art preview"
-        >
+      <div className="grid grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-[10px] items-start max-[600px]:grid-cols-1">
+        {previewUrl ? (
+          <button
+            className="w-full max-w-[420px] p-0 border-0 bg-transparent cursor-zoom-in focus-visible:outline-2 focus-visible:outline-[var(--pink)] focus-visible:outline-offset-3"
+            type="button"
+            onClick={() => setIsPreviewOpen(true)}
+            aria-label="Open generated art preview"
+          >
+            <div
+              className="w-full grid place-items-center overflow-hidden border border-[rgba(255,92,154,.28)] bg-[#0a1118] text-[var(--pink)]"
+              style={{ aspectRatio: previewAspectRatio }}
+            >
+              <img
+                className="block w-full h-full object-contain"
+                src={previewUrl}
+                alt="Selected generated art draft"
+                onError={() => draft && void refreshDraftImage(draft.generationRunId)}
+              />
+            </div>
+          </button>
+        ) : (
+          <div className="w-full max-w-[420px] aspect-square grid place-items-center border border-[rgba(255,92,154,.28)] bg-[#0a1118] bg-center bg-cover text-[var(--pink)] bg-[linear-gradient(135deg,rgba(255,92,154,.08),transparent_55%),repeating-linear-gradient(45deg,rgba(255,255,255,.035)_0_1px,transparent_1px_8px)]">
+            <Sparkles size={18} />
+            <span className="font-mono text-[8px] tracking-[.13em]">NO REVIEW DRAFT</span>
+          </div>
+        )}
+        {gallery.length ? (
           <div
-            className="w-full aspect-square grid place-items-center border border-[rgba(255,92,154,.28)] bg-[#0a1118] bg-center bg-cover text-[var(--pink)]"
-            style={{
-              backgroundImage: `url(${previewUrl})`,
-              aspectRatio: previewAspectRatio,
-            }}
-            role="img"
-            aria-label="Generated art draft"
-          />
-        </button>
-      ) : (
-        <div className="w-full max-w-[420px] aspect-square grid place-items-center border border-[rgba(255,92,154,.28)] bg-[#0a1118] bg-center bg-cover text-[var(--pink)] bg-[linear-gradient(135deg,rgba(255,92,154,.08),transparent_55%),repeating-linear-gradient(45deg,rgba(255,255,255,.035)_0_1px,transparent_1px_8px)]">
-          <Sparkles size={18} />
-          <span className="font-mono text-[8px] tracking-[.13em]">NO REVIEW DRAFT</span>
-        </div>
-      )}
+            aria-label="Generated image drafts"
+            className="grid grid-cols-[repeat(auto-fill,64px)] auto-rows-[64px] content-start gap-2"
+            role="group"
+          >
+            {gallery.map((entry, index) => {
+              const thumbnailUrl = entry.draft.image.base64
+                ? `data:${entry.draft.image.mediaType};base64,${entry.draft.image.base64}`
+                : entry.draft.image.url;
+              return (
+                <button
+                  key={entry.draft.generationRunId}
+                  aria-label={`Select generated image ${index + 1}`}
+                  aria-pressed={entry.draft.generationRunId === draft?.generationRunId}
+                  className={`w-[64px] h-[64px] overflow-hidden border bg-[#0a1118] p-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--pink)] focus-visible:outline-offset-2 ${entry.draft.generationRunId === draft?.generationRunId ? "border-[var(--pink)] shadow-[inset_0_0_0_1px_rgba(255,92,154,.3)]" : "border-[var(--line)] hover:border-[var(--cyan)]"}`}
+                  type="button"
+                  onClick={() => setDraft(entry.draft)}
+                >
+                  {thumbnailUrl ? (
+                    <img
+                      className="block w-full h-full object-cover"
+                      src={thumbnailUrl}
+                      alt=""
+                      onError={() => void refreshDraftImage(entry.draft.generationRunId)}
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
       {isPreviewOpen && previewUrl ? (
         <div
           className="fixed inset-0 z-[1000] grid place-items-center p-6 bg-[rgba(3,6,11,.88)]"
@@ -449,39 +646,25 @@ function AiArtStudioContent({
               className="block w-[96vw] max-w-full max-h-[calc(100vh-48px)] object-contain border border-[rgba(255,92,154,.45)] shadow-[0_24px_80px_rgba(0,0,0,.52)]"
               src={previewUrl}
               alt="Generated art draft enlarged"
+              onError={() => draft && void refreshDraftImage(draft.generationRunId)}
             />
           </div>
         </div>
       ) : null}
       <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
-        {isCharacterPortrait ? "Image description" : "Visual subject"}
-        {isCharacterPortrait ? (
-          <textarea
-            className="w-full min-h-[110px] resize-y border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] leading-[1.45] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)] placeholder:text-[#4d5a6b]"
-            aria-label="Image description"
-            maxLength={1200}
-            placeholder="Describe this saved character's appearance..."
-            value={subjectDraft}
-            onChange={(event) => {
-              const nextSubject = event.target.value;
-              if (onSubjectChange) onSubjectChange(nextSubject);
-              else setLocalSubjectDraft(nextSubject);
-            }}
-          />
-        ) : (
-          <input
-            className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)] placeholder:text-[#4d5a6b]"
-            aria-label="Visual subject"
-            maxLength={1200}
-            placeholder="Describe the character, faction, mission, or scene..."
-            value={subjectDraft}
-            onChange={(event) => {
-              const nextSubject = event.target.value;
-              if (onSubjectChange) onSubjectChange(nextSubject);
-              else setLocalSubjectDraft(nextSubject);
-            }}
-          />
-        )}
+        {isCharacterPortrait ? "Image description" : "Artwork description"}
+        <textarea
+          className="w-full min-h-[140px] resize-y border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] leading-[1.45] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)] placeholder:text-[#4d5a6b]"
+          aria-label={isCharacterPortrait ? "Image description" : "Artwork description"}
+          maxLength={1200}
+          placeholder={isCharacterPortrait ? "Describe this saved character's appearance..." : "Describe the character, faction, mission, or scene..."}
+          value={subjectDraft}
+          onChange={(event) => {
+            const nextSubject = event.target.value;
+            if (onSubjectChange) onSubjectChange(nextSubject);
+            else setLocalSubjectDraft(nextSubject);
+          }}
+        />
       </label>
       <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
         Focused refinement
@@ -502,7 +685,7 @@ function AiArtStudioContent({
         <button
           className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px !border-[rgba(255,92,154,.34)] bg-[rgba(255,92,154,.08)] !text-[var(--pink)] hover:!border-[var(--pink)] hover:bg-[rgba(255,92,154,.14)] min-h-[32px] !px-[10px] !text-[8px]"
           disabled={isGenerating || isApproving}
-          onClick={() => void generate(draft ? "refine" : "create")}
+          onClick={() => void generate()}
           type="button"
         >
           {isGenerating ? (
@@ -511,7 +694,7 @@ function AiArtStudioContent({
             </>
           ) : (
             <>
-              <Sparkles size={14} /> {draft ? "REFINE DRAFT" : "GENERATE DRAFT"}
+              <Sparkles size={14} /> {canRefineSelectedDraft ? "REFINE DRAFT" : "GENERATE DRAFT"}
             </>
           )}
         </button>

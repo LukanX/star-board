@@ -3,6 +3,7 @@
 import { LogOut } from "lucide-react";
 import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { clearArtStudioSessions } from "@/components/archive/artStudioSession";
 
 type SignOutButtonProps = {
   className?: string;
@@ -26,6 +27,7 @@ export default function SignOutButton({
       const { error: signOutError } =
         await getSupabaseBrowserClient().auth.signOut();
       if (signOutError) throw signOutError;
+      clearArtStudioSessions();
       window.location.assign("/");
     } catch (signOutError: unknown) {
       setError(

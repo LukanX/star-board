@@ -45,8 +45,10 @@ function ToolbarButton({
 
 export default function NoteFormattingToolbar({
   editor,
+  ariaLabel = "Text formatting",
 }: {
   editor: Editor | null;
+  ariaLabel?: string;
 }) {
   const state = useEditorState({
     editor,
@@ -90,7 +92,7 @@ export default function NoteFormattingToolbar({
 
   return (
     <div
-      aria-label="Note formatting"
+      aria-label={ariaLabel}
       className="flex flex-wrap items-center gap-1 border-b border-[var(--line)] px-2 py-2"
       role="toolbar"
     >

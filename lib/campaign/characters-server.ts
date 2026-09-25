@@ -1,6 +1,7 @@
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { getCampaignCredentialForGeneration } from "@/lib/ai/campaign-credentials";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { ApiCharacter } from "@/lib/campaign/types";
 
 export type CampaignCharactersResult = {
@@ -9,7 +10,7 @@ export type CampaignCharactersResult = {
   characters: ApiCharacter[];
 };
 
-const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 async function portraitCapability(campaignId: string, character: { owner_id: string | null }, membership: { role: "gm" | "player" }, userId: string) {
   const portraitAiRole = membership.role === "gm" ? "gm" : character.owner_id === userId ? "player" : null;
@@ -41,7 +42,13 @@ export async function getCampaignCharacters(campaignId: string): Promise<Campaig
 
   if (error) throw new Error(`Unable to read campaign characters: ${error.message}`);
 
-  const characters = await addCampaignArtUrls(context.supabase, data ?? []);
+  let characters = await addCampaignArtUrls(context.supabase, data ?? []);
+  if (membership.role !== "gm") {
+    characters = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, characters, (character) => [
+      { key: "backstory_markdown", markdown: character.backstory_markdown },
+      ...(character.physical_description_is_markdown ? [{ key: "physical_description", markdown: character.physical_description }] : []),
+    ]);
+  }
   return {
     role: membership.role,
     displayName: membership.displayName,
@@ -70,10 +77,16 @@ export async function getCampaignCharacter(campaignId: string, characterId: stri
   if (!data) return null;
 
   const [character] = await addCampaignArtUrls(context.supabase, [data]);
-  const capability = await portraitCapability(campaignId, character, membership, context.user.id);
+  const [visibleCharacter] = membership.role === "gm"
+    ? [character]
+    : await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [character], (record) => [
+      { key: "backstory_markdown", markdown: record.backstory_markdown },
+      ...(record.physical_description_is_markdown ? [{ key: "physical_description", markdown: record.physical_description }] : []),
+    ]);
+  const capability = await portraitCapability(campaignId, visibleCharacter, membership, context.user.id);
   return {
-    ...character,
-    can_edit: membership.role === "gm" || character.owner_id === context.user.id,
+    ...visibleCharacter,
+    can_edit: membership.role === "gm" || visibleCharacter.owner_id === context.user.id,
     ...capability,
   };
 }

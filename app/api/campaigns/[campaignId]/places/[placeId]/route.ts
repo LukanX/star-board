@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls, removeCampaignArtIfUnreferenced } from "@/lib/storage/campaign-art";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import { updatePlaceSchema } from "@/lib/validation/place";
 
 type RouteContext = { params: Promise<{ campaignId: string; placeId: string }> };
 
 export const runtime = "nodejs";
 
-const placeColumns = "id, campaign_id, author_id, parent_place_id, name, kind, description, player_notes_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const placeColumns = "id, campaign_id, author_id, parent_place_id, name, kind, description, description_is_markdown, player_notes_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 async function getParentPlaceError(supabase: Awaited<ReturnType<typeof getAuthenticatedUser>> extends infer Context ? Context extends { supabase: infer Client } ? Client : never : never, campaignId: string, placeId: string, parentPlaceId: string | null | undefined) {
   if (!parentPlaceId) return null;
@@ -60,7 +62,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const [placeWithArt] = await addCampaignArtUrls(context.supabase, [data]);
 
     if (membership.role !== "gm") {
-      return NextResponse.json({ role: membership.role, place: placeWithArt });
+      const [place] = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [placeWithArt], (record) => [
+        ...(record.description_is_markdown ? [{ key: "description", markdown: record.description }] : []),
+        { key: "player_notes_markdown", markdown: record.player_notes_markdown },
+      ]);
+      return NextResponse.json({ role: membership.role, place });
     }
 
     const { data: notes, error: notesError } = await context.supabase
@@ -110,7 +116,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     const { data: previousPlace, error: previousPlaceError } = await context.supabase
       .from("places")
-      .select("art_path")
+      .select("art_path, description, description_is_markdown")
       .eq("id", placeId)
       .eq("campaign_id", campaignId)
       .maybeSingle();
@@ -123,6 +129,19 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Place not found." }, { status: 404 });
     }
 
+    const nextDescription = input.data.description ?? previousPlace.description;
+    const nextDescriptionIsMarkdown = input.data.descriptionIsMarkdown
+      ?? previousPlace.description_is_markdown
+      ?? false;
+    const narrativeFields = [
+      ...(nextDescriptionIsMarkdown ? [{ markdown: nextDescription, audience: "player" as const }] : []),
+      ...(input.data.playerNotesMarkdown === undefined ? [] : [{ markdown: input.data.playerNotesMarkdown, audience: "player" as const }]),
+      ...(input.data.gmNotesMarkdown === undefined ? [] : [{ markdown: input.data.gmNotesMarkdown, audience: "gm" as const }]),
+    ];
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, narrativeFields))) {
+      return NextResponse.json({ error: "Place details link to an inaccessible or invalid campaign record." }, { status: 400 });
+    }
+
     const parentError = await getParentPlaceError(context.supabase, campaignId, placeId, input.data.parentPlaceId);
 
     if (parentError) {
@@ -133,6 +152,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       ...(input.data.name === undefined ? {} : { name: input.data.name }),
       ...(input.data.kind === undefined ? {} : { kind: input.data.kind }),
       ...(input.data.description === undefined ? {} : { description: input.data.description }),
+      ...(input.data.descriptionIsMarkdown === undefined ? {} : { description_is_markdown: input.data.descriptionIsMarkdown }),
       ...(input.data.playerNotesMarkdown === undefined ? {} : { player_notes_markdown: input.data.playerNotesMarkdown }),
       ...(input.data.parentPlaceId === undefined ? {} : { parent_place_id: input.data.parentPlaceId }),
       ...(input.data.artSubject === undefined ? {} : { art_subject: input.data.artSubject }),

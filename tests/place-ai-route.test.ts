@@ -119,6 +119,7 @@ describe("AI place assistance route", () => {
       expect.objectContaining({ campaignId, parentPlaceId: parentId, name: "The Blue Door" }),
       expect.objectContaining({ system: "Starfinder 2e" }),
       placeContext,
+      "",
     );
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       campaignId,

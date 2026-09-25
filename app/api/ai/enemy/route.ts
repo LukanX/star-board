@@ -6,6 +6,7 @@ import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
 import { buildEnemyPrompt } from "@/lib/ai/prompts";
+import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
 import { enemyGenerationInputSchema } from "@/lib/validation/ai";
@@ -64,7 +65,13 @@ export async function POST(request: Request) {
     const aiContext = await loadCampaignAiContext(context.supabase, input.data.campaignId);
     if (aiContext.error) return NextResponse.json({ error: aiContext.error }, { status: aiContext.notFound ? 404 : 503 });
 
-    const prompt = buildEnemyPrompt(input.data, aiContext.campaign);
+    const linkedContext = await loadLinkedEntityContext(context.supabase, input.data.campaignId, input.data, "gm");
+    if ("error" in linkedContext) {
+      const failure = linkedEntityContextFailure(linkedContext.error);
+      return NextResponse.json({ error: failure.message }, { status: failure.status });
+    }
+
+    const prompt = buildEnemyPrompt(input.data, aiContext.campaign, linkedContext.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundEnemyGeneration(request)) {

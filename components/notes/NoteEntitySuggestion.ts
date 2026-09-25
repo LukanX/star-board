@@ -14,6 +14,7 @@ type NoteEntitySuggestionOptions = {
   campaignId: string;
   noteId?: string;
   audience: NoteVisibility;
+  instanceId?: string;
 };
 
 const entityTypeOrder = ["characters", "npcs", "places", "factions", "jobs", "enemies", "episodes"];
@@ -27,7 +28,7 @@ const entityTypeLabels: Record<string, string> = {
   episodes: "EPISODES",
 };
 
-function renderItems(container: HTMLElement, items: NoteEntitySearchResult[], selectedIndex: number) {
+function renderItems(container: HTMLElement, items: NoteEntitySearchResult[], selectedIndex: number, instanceId: string) {
   container.replaceChildren();
   let currentType = "";
   let currentGroup: HTMLDivElement | null = null;
@@ -47,7 +48,7 @@ function renderItems(container: HTMLElement, items: NoteEntitySearchResult[], se
 
     const button = document.createElement("button");
     button.type = "button";
-    button.id = `note-entity-option-${index}`;
+    button.id = `${instanceId}-option-${index}`;
     button.setAttribute("role", "option");
     button.setAttribute("aria-selected", String(index === selectedIndex));
     button.className = `flex w-full items-start justify-between gap-4 border-0 bg-transparent px-3 py-2 text-left ${index === selectedIndex ? "bg-[rgba(98,232,255,.1)] text-[var(--ink)]" : "text-[var(--muted)] hover:bg-[rgba(255,255,255,.04)]"}`;
@@ -66,7 +67,7 @@ function renderItems(container: HTMLElement, items: NoteEntitySearchResult[], se
     button.append(copy);
     button.addEventListener("mousedown", (event) => event.preventDefault());
     button.addEventListener("click", () => {
-      container.dispatchEvent(new CustomEvent("note-entity-select", { detail: index }));
+      container.dispatchEvent(new CustomEvent("campaign-entity-select", { detail: index }));
     });
     currentGroup?.append(button);
   });
@@ -80,11 +81,14 @@ export const NoteEntitySuggestion = Extension.create<NoteEntitySuggestionOptions
       campaignId: "",
       noteId: undefined,
       audience: "player" as const,
+      instanceId: "",
     };
   },
 
   addProseMirrorPlugins() {
     const { campaignId, noteId, audience } = this.options;
+    const instanceId = this.options.instanceId || `campaign-entity-list-${campaignId}`;
+    const listId = `${instanceId}-listbox`;
 
     return [Suggestion<NoteEntitySearchResult>({
       editor: this.editor,
@@ -120,7 +124,7 @@ export const NoteEntitySuggestion = Extension.create<NoteEntitySuggestionOptions
         let selectedIndex = 0;
 
         const renderCurrentItems = () => {
-          if (container && currentProps) renderItems(container, currentProps.items, selectedIndex);
+          if (container && currentProps) renderItems(container, currentProps.items, selectedIndex, instanceId);
         };
 
         return {
@@ -129,12 +133,12 @@ export const NoteEntitySuggestion = Extension.create<NoteEntitySuggestionOptions
             selectedIndex = 0;
             container = document.createElement("div");
             container.className = "z-[100] max-h-64 min-w-56 max-w-[min(22rem,calc(100vw-2rem))] overflow-y-auto border border-[var(--line)] bg-[#0a1118] shadow-[0_12px_32px_rgba(0,0,0,.5)]";
-            container.id = `note-entity-list-${campaignId}`;
+            container.id = listId;
             container.setAttribute("role", "listbox");
             container.setAttribute("aria-label", "Campaign entity references");
             props.editor.view.dom.setAttribute("aria-controls", container.id);
             props.editor.view.dom.setAttribute("aria-expanded", String(props.items.length > 0));
-            container.addEventListener("note-entity-select", ((event: CustomEvent<number>) => {
+            container.addEventListener("campaign-entity-select", ((event: CustomEvent<number>) => {
               const item = currentProps?.items[event.detail];
               if (item) currentProps?.command(item);
             }) as EventListener);
@@ -145,7 +149,7 @@ export const NoteEntitySuggestion = Extension.create<NoteEntitySuggestionOptions
             currentProps = props;
             selectedIndex = Math.min(selectedIndex, Math.max(0, props.items.length - 1));
             props.editor.view.dom.setAttribute("aria-expanded", String(props.items.length > 0));
-            if (props.items.length) props.editor.view.dom.setAttribute("aria-activedescendant", `note-entity-option-${selectedIndex}`);
+            if (props.items.length) props.editor.view.dom.setAttribute("aria-activedescendant", `${instanceId}-option-${selectedIndex}`);
             renderCurrentItems();
           },
           onKeyDown({ event }) {
@@ -154,14 +158,14 @@ export const NoteEntitySuggestion = Extension.create<NoteEntitySuggestionOptions
               event.preventDefault();
               selectedIndex = (selectedIndex + 1) % currentProps.items.length;
               renderCurrentItems();
-              currentProps.editor.view.dom.setAttribute("aria-activedescendant", `note-entity-option-${selectedIndex}`);
+              currentProps.editor.view.dom.setAttribute("aria-activedescendant", `${instanceId}-option-${selectedIndex}`);
               return true;
             }
             if (event.key === "ArrowUp" && currentProps?.items.length) {
               event.preventDefault();
               selectedIndex = (selectedIndex - 1 + currentProps.items.length) % currentProps.items.length;
               renderCurrentItems();
-              currentProps.editor.view.dom.setAttribute("aria-activedescendant", `note-entity-option-${selectedIndex}`);
+              currentProps.editor.view.dom.setAttribute("aria-activedescendant", `${instanceId}-option-${selectedIndex}`);
               return true;
             }
             if (event.key === "Enter" && currentProps?.items[selectedIndex]) {

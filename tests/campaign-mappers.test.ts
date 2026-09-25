@@ -97,6 +97,6 @@ describe("campaign mappers", () => {
 
   test("converts a character to a draft while preserving nullable art fields", () => {
     const mapped = mapApiCharacter(character({ art_subject: null, art_path: null, art_url: null, art_prompt: null, art_provider: null }), 0);
-    expect(toCharacterDraft(mapped)).toEqual({ name: "Ari", species: "Human", className: "Pilot", level: 3, isActive: true, backstoryMarkdown: "Past", physicalDescription: "Tall", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null });
+    expect(toCharacterDraft(mapped)).toEqual({ name: "Ari", species: "Human", className: "Pilot", level: 3, isActive: true, backstoryMarkdown: "Past", physicalDescription: "Tall", physicalDescriptionIsMarkdown: false, artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null });
   });
 });

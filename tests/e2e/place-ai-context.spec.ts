@@ -101,7 +101,7 @@ test("threads the selected Place parent through image generation", async ({
     await page
       .getByRole("button", { name: "GENERATE ART", exact: true })
       .click();
-    await page.getByLabel("Visual subject").fill("A hidden transit room");
+    await page.getByLabel("Artwork description").fill("A hidden transit room");
     await page
       .getByRole("button", { name: "GENERATE DRAFT", exact: true })
       .click();

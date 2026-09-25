@@ -12,7 +12,9 @@ type NoteLinkNode = {
 };
 
 type NoteLinkType = NoteEntityType | "episode";
-type NoteLinkReference = { type: NoteLinkType; id: string };
+export type CampaignEntityLinkReference = { type: NoteLinkType; id: string };
+type NoteLinkReference = CampaignEntityLinkReference;
+export type CampaignEntityLinkField = { markdown: string; audience: NoteVisibility };
 type NoteLinkResult = { data: unknown[] | null; error: unknown };
 type NoteLinkQuery = PromiseLike<NoteLinkResult> & {
   select: (columns: string) => NoteLinkQuery;
@@ -77,6 +79,19 @@ function collectInternalLinks(markdown: string, campaignId: string) {
   return { references: [...references.values()], positions };
 }
 
+export function collectCampaignEntityLinkReferences(markdowns: string[], campaignId: string) {
+  const collected = markdowns.map((markdown) => collectInternalLinks(markdown, campaignId));
+  const references = [...new Map(collected.flatMap(({ references: fieldReferences }) =>
+    fieldReferences.map((reference) => [`${reference.type}:${reference.id}`, reference] as const),
+  )).values()];
+  return {
+    references,
+    hasInvalidReference: collected.some(({ positions }) =>
+      positions.some((position) => position.reference === "invalid"),
+    ),
+  };
+}
+
 async function readReferenceRows(
   supabase: unknown,
   campaignId: string,
@@ -134,11 +149,25 @@ export async function validateNoteEntityLinks(
   campaignId: string,
   markdown: string,
 ): Promise<boolean> {
-  const { references, positions } = collectInternalLinks(markdown, campaignId);
-  if (positions.some((position) => position.reference === "invalid") || references.length > 64) return false;
+  return validateCampaignEntityLinkFields(supabase, campaignId, [{ markdown, audience: "player" }]);
+}
+
+export async function validateCampaignEntityLinkFields(
+  supabase: unknown,
+  campaignId: string,
+  fields: CampaignEntityLinkField[],
+): Promise<boolean> {
+  const collected = fields.map(({ markdown }) => collectInternalLinks(markdown, campaignId));
+  const references = [...new Map(collected.flatMap(({ references: fieldReferences }) =>
+    fieldReferences.map((reference) => [`${reference.type}:${reference.id}`, reference] as const),
+  )).values()];
+  if (collected.some(({ positions }) => positions.some((position) => position.reference === "invalid"))
+    || references.length > 64) return false;
 
   const rows = await readReferenceRows(supabase, campaignId, references);
-  return references.every((reference) => isReferenceVisible(reference, rows, "player"));
+  return collected.every((field, index) =>
+    field.references.every((reference) => isReferenceVisible(reference, rows, fields[index].audience)),
+  );
 }
 
 export async function maskHiddenNoteEntityLinks(
@@ -173,4 +202,39 @@ export async function maskHiddenNoteEntityLinksBatch(
     }
     return masked;
   });
+}
+
+export function maskCampaignEntityLinkFieldsBatch(
+  supabase: unknown,
+  campaignId: string,
+  fields: CampaignEntityLinkField[],
+): Promise<string[]> {
+  return maskHiddenNoteEntityLinksBatch(
+    supabase,
+    campaignId,
+    fields.map(({ markdown, audience }) => ({ markdown, visibility: audience })),
+  );
+}
+
+export async function maskPlayerFacingEntityMarkdownBatch<T extends object>(
+  supabase: unknown,
+  campaignId: string,
+  records: T[],
+  getFields: (record: T) => Array<{ key: string; markdown: string }>,
+): Promise<T[]> {
+  const fields = records.flatMap((record, recordIndex) =>
+    getFields(record).map((field) => ({ ...field, recordIndex })),
+  );
+  if (!fields.length) return records;
+
+  const masked = await maskCampaignEntityLinkFieldsBatch(
+    supabase,
+    campaignId,
+    fields.map(({ markdown }) => ({ markdown, audience: "player" })),
+  );
+  const output = records.map((record) => ({ ...record }));
+  fields.forEach(({ key, recordIndex }, index) => {
+    (output[recordIndex] as Record<string, unknown>)[key] = masked[index];
+  });
+  return output;
 }

@@ -4,6 +4,7 @@ import VisualAsset from "@/components/ui/VisualAsset";
 import StatusPill from "@/components/ui/StatusPill";
 import { campaignEntityPath } from "@/lib/campaign/routes";
 import type { Mission } from "@/lib/campaign/types";
+import { markdownExcerpt } from "@/lib/campaign/markdown-excerpt";
 
 export default function JobCard({ campaignId, job, isGM, index, compact = false, onVote, onEdit, onPromote }: {
   campaignId: string;
@@ -33,7 +34,7 @@ export default function JobCard({ campaignId, job, isGM, index, compact = false,
     <div data-mission-content="true" className={missionContentClassName}>
       <div data-mission-meta="true" className="flex items-center gap-[10px] mb-[11px]"><StatusPill color={job.status === "open" ? "open" : job.accent}>{job.status === "open" ? "OPEN JOB" : job.category}</StatusPill></div>
       <Link className="no-underline text-inherit hover:text-[var(--cyan)]" href={campaignEntityPath(campaignId, "jobs", job.id)}><h3 className="m-0 mb-[7px] !text-[17px] tracking-[-.02em] max-[760px]:!text-[14px]">{job.title}</h3></Link>
-      <p data-mission-summary="true" className="!max-w-[500px] m-0 text-[var(--muted)] text-[11px] leading-[1.55] max-[760px]:text-[10px]">{job.summary}</p>
+      <p data-mission-summary="true" className="!max-w-[500px] m-0 line-clamp-3 text-[var(--muted)] text-[11px] leading-[1.55] max-[760px]:text-[10px]">{markdownExcerpt(job.summary)}</p>
       <div data-mission-footer="true" className={missionFooterClassName}><span data-giver="true" className="flex items-center gap-2 min-w-0"><span data-giver-glyph="true" className="w-[22px] h-[22px] grid place-items-center border border-[rgba(98,232,255,.32)] text-[var(--cyan)] font-mono text-[9px]">{job.giverType === "NPC" ? "N" : "F"}</span><span><small data-giver-label="true" className="text-[var(--dim)] font-mono text-[7px] tracking-[.11em]">{job.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}</small><strong data-giver-name="true" className="block max-w-[150px] overflow-hidden text-[#cfd8e5] text-[10px] font-[560] text-ellipsis whitespace-nowrap mt-[3px]">{job.giver}</strong></span></span></div>
     </div>
     <div data-mission-vote="true" className="absolute left-0 right-0 bottom-0 z-[1] h-[60px] flex flex-row items-center justify-end gap-2 p-0 pr-[19px] bg-[rgba(8,11,17,.65)] border-t border-[var(--line)] max-[760px]:pr-[10px] max-[420px]:pr-[7px]">

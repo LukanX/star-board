@@ -1,5 +1,6 @@
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { PlaceRelatedRecords, RelatedEpisodeSummary, RelatedFactionSummary, RelatedJobSummary, RelatedNpcSummary, RelatedPlaceSummary } from "@/lib/campaign/detail-types";
 import type { ApiPlace } from "@/lib/campaign/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -23,7 +24,7 @@ export type CampaignPlaceResult = {
   related: PlaceRelatedRecords;
 };
 
-const placeColumns = "id, campaign_id, author_id, parent_place_id, name, kind, description, player_notes_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const placeColumns = "id, campaign_id, author_id, parent_place_id, name, kind, description, description_is_markdown, player_notes_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 function toPlaceSummary(place: Pick<ApiPlace, "id" | "name" | "kind">): RelatedPlaceSummary {
   return { id: place.id, name: place.name, kind: place.kind };
@@ -98,7 +99,11 @@ export async function getCampaignPlaces(campaignId: string): Promise<CampaignPla
 
   const placesWithArt = await addCampaignArtUrls(context.supabase, data ?? []);
   if (membership.role !== "gm") {
-    return { role: membership.role, displayName: membership.displayName, places: placesWithArt };
+    const places = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, placesWithArt, (place) => [
+      ...(place.description_is_markdown ? [{ key: "description", markdown: place.description }] : []),
+      { key: "player_notes_markdown", markdown: place.player_notes_markdown },
+    ]);
+    return { role: membership.role, displayName: membership.displayName, places };
   }
 
   const placeIds = (data ?? []).map((place) => place.id);
@@ -149,6 +154,11 @@ export async function getCampaignPlace(
 
     if (notesError) throw new Error(`Unable to read place private notes: ${notesError.message}`);
     place = { ...placeWithArt, gm_notes_markdown: notes?.body_markdown ?? "" };
+  } else {
+    [place] = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [placeWithArt], (record) => [
+      ...(record.description_is_markdown ? [{ key: "description", markdown: record.description }] : []),
+      { key: "player_notes_markdown", markdown: record.player_notes_markdown },
+    ]);
   }
 
   const placesResult = await placesResultPromise;

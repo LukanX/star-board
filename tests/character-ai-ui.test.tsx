@@ -101,6 +101,21 @@ describe("character portrait UI boundaries", () => {
     expect(gmMarkup).toContain("IMAGE MODEL");
   });
 
+  it("uses a large multiline artwork description field for non-character art", () => {
+    const markup = render(
+      <AiArtStudio
+        campaignId={campaignId}
+        kind="place"
+        subject="A hidden transit room"
+        onApproved={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="Artwork description"');
+    expect(markup).toContain("min-h-[140px]");
+    expect(markup).not.toContain("Visual subject");
+  });
+
   it("uses a single description workflow for character assistance", () => {
     const markup = render(
       <AiDraftAssistant

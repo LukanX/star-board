@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import NarrativeContent from "@/components/markdown/NarrativeContent";
 import VisualAsset from "@/components/ui/VisualAsset";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { Character } from "@/lib/campaign/types";
@@ -59,18 +60,22 @@ export default function CharacterPublicRecord({
           <MarkdownPreviewToolbar>
             BACKSTORY.MD <span>PLAYER VISIBLE</span>
           </MarkdownPreviewToolbar>
-          <p>
-            {character.backstoryMarkdown || "No public backstory recorded yet."}
-          </p>
+          <NarrativeContent
+            source={character.backstoryMarkdown || "No public backstory recorded yet."}
+            isMarkdown
+          />
         </MarkdownPreview>
         {character.physicalDescription ? (
           <div className="p-[15px] border border-[rgba(98,232,255,.2)] bg-[rgba(98,232,255,.035)]">
             <p className={`${eyebrowClassName} !mb-2 text-[var(--cyan)]`}>
               PHYSICAL APPEARANCE
             </p>
-            <p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65]">
-              {character.physicalDescription}
-            </p>
+            <NarrativeContent
+              source={character.physicalDescription}
+              isMarkdown={character.physicalDescriptionIsMarkdown ?? false}
+              suppressAutolinkLiterals
+              className="m-0 text-[11px] leading-[1.65]"
+            />
           </div>
         ) : null}
       </div>

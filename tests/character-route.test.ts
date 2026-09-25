@@ -140,6 +140,7 @@ describe("character routes", () => {
       level: 3,
       backstory_markdown: "",
       physical_description: "Tall with silver eyes.",
+      physical_description_is_markdown: false,
       art_subject: "A silver-eyed mechanic in a worn flight jacket.",
       art_path: null,
       art_prompt: "A cinematic portrait",

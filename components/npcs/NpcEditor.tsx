@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { LockKeyhole, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
+import RichMarkdownField from "@/components/markdown/RichMarkdownField";
 import {
+  discardNewCampaignArtStudioSession,
+  finalizeCampaignArtStudioSession,
   markCampaignArtPersisted,
   useCampaignArtEditor,
 } from "@/components/archive/CampaignArtField";
@@ -20,6 +23,7 @@ type NpcDraft = {
   species: string;
   role: string;
   description: string;
+  descriptionIsMarkdown: boolean;
   playerNotesMarkdown: string;
   gmNotesMarkdown: string;
   placeId: string | null;
@@ -36,6 +40,7 @@ const emptyNpcDraft: NpcDraft = {
   species: "",
   role: "",
   description: "",
+  descriptionIsMarkdown: false,
   playerNotesMarkdown: "",
   gmNotesMarkdown: "",
   placeId: null,
@@ -54,6 +59,7 @@ function toDraft(npc?: ApiNpc): NpcDraft {
         species: npc.species,
         role: npc.role,
         description: npc.description,
+        descriptionIsMarkdown: npc.description_is_markdown ?? false,
         playerNotesMarkdown: npc.player_notes_markdown,
         gmNotesMarkdown: npc.gm_notes_markdown ?? "",
         placeId: npc.place_id,
@@ -91,10 +97,11 @@ export default function NpcEditor({
     setDirty();
     setDraftState(updater);
   };
-  const update = (field: keyof NpcDraft, value: string | null) =>
+  const update = (field: keyof NpcDraft, value: string | null | boolean) =>
     setDraft((current) => ({ ...current, [field]: value }));
   const onCancel = () => {
     if (!confirmNavigation()) return;
+    if (!npc) discardNewCampaignArtStudioSession(campaignId, "npc");
     clearDirty();
     parentOnCancel?.();
   };
@@ -104,6 +111,7 @@ export default function NpcEditor({
       ? {
           campaignId,
           kind: "npc",
+          entityId: npc?.id,
           visible: !assistantOpen,
           value: draft.artPath,
           trackUnsavedUploads: true,
@@ -143,6 +151,7 @@ export default function NpcEditor({
       if (!response.ok || !result.npc)
         throw new Error(result.error ?? "NPC could not be saved.");
       markCampaignArtPersisted(campaignId, result.npc.art_path);
+      finalizeCampaignArtStudioSession(campaignId, "npc", npc?.id, result.npc.id);
       clearDirty();
       onSaved?.(result.npc);
     } catch (saveError) {
@@ -262,6 +271,7 @@ export default function NpcEditor({
             species: candidate.species ?? current.species,
             role: candidate.role ?? current.role,
             description: candidate.shortDescription ?? current.description,
+            descriptionIsMarkdown: candidate.shortDescription === undefined ? current.descriptionIsMarkdown : true,
             playerNotesMarkdown:
               candidate.playerNotes ?? current.playerNotesMarkdown,
             gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
@@ -301,35 +311,36 @@ export default function NpcEditor({
             />
           </label>
         </div>
-        <label>
-          Description
-          <textarea
-            maxLength={4000}
-            value={draft.description}
-            onChange={(event) => update("description", event.target.value)}
-          />
-        </label>
-        <label>
-          Player notes
-          <textarea
-            maxLength={20000}
-            value={draft.playerNotesMarkdown}
-            onChange={(event) =>
-              update("playerNotesMarkdown", event.target.value)
-            }
-          />
-        </label>
-        <label>
-          GM notes{" "}
-          <span className="inline-flex items-center gap-1 text-[var(--pink)]">
-            <LockKeyhole size={11} /> PRIVATE
-          </span>
-          <textarea
-            maxLength={20000}
-            value={draft.gmNotesMarkdown}
-            onChange={(event) => update("gmNotesMarkdown", event.target.value)}
-          />
-        </label>
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="Description"
+          value={draft.description}
+          isMarkdown={draft.descriptionIsMarkdown}
+          maxLength={4000}
+          audience="player"
+          onChange={(value, isMarkdown) => {
+            update("description", value);
+            update("descriptionIsMarkdown", isMarkdown);
+          }}
+        />
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="Player notes"
+          value={draft.playerNotesMarkdown}
+          isMarkdown
+          maxLength={20000}
+          audience="player"
+          onChange={(value) => update("playerNotesMarkdown", value)}
+        />
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="GM notes / PRIVATE"
+          value={draft.gmNotesMarkdown}
+          isMarkdown
+          maxLength={20000}
+          audience="gm"
+          onChange={(value) => update("gmNotesMarkdown", value)}
+        />
         <label className="place-quick-field">
           Primary place
           <select className={editorSelectClassName} value={draft.placeId ?? ""} onChange={(event) => update("placeId", event.target.value || null)}>

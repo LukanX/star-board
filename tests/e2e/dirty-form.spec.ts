@@ -145,8 +145,8 @@ test("guards internal navigation after a job edit", async ({ page, campaign }) =
   await titleInput.focus();
   await expect(titleInput).toHaveCSS("border-left-color", "rgb(98, 232, 255)");
   const summaryInput = page.locator("form.character-form").getByLabel("Summary");
-  await expect(summaryInput).toHaveCSS("min-height", "110px");
-  await expect(summaryInput).toHaveCSS("resize", "vertical");
+  await expect(summaryInput).toHaveCSS("min-height", "130px");
+  await expect(summaryInput).toHaveAttribute("contenteditable", "true");
   await expect(page.locator(".character-form-actions").first()).toHaveClass(/flex/);
   await expect(page.locator(".character-form-actions").first()).toHaveClass(/max-\[760px\]:flex-wrap/);
   const formGrid = page.locator(".character-form-grid").first();
@@ -175,7 +175,7 @@ test("guards internal navigation after a place edit", async ({ page, campaign })
   const placeEditor = page.locator("[data-editor-panel]").first();
   await expect(placeEditor).toHaveClass(/mb-\[18px\]/);
   await expect(placeEditor).not.toHaveClass(/place-editor/);
-  const privateLock = page.locator("label").filter({ hasText: "GM notes" }).getByText("PRIVATE", { exact: true });
+  const privateLock = page.locator("form.character-form [data-private-field='true']").filter({ hasText: "PRIVATE" });
   await expect(privateLock).toHaveClass(/inline-flex/);
   await expect(privateLock).toHaveClass(/items-center/);
   await expect(privateLock).toHaveClass(/gap-1/);
@@ -317,10 +317,11 @@ test("keeps place artwork frames in route-owned utilities", async ({ page, campa
     const brief = detailBody.locator("[data-place-public-brief]");
     await expect(brief).toHaveClass(/grid/);
     await expect(brief).toHaveClass(/gap-\[8px\]/);
-    await expect(brief.locator("p").last()).toHaveClass(/m-0/);
-    await expect(brief.locator("p").last()).toHaveClass(/text-\[var\(--muted\)\]/);
-    await expect(brief.locator("p").last()).toHaveClass(/text-\[11px\]/);
-    await expect(brief.locator("p").last()).toHaveClass(/leading-\[1\.65\]/);
+    const briefText = brief.locator(".whitespace-pre-wrap");
+    await expect(briefText).toHaveClass(/m-0/);
+    await expect(briefText).toHaveClass(/text-\[var\(--muted\)\]/);
+    await expect(briefText).toHaveClass(/text-\[11px\]/);
+    await expect(briefText).toHaveClass(/leading-\[1\.65\]/);
     const previews = detailBody.locator("[data-place-public-preview], [data-place-private-preview]");
     await expect(previews).toHaveCount(2);
     await expect(previews.first()).toHaveClass(/min-w-0/);

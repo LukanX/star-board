@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { LockKeyhole, Save, Sparkles, Trash2, X } from "lucide-react";
+import { Save, Sparkles, Trash2, X } from "lucide-react";
 import AiDraftAssistant, { type AiDraftSelectField } from "@/components/archive/AiDraftAssistant";
+import RichMarkdownField from "@/components/markdown/RichMarkdownField";
 import {
+  discardNewCampaignArtStudioSession,
+  finalizeCampaignArtStudioSession,
   markCampaignArtPersisted,
   useCampaignArtEditor,
 } from "@/components/archive/CampaignArtField";
@@ -18,6 +21,7 @@ type PlaceDraft = {
   name: string;
   kind: string;
   description: string;
+  descriptionIsMarkdown: boolean;
   playerNotesMarkdown: string;
   gmNotesMarkdown: string;
   parentPlaceId: string | null;
@@ -32,6 +36,7 @@ const emptyPlaceDraft: PlaceDraft = {
   name: "",
   kind: "location",
   description: "",
+  descriptionIsMarkdown: false,
   playerNotesMarkdown: "",
   gmNotesMarkdown: "",
   parentPlaceId: null,
@@ -51,6 +56,7 @@ function toDraft(
         name: place.name,
         kind: place.kind,
         description: place.description,
+        descriptionIsMarkdown: place.description_is_markdown ?? false,
         playerNotesMarkdown: place.player_notes_markdown,
         gmNotesMarkdown: place.gm_notes_markdown ?? "",
         parentPlaceId: place.parent_place_id,
@@ -91,10 +97,11 @@ export default function PlaceEditor({
     setDirty();
     setDraftState(updater);
   };
-  const update = (field: keyof PlaceDraft, value: string | null) =>
+  const update = (field: keyof PlaceDraft, value: string | null | boolean) =>
     setDraft((current) => ({ ...current, [field]: value }));
   const onCancel = () => {
     if (!confirmNavigation()) return;
+    if (!place) discardNewCampaignArtStudioSession(campaignId, "place");
     clearDirty();
     parentOnCancel?.();
   };
@@ -124,6 +131,7 @@ export default function PlaceEditor({
   useCampaignArtEditor({
     campaignId,
     kind: "place",
+    entityId: place?.id,
     visible: !assistantOpen,
     parentPlaceId: draft.parentPlaceId,
     value: draft.artPath,
@@ -161,6 +169,7 @@ export default function PlaceEditor({
         throw new Error(result.error ?? "Place could not be saved.");
 
       markCampaignArtPersisted(campaignId, result.place.art_path);
+      finalizeCampaignArtStudioSession(campaignId, "place", place?.id, result.place.id);
       clearDirty();
       onSaved?.(result.place);
     } catch (saveError) {
@@ -309,6 +318,7 @@ export default function PlaceEditor({
             name: candidate.name ?? current.name,
             kind: candidate.kind ?? current.kind,
             description: candidate.description ?? current.description,
+            descriptionIsMarkdown: candidate.description === undefined ? current.descriptionIsMarkdown : true,
             playerNotesMarkdown:
               candidate.playerNotes ?? current.playerNotesMarkdown,
             gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
@@ -363,36 +373,36 @@ export default function PlaceEditor({
             </select>
           </label>
         </div>
-        <label>
-          Description
-          <textarea
-            maxLength={4000}
-            placeholder="What can the campaign safely reveal about this place?"
-            value={draft.description}
-            onChange={(event) => update("description", event.target.value)}
-          />
-        </label>
-        <label>
-          Player notes
-          <textarea
-            maxLength={20000}
-            value={draft.playerNotesMarkdown}
-            onChange={(event) =>
-              update("playerNotesMarkdown", event.target.value)
-            }
-          />
-        </label>
-        <label>
-          GM notes{" "}
-          <span className="inline-flex items-center gap-1 text-[var(--pink)]">
-            <LockKeyhole size={11} /> PRIVATE
-          </span>
-          <textarea
-            maxLength={20000}
-            value={draft.gmNotesMarkdown}
-            onChange={(event) => update("gmNotesMarkdown", event.target.value)}
-          />
-        </label>
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="Description"
+          value={draft.description}
+          isMarkdown={draft.descriptionIsMarkdown}
+          maxLength={4000}
+          audience="player"
+          onChange={(value, isMarkdown) => {
+            update("description", value);
+            update("descriptionIsMarkdown", isMarkdown);
+          }}
+        />
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="Player notes"
+          value={draft.playerNotesMarkdown}
+          isMarkdown
+          maxLength={20000}
+          audience="player"
+          onChange={(value) => update("playerNotesMarkdown", value)}
+        />
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="GM notes / PRIVATE"
+          value={draft.gmNotesMarkdown}
+          isMarkdown
+          maxLength={20000}
+          audience="gm"
+          onChange={(value) => update("gmNotesMarkdown", value)}
+        />
         {error ? (
           <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">
             {error}

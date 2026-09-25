@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { readCampaignEnemiesForRole, readCampaignEnemyForRole } from "@/lib/campaign/enemies-server";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { createEnemySchema, enemyRaritySchema, enemySizeSchema } from "@/lib/validation/enemy";
 import { createAonImportPayload, createAonSourceSnapshot } from "@/lib/enemies/aon-import";
 import { fetchAonCreatureHtml, AonFetchError } from "@/lib/enemies/aon-fetch";
@@ -145,6 +146,15 @@ export async function POST(request: Request, { params }: RouteContext) {
       throw error;
     }
 
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, [
+      ...(verifiedInput.playerDescriptionIsMarkdown
+        ? [{ markdown: verifiedInput.playerDescription, audience: "player" as const }]
+        : []),
+      { markdown: verifiedInput.gmNotesMarkdown, audience: "gm" },
+    ]))) {
+      return NextResponse.json({ error: "Enemy details link to an inaccessible or invalid campaign record." }, { status: 400 });
+    }
+
     if (verifiedInput.artPath && !isExternalArtPath(verifiedInput.artPath)) {
       try {
         await createCampaignArtSignedUrl(context.supabase, verifiedInput.artPath, 3600, true);
@@ -158,6 +168,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       p_public: {
         name: verifiedInput.name,
         playerDescription: verifiedInput.playerDescription,
+        playerDescriptionIsMarkdown: verifiedInput.playerDescriptionIsMarkdown,
         isRevealed: verifiedInput.isRevealed,
         artPath: verifiedInput.artPath ?? null,
       },

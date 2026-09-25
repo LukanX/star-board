@@ -2,6 +2,7 @@ import { Skull } from "lucide-react";
 import RecordPortrait from "@/components/ui/RecordPortrait";
 import { recordMainClassName, recordRowClassName } from "@/components/ui/recordStyles";
 import { getAttachedArtUrl } from "@/lib/campaign/mappers";
+import { markdownExcerpt } from "@/lib/campaign/markdown-excerpt";
 import type { ApiEnemy } from "@/lib/campaign/types";
 
 export default function EnemyCard({ enemy, selected, isGM, onSelect }: { enemy: ApiEnemy; selected: boolean; isGM: boolean; onSelect: (enemyId: string) => void }) {
@@ -17,7 +18,7 @@ export default function EnemyCard({ enemy, selected, isGM, onSelect }: { enemy: 
     <RecordPortrait src={artUrl} label={`${enemy.name} artwork`} className="grid h-[62px] w-[62px] flex-[0_0_62px] place-items-center border border-[rgba(255,92,154,.38)] bg-[rgba(255,92,154,.08)] text-[var(--pink)] max-[760px]:h-[56px] max-[760px]:w-[56px] max-[760px]:flex-[0_0_56px]" fallback={<Skull size={19} />} />
     <div className={recordMainClassName}>
       <h3 className="m-0 text-[13px] text-[var(--ink)] [overflow-wrap:anywhere]">{enemy.name}</h3>
-      <p>{enemy.player_description || "No player-safe brief recorded."}</p>
+      <p>{enemy.player_description_is_markdown ? markdownExcerpt(enemy.player_description) : enemy.player_description || "No player-safe brief recorded."}</p>
       {isGM ? <small className="font-mono text-[8px] tracking-[.08em] text-[var(--pink)]">LEVEL {enemy.level ?? "?"}{" // "}{(enemy.rarity ?? "unknown").toUpperCase()}</small> : null}
     </div>
   </button>;

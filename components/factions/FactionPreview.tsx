@@ -2,6 +2,7 @@ import { ArrowUpRight, BookOpen, LockKeyhole, Map } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
 import { FactionEmblem } from "@/components/factions/FactionCard";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import NarrativeContent from "@/components/markdown/NarrativeContent";
 import ArchiveRelatedList from "@/components/ui/ArchiveRelatedList";
 import { archivePreviewArtworkClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
@@ -26,9 +27,9 @@ export default function FactionPreview({ campaignId, faction, places, memberNpcs
     <div data-faction-preview-art="true" className={archivePreviewArtworkClassName}><FactionEmblem faction={faction} iconSize={72} size="fill" />{artUrl ? <span className="sr-only">Artwork attached</span> : null}</div>
     <div className="grid gap-[14px]">
       <p className="m-0 flex flex-wrap items-center gap-[6px] text-[var(--cyan)] font-mono text-[8px] tracking-[.07em] leading-[1.5] [overflow-wrap:anywhere]"><Map size={13} /> {getPlaceBreadcrumb(places, faction.place_id) || "NO PRIMARY PLACE"}</p>
-      <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">{faction.description || "No public description recorded yet."}</p></div>
-      <MarkdownPreview data-faction-preview-notes="true"><MarkdownPreviewToolbar><BookOpen size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><p>{faction.player_notes_markdown || "No player notes recorded yet."}</p></MarkdownPreview>
-      {isGM ? <MarkdownPreview data-faction-preview-private="true" className="border-[rgba(255,92,154,.25)]"><MarkdownPreviewToolbar className="text-[var(--pink)]"><LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span></MarkdownPreviewToolbar><p>{faction.gm_notes_markdown || "No private notes recorded yet."}</p></MarkdownPreview> : null}
+      <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PUBLIC BRIEF</p><NarrativeContent source={faction.description || "No public description recorded yet."} isMarkdown={faction.description_is_markdown ?? false} suppressAutolinkLiterals className="m-0 text-[11px] leading-[1.65] [overflow-wrap:anywhere]" /></div>
+      <MarkdownPreview data-faction-preview-notes="true"><MarkdownPreviewToolbar><BookOpen size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span></MarkdownPreviewToolbar><NarrativeContent source={faction.player_notes_markdown || "No player notes recorded yet."} isMarkdown /></MarkdownPreview>
+      {isGM ? <MarkdownPreview data-faction-preview-private="true" className="border-[rgba(255,92,154,.25)]"><MarkdownPreviewToolbar className="text-[var(--pink)]"><LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span></MarkdownPreviewToolbar><NarrativeContent source={faction.gm_notes_markdown || "No private notes recorded yet."} isMarkdown /></MarkdownPreview> : null}
       <ArchiveRelatedList eyebrow="FACTION ROSTER" title={`${memberNpcs.length} NPC${memberNpcs.length === 1 ? "" : "S"}`} emptyMessage="No NPCs are assigned to this faction." items={memberNpcs.map((npc) => ({ id: npc.id, href: campaignEntityPath(campaignId, "npcs", npc.id), label: npc.name, meta: [npc.species, npc.role].filter(Boolean).join(" // ") }))} />
     </div>
   </div>;

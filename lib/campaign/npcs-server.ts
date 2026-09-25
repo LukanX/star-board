@@ -1,5 +1,6 @@
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { CampaignAffiliationContext } from "@/lib/campaign/affiliations-server";
 import type { NpcRelatedRecords, RelatedJobSummary, RelatedPlaceSummary } from "@/lib/campaign/detail-types";
 import type { CampaignPlacesContext } from "@/lib/campaign/places-server";
@@ -20,7 +21,7 @@ export type CampaignNpcResult = {
   related: NpcRelatedRecords;
 };
 
-const npcColumns = "id, author_id, name, species, role, description, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const npcColumns = "id, author_id, name, species, role, description, description_is_markdown, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 function toPlaceSummary(place: Pick<ApiPlace, "id" | "name" | "kind">): RelatedPlaceSummary {
   return { id: place.id, name: place.name, kind: place.kind };
@@ -74,7 +75,11 @@ export async function getCampaignNpcs(campaignId: string): Promise<CampaignNpcsR
 
   const npcsWithArt = await addCampaignArtUrls(context.supabase, data ?? []);
   if (membership.role !== "gm") {
-    return { role: membership.role, displayName: membership.displayName, npcs: npcsWithArt };
+    const npcs = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, npcsWithArt, (npc) => [
+      ...(npc.description_is_markdown ? [{ key: "description", markdown: npc.description }] : []),
+      { key: "player_notes_markdown", markdown: npc.player_notes_markdown },
+    ]);
+    return { role: membership.role, displayName: membership.displayName, npcs };
   }
 
   const npcIds = (data ?? []).map((npc) => npc.id);
@@ -126,6 +131,11 @@ export async function getCampaignNpc(
 
     if (notesError) throw new Error(`Unable to read NPC private notes: ${notesError.message}`);
     npc = { ...npcWithArt, gm_notes_markdown: notes?.body_markdown ?? "" };
+  } else {
+    [npc] = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [npcWithArt], (record) => [
+      ...(record.description_is_markdown ? [{ key: "description", markdown: record.description }] : []),
+      { key: "player_notes_markdown", markdown: record.player_notes_markdown },
+    ]);
   }
 
   const placesResult = await placesResultPromise;

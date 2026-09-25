@@ -9,7 +9,7 @@ const episodeDateSchema = z
 export const updateEpisodeSchema = z
   .object({
     title: z.string().trim().min(1).max(160).optional(),
-    summary: z.string().trim().max(4000).optional(),
+    summary: z.string().max(4000).optional(),
     playerContextMarkdown: z.string().max(20000).optional(),
     status: z.enum(["planned", "active", "complete", "archived"]).optional(),
     startedAt: episodeDateSchema.nullable().optional(),

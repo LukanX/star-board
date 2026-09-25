@@ -85,6 +85,7 @@ export default function EpisodePublicRecord({
           </MarkdownPreviewToolbar>
           <MarkdownContent
             source={episode.summary || "No public episode brief recorded yet."}
+            preserveSoftBreaks
           />
         </MarkdownPreview>
         <MarkdownPreview>
@@ -98,6 +99,7 @@ export default function EpisodePublicRecord({
               episode.summary ||
               "No public episode context recorded yet."
             }
+            preserveSoftBreaks
           />
         </MarkdownPreview>
       </div>

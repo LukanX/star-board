@@ -5,6 +5,7 @@ import TableRow from "@tiptap/extension-table-row";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import { Markdown, MarkdownManager } from "@tiptap/markdown";
+import type { JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
@@ -25,6 +26,25 @@ export const noteEditorExtensions = [
 ];
 
 const markdownAstProcessor = unified().use(remarkParse).use(remarkGfm);
+const markdownManager = new MarkdownManager({
+  extensions: noteEditorExtensions,
+  markedOptions: { gfm: true },
+});
+
+function escapeMarkdownBlockSyntax(markdown: string) {
+  return markdown.replace(
+    /(^|\n)([ \t]{0,3})(#{1,6}[ \t]|>[ \t]?|[-+*][ \t]+|\d{1,9}[.)][ \t]+|(?:-{3,}|_{3,}|\*{3,})[ \t]*$|`{3,}|~{3,})/gm,
+    (_match, lineStart: string, indentation: string, marker: string) => `${lineStart}${indentation}\\${marker}`,
+  );
+}
+
+export function serializeRichMarkdown(document: JSONContent): string {
+  return (document.content ?? []).map((block) => {
+    const markdown = markdownManager.serialize({ type: "doc", content: [block] })
+      .replace(/(?:\r?\n)+$/g, "");
+    return block.type === "paragraph" ? escapeMarkdownBlockSyntax(markdown) : markdown;
+  }).join("\n\n");
+}
 
 function stripMarkdownPositions(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripMarkdownPositions);
@@ -39,11 +59,7 @@ function stripMarkdownPositions(value: unknown): unknown {
 
 export function isNoteMarkdownVisualSafe(markdown: string): boolean {
   try {
-    const manager = new MarkdownManager({
-      extensions: noteEditorExtensions,
-      markedOptions: { gfm: true },
-    });
-    const roundTripped = manager.serialize(manager.parse(markdown));
+    const roundTripped = markdownManager.serialize(markdownManager.parse(markdown));
     return JSON.stringify(stripMarkdownPositions(markdownAstProcessor.parse(roundTripped)))
       === JSON.stringify(stripMarkdownPositions(markdownAstProcessor.parse(markdown)));
   } catch {
