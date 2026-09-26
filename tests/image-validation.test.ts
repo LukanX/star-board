@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildArtPrompt } from "@/lib/ai/prompts";
+import { getPreferredImageResolution, getSupportedImageAspectRatios } from "@/lib/ai/image-options";
 import { campaignArtKindSchema } from "@/lib/validation/art";
 import { imageDraftSchema, imageGenerationInputSchema, imagePromptMaxLength } from "@/lib/validation/image";
 
@@ -31,8 +32,33 @@ const placeContext = {
 };
 
 describe("image generation schemas", () => {
+  it("chooses the lowest supported tier at or above 1K and model-supported ratios", () => {
+    expect(getPreferredImageResolution(["512", "1K", "2K"])).toBe("1K");
+    expect(getPreferredImageResolution(["2K", "4K"])).toBe("2K");
+    expect(getPreferredImageResolution(["4K"])).toBe("4K");
+    expect(getPreferredImageResolution(["512"])).toBeUndefined();
+    expect(getSupportedImageAspectRatios(["aspect_ratio"], { aspect_ratio: ["1:1", "16:9"] })).toEqual(["1:1", "16:9"]);
+    expect(getSupportedImageAspectRatios([], {})).toEqual([]);
+    expect(getSupportedImageAspectRatios(undefined, undefined)).toEqual(["1:1"]);
+  });
+
   it("accepts a reviewed draft with a canonical UTC timestamp", () => {
     expect(imageDraftSchema.safeParse(validDraft).success).toBe(true);
+  });
+
+  it("accepts new aspect-ratio-only requests and drafts without pixel dimensions", () => {
+    const input = imageGenerationInputSchema.safeParse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      mode: "create",
+      targetKind: "npc",
+      subject: "A masked station broker",
+      aspectRatio: "16:9",
+    });
+    const draftWithoutSize = Object.fromEntries(Object.entries(validDraft).filter(([key]) => key !== "size"));
+
+    expect(input.success).toBe(true);
+    if (input.success) expect(input.data.size).toBeUndefined();
+    expect(imageDraftSchema.safeParse(draftWithoutSize).success).toBe(true);
   });
 
   it("requires either base64 image data or an image URL", () => {

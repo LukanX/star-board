@@ -1,5 +1,5 @@
 import { generateImage } from "../../lib/ai/client";
-import { getAiProviderFailure, logAiProviderFailure } from "../../lib/ai/errors";
+import { getAiProviderFailure, logAiProviderFailure, uncertainImageOutcomeMessage } from "../../lib/ai/errors";
 import { imageJobPendingTimeoutMs, imageJobProviderTimeoutMs } from "../../lib/ai/image-job-lifecycle";
 import { parseImageBackgroundJob, verifyImageBackgroundSignature } from "../../lib/ai/image-jobs";
 import { getServerEnv } from "../../lib/env";
@@ -52,7 +52,8 @@ function logWorkerEvent(event: string, fields: Record<string, unknown> = {}) {
 }
 
 async function failRun(supabase: ReturnType<typeof getSupabaseServiceRoleClient>, generationRunId: string, error: unknown) {
-  const message = getAiProviderFailure(error, "Art generation is temporarily unavailable.").message;
+  const failure = getAiProviderFailure(error, "Art generation is temporarily unavailable.");
+  const message = failure.outcomeUnknown ? uncertainImageOutcomeMessage : failure.message;
   const { error: updateError } = await supabase.from("ai_generation_runs").update({
     status: "failed",
     status_updated_at: new Date().toISOString(),
@@ -155,7 +156,13 @@ export default async function handler(request: Request) {
     if (characterAccess?.access && !canUseCharacterPortraitAi(characterAccess.access, campaignCredential.status.allowPlayerAi)) {
       throw new Error("Player AI assistance is no longer enabled for this campaign.");
     }
-    const response = await generateImage(campaignCredential.apiKey, input.data.prompt, input.data.model, { aspectRatio: input.data.aspectRatio, size: input.data.size, timeoutMs: imageJobProviderTimeoutMs });
+    const response = await generateImage(campaignCredential.apiKey, input.data.prompt, input.data.model, {
+      aspectRatio: input.data.aspectRatio,
+      ...(input.data.size ? { size: input.data.size } : {}),
+      ...(input.data.resolution ? { resolution: input.data.resolution } : {}),
+      ...(input.data.supportedParameters ? { supportedParameters: input.data.supportedParameters } : {}),
+      timeoutMs: imageJobProviderTimeoutMs,
+    });
     const storedImage = await getStoredImage(response.image);
     const filePrefix = claimedRun.purpose === "style-preview" ? "style-preview" : "image";
     const path = `${claimedRun.campaign_id}/${claimedRun.requested_by}/${filePrefix}-${claimedRun.id}.${imageMediaTypes[storedImage.mediaType]}`;

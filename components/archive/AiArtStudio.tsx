@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Sparkles, UploadCloud, X } from "lucide-react";
-import AiModelPicker from "@/components/archive/AiModelPicker";
+import AiModelPicker, { type AiModelOptions } from "@/components/archive/AiModelPicker";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { waitForImageBackgroundJob, type ImageBackgroundJob, type ImageDraft } from "@/lib/ai/image-job-polling";
 import { imageGenerationRequestTimeoutMs } from "@/lib/ai/image-job-lifecycle";
@@ -17,11 +17,8 @@ import {
 } from "@/components/archive/artStudioSession";
 import {
   defaultImageAspectRatio,
-  defaultImageSize,
-  imageAspectRatioValues,
-  imageSizeOptions,
+  getSupportedImageAspectRatios,
   type ImageAspectRatio,
-  type ImageSize,
 } from "@/lib/ai/image-options";
 
 type ArtKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
@@ -151,13 +148,14 @@ function AiArtStudioContent({
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
   const [styleSelectionChanged, setStyleSelectionChanged] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  const [aspectRatio, setAspectRatio] = useState<ImageAspectRatio>(
+  const [selectedModelOptions, setSelectedModelOptions] = useState<AiModelOptions | null>(null);
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<ImageAspectRatio>(
     defaultImageAspectRatio,
   );
-  const [size, setSize] = useState<ImageSize>(defaultImageSize);
   const [localSubjectDraft, setLocalSubjectDraft] = useState(subject ?? "");
   const [refinement, setRefinement] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [outcomeUnknown, setOutcomeUnknown] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +164,10 @@ function AiArtStudioContent({
   const sessionDisabledRef = useRef(false);
 
   const subjectDraft = onSubjectChange ? (subject ?? "") : localSubjectDraft;
-  const availableSizes = imageSizeOptions[aspectRatio];
+  const availableAspectRatios = getSupportedImageAspectRatios(selectedModelOptions?.supportedParameters, selectedModelOptions?.parameterValues);
+  const aspectRatio = availableAspectRatios.find((ratio) => ratio === selectedAspectRatio)
+    ?? availableAspectRatios[0]
+    ?? selectedAspectRatio;
   const isCharacterPortrait = kind === "character" && Boolean(characterId);
   const canCustomizePortrait = !isCharacterPortrait || portraitAiRole === "gm";
   const sessionKey = campaignId
@@ -286,15 +287,7 @@ function AiArtStudioContent({
   }, [isPreviewOpen]);
 
   const changeAspectRatio = (nextAspectRatio: ImageAspectRatio) => {
-    const currentTier =
-      imageSizeOptions[aspectRatio].find((option) => option.value === size)
-        ?.tier ?? "1K";
-    setAspectRatio(nextAspectRatio);
-    setSize(
-      imageSizeOptions[nextAspectRatio].find(
-        (option) => option.tier === currentTier,
-      )?.value ?? imageSizeOptions[nextAspectRatio][0].value,
-    );
+    setSelectedAspectRatio(nextAspectRatio);
   };
 
   const generate = async () => {
@@ -322,6 +315,8 @@ function AiArtStudioContent({
       return;
     }
 
+    if (outcomeUnknown && !window.confirm("The previous image request may have been billed without returning a draft. Check OpenRouter usage before generating again. Start another potentially charged request?")) return;
+
     setIsGenerating(true);
     setError(null);
     activeGenerationRef.current?.abort();
@@ -347,7 +342,6 @@ function AiArtStudioContent({
           model: canCustomizePortrait ? selectedModel ?? undefined : undefined,
           subject: subjectDraft,
           aspectRatio,
-          size,
           refinement: refinement.trim() || undefined,
           currentPrompt: requestedPrompt,
         }),
@@ -355,6 +349,9 @@ function AiArtStudioContent({
       const result = (await response.json()) as {
         error?: string;
         details?: string;
+        diagnosticStage?: string;
+        outcomeUnknown?: boolean;
+        providerRequestId?: string;
         issues?: ImageValidationIssues;
         draft?: ImageDraft;
         job?: ImageBackgroundJob;
@@ -363,6 +360,7 @@ function AiArtStudioContent({
 
       if (response.status === 202 && result.job) {
         const nextDraft = await waitForImageBackgroundJob(result.job, { signal: generationController.signal });
+        setOutcomeUnknown(false);
         setGallery((current) => [
           ...current.filter((entry) => entry.draft.generationRunId !== nextDraft.generationRunId),
           { draft: nextDraft, styleId: requestedStyleId, contextPlaceId: requestedContextPlaceId },
@@ -372,12 +370,27 @@ function AiArtStudioContent({
       }
 
       if (!response.ok || !result.draft) {
+        if (result.outcomeUnknown) setOutcomeUnknown(true);
         const issueDetails = formatImageValidationIssues(result.issues);
+        const providerDetails = result.providerRequestId
+          ? `HTTP ${response.status}. OpenRouter request ID: ${result.providerRequestId.slice(0, 160)}.`
+          : !response.ok
+            ? `HTTP ${response.status}.`
+            : undefined;
+        const diagnosticDetails = result.diagnosticStage
+          ? `Failure stage: ${result.diagnosticStage}.`
+          : undefined;
+        const socketCaution = result.outcomeUnknown
+          ? "The connection closed before a response; check OpenRouter usage before retrying, as the request may have completed."
+          : undefined;
         throw new Error(
           [
             result.error ?? "The art draft could not be generated.",
             result.details,
             issueDetails,
+            providerDetails,
+            diagnosticDetails,
+            socketCaution,
           ]
             .filter(Boolean)
             .join(" "),
@@ -388,9 +401,11 @@ function AiArtStudioContent({
         ...current.filter((entry) => entry.draft.generationRunId !== result.draft!.generationRunId),
         { draft: result.draft!, styleId: requestedStyleId, contextPlaceId: requestedContextPlaceId },
       ]);
+      setOutcomeUnknown(false);
       setDraft(result.draft);
     } catch (generationError: unknown) {
       if (generationController.signal.aborted && !generationRequestTimedOut) return;
+      if (generationError instanceof Error && generationError.name === "ImageJobOutcomeUnknownError") setOutcomeUnknown(true);
       setError(
         generationRequestTimedOut
           ? "The image generation request timed out. Check the art service and try again."
@@ -514,54 +529,44 @@ function AiArtStudioContent({
           </select>
           <span className="text-[var(--dim)] text-[8px] tracking-[.04em]">{selectedStyleName ? `SELECTED // ${selectedStyleName}` : "SELECT A READY STYLE OR USE THE CAMPAIGN DEFAULT."}</span>
         </label> : null}
-        <fieldset className="grid gap-2 min-w-0 m-0 p-0 border-0">
-          <legend className="p-0 text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">ASPECT RATIO</legend>
-          <div
-            className="grid grid-cols-4 gap-2 w-full max-w-[480px] min-w-0 max-[760px]:grid-cols-2"
-            aria-label="Image aspect ratio"
-            role="group"
-          >
-            {imageAspectRatioValues.map((option) => (
-              <button
-                aria-pressed={aspectRatio === option}
-                className={`grid place-items-center content-center gap-[7px] min-w-0 aspect-square p-[8px_5px] border border-[rgba(139,151,169,.28)] bg-[rgba(8,11,17,.34)] text-[var(--dim)] cursor-pointer font-mono text-[8px] tracking-[.08em] transition-[border-color,background-color,color] duration-[160ms] ease-in-out hover:border-[rgba(255,92,154,.58)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--pink)] focus-visible:outline-offset-2 ${aspectRatio === option ? "border-[var(--pink)] bg-[rgba(0,0,0,.52)] text-[var(--pink)] shadow-[inset_0_0_0_1px_rgba(255,92,154,.12)]" : ""}`}
-                key={option}
-                onClick={() => changeAspectRatio(option)}
-                type="button"
-              >
-                <span
-                  className="block w-[68%] max-w-[54px] max-h-[54px] border border-current bg-[linear-gradient(135deg,rgba(255,92,154,.22),rgba(98,232,255,.1))]"
-                  style={{ aspectRatio: option.replace(":", " / ") }}
-                  aria-hidden="true"
-                />
-                <span>{option}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(180px,.8fr)] gap-[10px] items-start">
-          {canCustomizePortrait ? <AiModelPicker
-              campaignId={campaignId}
-              capability="image"
-              value={selectedModel}
-              onChange={setSelectedModel}
-            /> : null}
-          <label>
-            OUTPUT SIZE
-            <select
-              className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none px-[10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)]"
-              aria-label="Image output size"
-              value={size}
-              onChange={(event) => setSize(event.target.value as ImageSize)}
+        {availableAspectRatios.length ? (
+          <fieldset className="grid gap-2 min-w-0 m-0 p-0 border-0">
+            <legend className="p-0 text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">ASPECT RATIO</legend>
+            <div
+              className={`grid gap-2 w-full min-w-0 max-[760px]:grid-cols-2 ${availableAspectRatios.length === 1 ? "max-w-[120px] grid-cols-1" : "max-w-[480px] grid-cols-4"}`}
+              aria-label="Image aspect ratio"
+              role="group"
             >
-              {availableSizes.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+              {availableAspectRatios.map((option) => (
+                <button
+                  aria-pressed={aspectRatio === option}
+                  className={`grid place-items-center content-center gap-[7px] min-w-0 aspect-square p-[8px_5px] border border-[rgba(139,151,169,.28)] bg-[rgba(8,11,17,.34)] text-[var(--dim)] cursor-pointer font-mono text-[8px] tracking-[.08em] transition-[border-color,background-color,color] duration-[160ms] ease-in-out hover:border-[rgba(255,92,154,.58)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--pink)] focus-visible:outline-offset-2 ${aspectRatio === option ? "border-[var(--pink)] bg-[rgba(0,0,0,.52)] text-[var(--pink)] shadow-[inset_0_0_0_1px_rgba(255,92,154,.12)]" : ""}`}
+                  key={option}
+                  onClick={() => changeAspectRatio(option)}
+                  type="button"
+                >
+                  <span
+                    className="block w-[68%] max-w-[54px] max-h-[54px] border border-current bg-[linear-gradient(135deg,rgba(255,92,154,.22),rgba(98,232,255,.1))]"
+                    style={{ aspectRatio: option.replace(":", " / ") }}
+                    aria-hidden="true"
+                  />
+                  <span>{option}</span>
+                </button>
               ))}
-            </select>
-          </label>
-        </div>
+            </div>
+          </fieldset>
+        ) : (
+          <p className="m-0 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">MODEL SELECTS ASPECT RATIO</p>
+        )}
+        {canCustomizePortrait ? <div className="max-w-[420px]">
+          <AiModelPicker
+            campaignId={campaignId}
+            capability="image"
+            value={selectedModel}
+            onChange={setSelectedModel}
+            onModelOptionsChange={setSelectedModelOptions}
+          />
+        </div> : null}
       </div>
       <div className="grid grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-[10px] items-start max-[600px]:grid-cols-1">
         {previewUrl ? (
@@ -719,7 +724,7 @@ function AiArtStudioContent({
       </div>
       {draft ? (
         <p className="m-0 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">
-          {draft.model.toUpperCase()} / {draft.aspectRatio} / {draft.size} /{" "}
+          {draft.model.toUpperCase()} / {draft.aspectRatio} /{" "}
           {draft.image.mediaType} {" // "}{" "}
           {new Date(draft.createdAt).toLocaleTimeString()}
         </p>

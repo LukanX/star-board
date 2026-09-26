@@ -49,6 +49,7 @@ export type AiModelCatalogEntry = {
   inputModalities: string[];
   outputModalities: string[];
   supportedParameters: string[];
+  parameterValues: Record<string, string[]>;
   source: "live" | "stale" | "local";
   reason?: string;
 };
@@ -89,6 +90,37 @@ function normalizeParameters(value: unknown) {
   if (Array.isArray(value)) return value.filter((parameter): parameter is string => typeof parameter === "string");
   if (value && typeof value === "object") return Object.keys(value);
   return [];
+}
+
+function normalizeParameterValues(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  return Object.fromEntries(Object.entries(value).flatMap(([parameter, descriptor]) => {
+    if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor)) return [];
+    const values = (descriptor as { values?: unknown }).values;
+    if (!Array.isArray(values)) return [];
+    return [[parameter, values.filter((item): item is string => typeof item === "string")]];
+  }));
+}
+
+const seedreamAspectRatios = ["1:1", "3:4", "4:3", "16:9"];
+const geminiFlashImageAspectRatios = ["1:1", "3:4", "4:3", "16:9"];
+
+function fallbackParameterValues(modelId: string, capability: AiCapability): Record<string, string[]> {
+  if (capability !== "image") return {};
+  if (modelId === "bytedance-seed/seedream-5-0-lite") {
+    return { aspect_ratio: seedreamAspectRatios, resolution: ["2K", "4K"] };
+  }
+  if (modelId === "bytedance-seed/seedream-5-0-pro") {
+    return { aspect_ratio: seedreamAspectRatios, resolution: ["1K", "2K"] };
+  }
+  if (modelId === "bytedance-seed/seedream-4.5") {
+    return { aspect_ratio: seedreamAspectRatios, resolution: ["1K", "2K", "4K"] };
+  }
+  if (modelId === "google/gemini-2.5-flash-image") {
+    return { aspect_ratio: geminiFlashImageAspectRatios };
+  }
+  return { aspect_ratio: ["1:1"] };
 }
 
 async function fetchDiscovery(apiKey: string, capability: AiCapability, sort: AiModelSort, cacheKey: string) {
@@ -132,27 +164,32 @@ function toCatalogEntry(capability: AiCapability, providerModel: ProviderModel, 
     inputModalities: providerModel.architecture?.input_modalities ?? [],
     outputModalities: providerModel.architecture?.output_modalities ?? [],
     supportedParameters: normalizeParameters(providerModel.supported_parameters),
+    parameterValues: normalizeParameterValues(providerModel.supported_parameters),
     source,
   };
 }
 
 function fallbackCatalog(capability: AiCapability): AiModelCatalogEntry[] {
-  return fallbackAiModels.filter((model) => model.capability === capability).map((model) => ({
-    ...model,
-    capability,
-    available: false,
-    compatible: true,
-    providerName: model.id.split("/", 1)[0] ?? null,
-    providerDescription: model.description,
-    pricing: null,
-    contextLength: null,
-    created: null,
-    inputModalities: ["text"],
-    outputModalities: [capability === "image" ? "image" : "text"],
-    supportedParameters: capability === "structured-text" ? ["structured_outputs"] : [],
-    source: "local",
-    reason: "OpenRouter model discovery is unavailable; showing the offline fallback catalog.",
-  }));
+  return fallbackAiModels.filter((model) => model.capability === capability).map((model) => {
+    const parameterValues = fallbackParameterValues(model.id, capability);
+    return {
+      ...model,
+      capability,
+      available: false,
+      compatible: true,
+      providerName: model.id.split("/", 1)[0] ?? null,
+      providerDescription: model.description,
+      pricing: null,
+      contextLength: null,
+      created: null,
+      inputModalities: ["text"],
+      outputModalities: [capability === "image" ? "image" : "text"],
+      supportedParameters: capability === "structured-text" ? ["structured_outputs"] : Object.keys(parameterValues),
+      parameterValues,
+      source: "local" as const,
+      reason: "OpenRouter model discovery is unavailable; showing the offline fallback catalog.",
+    };
+  });
 }
 
 export async function getAiModelCatalog(apiKey: string, capability: AiCapability, sort: AiModelSort = "most-popular"): Promise<AiModelCatalogSnapshot> {

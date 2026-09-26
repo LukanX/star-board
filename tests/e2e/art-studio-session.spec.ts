@@ -149,12 +149,14 @@ test("keeps generated image drafts and refinement notes through style changes an
     await placeForm.getByLabel("Name").fill(childName);
     await placeForm.getByLabel("Kind").fill("room");
     await page.getByRole("button", { name: "GENERATE ART", exact: true }).click();
+    await expect(page.getByLabel("Image output size")).toHaveCount(0);
     await page.getByLabel("Artwork description").fill("A hidden transit room with blue lanterns.");
     await page.getByLabel("Focused refinement").fill(refinement);
     await page.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
 
     const thumbnails = page.getByRole("button", { name: /Select generated image/ });
     await expect(thumbnails).toHaveCount(1);
+    expect(imageRequests[0]).not.toHaveProperty("size");
     await page.getByLabel("Visual style for image generation").selectOption(visualStyleId);
     await expect(page.getByRole("button", { name: "GENERATE DRAFT", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open generated art preview" })).toBeVisible();
@@ -236,4 +238,102 @@ test("keeps generated image drafts and refinement notes through style changes an
       );
     }
   }
+});
+
+test("does not repeat an uncertain image request without confirmation", async ({ page, campaign }) => {
+  let generationRequests = 0;
+  await page.route("**/api/ai/image", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+
+    generationRequests += 1;
+    await route.fulfill({
+      status: 502,
+      json: {
+        error: "OpenRouter image generation request failed. fetch failed (UND_ERR_SOCKET, sent 4255 bytes, received 7502 bytes)",
+        diagnosticStage: "provider-generation",
+        outcomeUnknown: true,
+      },
+    });
+  });
+
+  await page.goto(`/campaigns/${campaign.campaignId}/jobs`);
+  await page.getByRole("button", { name: "NEW MISSION" }).click();
+  await page.getByRole("button", { name: "GENERATE ART", exact: true }).click();
+  await page.getByLabel("Artwork description").fill("A courier skiff crossing a frontier moon.");
+  await page.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
+
+  await expect(page.getByText(/The connection closed before a response/)).toBeVisible();
+  expect(generationRequests).toBe(1);
+
+  const dialogPromise = page.waitForEvent("dialog");
+  const retryClick = page.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
+  const dialog = await dialogPromise;
+  expect(dialog.message()).toContain("may have been billed");
+  await dialog.dismiss();
+  await retryClick;
+
+  expect(generationRequests).toBe(1);
+});
+
+test("does not repeat a possibly billed background job without confirmation", async ({ page, campaign }) => {
+  const generationRunId = "00000000-0000-4000-8000-000000000099";
+  let generationRequests = 0;
+  await page.route("**/api/ai/image**", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/ai/image") {
+      generationRequests += 1;
+      const body = request.postDataJSON() as ImageRequestBody;
+      await route.fulfill({
+        status: 202,
+        json: {
+          job: {
+            generationRunId,
+            status: "pending",
+            targetKind: body.targetKind,
+            mode: body.mode,
+            subject: body.subject,
+            aspectRatio: "1:1",
+            prompt: "A courier skiff",
+            model: "bytedance-seed/seedream-5-0-pro",
+            createdAt: new Date().toISOString(),
+            statusUpdatedAt: new Date().toISOString(),
+          },
+        },
+      });
+      return;
+    }
+    if (request.method() === "GET" && new URL(request.url()).pathname.endsWith(generationRunId)) {
+      await route.fulfill({
+        status: 200,
+        json: {
+          job: { generationRunId, status: "failed" },
+          error: "The image may have been billed; check OpenRouter activity before generating again.",
+          outcomeUnknown: true,
+        },
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto(`/campaigns/${campaign.campaignId}/jobs`);
+  await page.getByRole("button", { name: "NEW MISSION" }).click();
+  await page.getByRole("button", { name: "GENERATE ART", exact: true }).click();
+  await page.getByLabel("Artwork description").fill("A courier skiff crossing a frontier moon.");
+  await page.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
+
+  await expect(page.getByText(/may have been billed; check OpenRouter activity/)).toBeVisible();
+  expect(generationRequests).toBe(1);
+
+  const dialogPromise = page.waitForEvent("dialog");
+  const retryClick = page.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
+  const dialog = await dialogPromise;
+  expect(dialog.message()).toContain("may have been billed");
+  await dialog.dismiss();
+  await retryClick;
+
+  expect(generationRequests).toBe(1);
 });

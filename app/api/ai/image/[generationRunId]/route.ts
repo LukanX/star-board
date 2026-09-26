@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { uncertainImageOutcomeMessage } from "@/lib/ai/errors";
 import { getImageJobStaleMessage } from "@/lib/ai/image-job-lifecycle";
 import { loadCharacterPortraitAccess } from "@/lib/ai/character-portrait-access";
 import { getAuthenticatedUser, getCampaignRole } from "@/lib/auth/permissions";
@@ -68,7 +69,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
     }
 
     if (run.status === "failed") {
-      return noStoreJson({ job: { generationRunId: run.id, status: run.status }, error: run.error_message ?? "Art generation is temporarily unavailable." });
+      return noStoreJson({
+        job: { generationRunId: run.id, status: run.status },
+        error: run.error_message ?? "Art generation is temporarily unavailable.",
+        ...(run.error_message === uncertainImageOutcomeMessage ? { outcomeUnknown: true } : {}),
+      });
     }
 
     if (!run.image_path || !run.image_media_type) {

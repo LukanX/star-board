@@ -9,8 +9,8 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import AiModelPricing from "@/components/archive/AiModelPricing";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
-import { formatAiModelPricing } from "@/lib/ai/model-pricing";
 import { panelClassName } from "@/components/ui/recordStyles";
 import {
   accentIconCyanClassName,
@@ -297,9 +297,13 @@ export default function CampaignAiSettings({
                   <strong className="block overflow-wrap-anywhere text-[var(--ink)] text-[11px] font-semibold leading-[1.25]">
                     {model.label}
                   </strong>
-                  <small className="block mt-[9px] overflow-wrap-anywhere text-[var(--dim)] text-[10px] leading-[1.5] tracking-[.03em] [word-spacing:.12em]">
-                    {formatAiModelPricing(model.capability, model.pricing)}
-                  </small>
+                  <AiModelPricing
+                    campaignId={campaignId}
+                    modelId={model.id}
+                    capability={model.capability}
+                    pricing={model.pricing}
+                    className="block mt-[9px] overflow-wrap-anywhere text-[var(--dim)] text-[10px] leading-[1.5] tracking-[.03em] [word-spacing:.12em]"
+                  />
                 </span>
                 <button
                   aria-label={`Remove ${model.label}`}
@@ -333,9 +337,14 @@ export default function CampaignAiSettings({
                   <strong className="block overflow-wrap-anywhere text-[var(--ink)] text-[11px] font-semibold leading-[1.25]">
                     {model.label}
                   </strong>
-                  <small className="block mt-[9px] overflow-wrap-anywhere text-[var(--dim)] text-[10px] leading-[1.5] tracking-[.03em] [word-spacing:.12em]">
-                    {formatAiModelPricing(model.capability, model.pricing)}
-                  </small>
+                  <AiModelPricing
+                    campaignId={campaignId}
+                    modelId={model.id}
+                    capability={model.capability}
+                    pricing={model.pricing}
+                    defer
+                    className="block mt-[9px] overflow-wrap-anywhere text-[var(--dim)] text-[10px] leading-[1.5] tracking-[.03em] [word-spacing:.12em]"
+                  />
                 </span>
                 <button
                   aria-label={`Remove ${model.label}`}
@@ -429,9 +438,14 @@ export default function CampaignAiSettings({
                     <strong className="block overflow-wrap-anywhere text-[var(--ink)] text-[11px] font-semibold leading-[1.25]">
                       {model.label}
                     </strong>
-                    <small className="block mt-[9px] overflow-wrap-anywhere text-[var(--dim)] text-[10px] leading-[1.5] tracking-[.03em] [word-spacing:.12em]">
-                      {formatAiModelPricing(model.capability, model.pricing)}
-                    </small>
+                    <AiModelPricing
+                      campaignId={campaignId}
+                      modelId={model.id}
+                      capability={model.capability}
+                      pricing={model.pricing}
+                      defer={model.capability === "image"}
+                      className="block mt-[9px] overflow-wrap-anywhere text-[var(--dim)] text-[10px] leading-[1.5] tracking-[.03em] [word-spacing:.12em]"
+                    />
                   </span>
                   <button
                     aria-label={`Add ${model.label}`}

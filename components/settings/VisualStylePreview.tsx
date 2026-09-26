@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, RefreshCw, Save, Sparkles } from "lucide-react";
 import AiModelPicker from "@/components/archive/AiModelPicker";
 import { waitForImageBackgroundJob, type ImageBackgroundJob, type ImageDraft } from "@/lib/ai/image-job-polling";
-import { defaultImageAspectRatio, defaultImageSize } from "@/lib/ai/image-options";
+import { defaultImageAspectRatio } from "@/lib/ai/image-options";
 
 export type VisualStylePreviewRecord = {
   id: string;
@@ -88,7 +88,6 @@ export default function VisualStylePreview({ campaignId, style, visualStyleOverr
           visualStyleOverride: styleOverride || undefined,
           model: selectedModel ?? undefined,
           aspectRatio: defaultImageAspectRatio,
-          size: defaultImageSize,
         }),
       });
       const result = (await response.json()) as ImageResponse;

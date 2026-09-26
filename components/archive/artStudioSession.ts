@@ -59,8 +59,7 @@ function parseDraftMetadata(value: unknown, kind: ArtStudioKind): ArtStudioDraft
     || typeof value.subject !== "string"
     || typeof value.aspectRatio !== "string"
     || !imageAspectRatioValues.includes(value.aspectRatio as (typeof imageAspectRatioValues)[number])
-    || typeof value.size !== "string"
-    || !imageSizeValues.includes(value.size as (typeof imageSizeValues)[number])
+    || (value.size !== undefined && (typeof value.size !== "string" || !imageSizeValues.includes(value.size as (typeof imageSizeValues)[number])))
     || typeof value.prompt !== "string"
     || value.provider !== "openrouter"
     || typeof value.model !== "string"
@@ -82,7 +81,7 @@ function parseDraftMetadata(value: unknown, kind: ArtStudioKind): ArtStudioDraft
     mode: value.mode,
     subject: value.subject,
     aspectRatio: value.aspectRatio as ImageDraft["aspectRatio"],
-    size: value.size as ImageDraft["size"],
+    ...(typeof value.size === "string" ? { size: value.size as ImageDraft["size"] } : {}),
     prompt: value.prompt,
     provider: "openrouter",
     model: value.model,

@@ -87,6 +87,17 @@ describe("art studio session storage", () => {
     expect(readArtStudioSession(identity, storage)).toEqual(session());
   });
 
+  it("restores aspect-only drafts without discarding legacy pixel-sized drafts", () => {
+    const storage = new MemoryStorage();
+    const draftWithoutSize = { ...session().drafts[0] };
+    delete draftWithoutSize.size;
+    const aspectOnlySession = { ...session(), drafts: [draftWithoutSize] };
+    writeArtStudioSession(identity, aspectOnlySession, storage);
+
+    expect(readArtStudioSession(identity, storage)).toEqual(aspectOnlySession);
+    expect(readArtStudioSession(identity, storage).drafts[0].size).toBeUndefined();
+  });
+
   it("treats malformed and unknown session data as an empty session", () => {
     const storage = new MemoryStorage();
     storage.setItem(artStudioSessionKey(identity), "{");

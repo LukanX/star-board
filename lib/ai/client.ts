@@ -3,12 +3,49 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z, type ZodType } from "zod";
 import { getServerEnv } from "@/lib/env";
 import { AiProviderError, extractProviderGenerationId, extractProviderMessage, normalizeProviderError, serializeProviderBody } from "@/lib/ai/errors";
-import { defaultImageAspectRatio, defaultImageSize, imageSizeOptions, type ImageAspectRatio, type ImageSize } from "@/lib/ai/image-options";
+import { defaultImageAspectRatio, defaultImageSize, getPreferredImageResolution, imageSizeOptions, type ImageAspectRatio, type ImageResolution, type ImageSize } from "@/lib/ai/image-options";
 
 export { AiProviderError } from "@/lib/ai/errors";
 
 const openRouterBaseUrl = "https://openrouter.ai/api/v1";
 const defaultImageGenerationTimeoutMs = 2 * 60 * 1000;
+
+function getTransportDiagnostics(error: unknown) {
+  const cause = error instanceof Error ? error.cause : undefined;
+  const nestedErrors = cause && typeof cause === "object" && Array.isArray((cause as { errors?: unknown }).errors)
+    ? (cause as { errors: unknown[] }).errors
+    : [cause];
+  const socketMetrics: Array<{ bytesWritten?: number; bytesRead?: number; timeoutMs?: number }> = [];
+  const causes = nestedErrors.slice(0, 3).flatMap((nested) => {
+    if (!nested || typeof nested !== "object") return [];
+    const detail = nested as { name?: unknown; code?: unknown; socket?: unknown };
+    if (detail.socket && typeof detail.socket === "object") {
+      const socket = detail.socket as { bytesWritten?: unknown; bytesRead?: unknown; timeout?: unknown };
+      const metrics = {
+        ...(typeof socket.bytesWritten === "number" ? { bytesWritten: socket.bytesWritten } : {}),
+        ...(typeof socket.bytesRead === "number" ? { bytesRead: socket.bytesRead } : {}),
+        ...(typeof socket.timeout === "number" ? { timeoutMs: socket.timeout } : {}),
+      };
+      if (Object.keys(metrics).length) socketMetrics.push(metrics);
+    }
+    return [{
+      ...(typeof detail.name === "string" ? { name: detail.name.slice(0, 80) } : {}),
+      ...(typeof detail.code === "string" && /^[a-z0-9_-]{1,80}$/i.test(detail.code) ? { code: detail.code } : {}),
+    }];
+  });
+  const transportCode = causes.find((detail) => detail.code)?.code;
+  const firstSocketMetrics = socketMetrics[0];
+
+  return {
+    ...(transportCode ? { transportCode } : {}),
+    ...(firstSocketMetrics ? { socket: firstSocketMetrics } : {}),
+    providerBody: serializeProviderBody({
+      errorName: error instanceof Error ? error.name : "unknown",
+      causes,
+      ...(firstSocketMetrics ? { socket: firstSocketMetrics } : {}),
+    }),
+  };
+}
 
 export function getOpenRouterClient(apiKey: string) {
   const env = getServerEnv();
@@ -122,25 +159,39 @@ export type ImageGenerationResult = {
 
 export type ImageGenerationOptions = {
   aspectRatio?: ImageAspectRatio;
+  resolution?: ImageResolution;
   size?: ImageSize;
+  supportedParameters?: readonly string[];
+  outputFormat?: "png" | "jpeg" | "webp";
   timeoutMs?: number;
 };
 
 const seedreamModelPrefix = "bytedance-seed/seedream-";
 const seedreamLiteModel = "bytedance-seed/seedream-5-0-lite";
+const grokImageModelPrefix = "x-ai/grok-imagine-image";
 
 function buildImageRequestBody(requestedModel: string, prompt: string, options: ImageGenerationOptions) {
   const aspectRatio = options.aspectRatio ?? defaultImageAspectRatio;
   const size = options.size ?? defaultImageSize;
+  const supportsParameter = (parameter: string) => options.supportedParameters
+    ? options.supportedParameters.includes(parameter)
+    : parameter === "aspect_ratio";
 
-  if (requestedModel.startsWith(seedreamModelPrefix)) {
+  if (requestedModel.startsWith(seedreamModelPrefix) || requestedModel.startsWith(grokImageModelPrefix)) {
     const tier = imageSizeOptions[aspectRatio].find((option) => option.value === size)?.tier ?? "1K";
-    const resolution = requestedModel === seedreamLiteModel && tier === "1K" ? "2K" : tier;
+    const defaultResolution = requestedModel === seedreamLiteModel && tier === "1K" ? "2K" : tier;
+    const resolution = options.resolution ?? getPreferredImageResolution([defaultResolution]) ?? "1K";
 
     return { model: requestedModel, prompt, aspect_ratio: aspectRatio, resolution };
   }
 
-  return { model: requestedModel, prompt, aspect_ratio: aspectRatio, size, output_format: "png" };
+  const body: Record<string, string> = { model: requestedModel, prompt };
+  if (supportsParameter("aspect_ratio")) body.aspect_ratio = aspectRatio;
+  if (options.resolution && supportsParameter("resolution")) body.resolution = options.resolution;
+  if (options.size && supportsParameter("size")) body.size = options.size;
+  if (options.outputFormat && supportsParameter("output_format")) body.output_format = options.outputFormat;
+
+  return body;
 }
 
 export async function generateImage(apiKey: string, prompt: string, requestedModel: string, options: ImageGenerationOptions = {}): Promise<ImageGenerationResult> {
@@ -167,7 +218,20 @@ export async function generateImage(apiKey: string, prompt: string, requestedMod
       throw new AiProviderError("OpenRouter image generation timed out. Try again, or use background generation for long-running requests.", { status: 504 });
     }
 
-    throw error;
+    const normalized = normalizeProviderError(error, "OpenRouter image generation request failed.");
+    const diagnostics = getTransportDiagnostics(error);
+    const socketDetail = diagnostics.socket
+      ? `, sent ${diagnostics.socket.bytesWritten ?? "?"} bytes, received ${diagnostics.socket.bytesRead ?? "?"} bytes`
+      : "";
+    const transportDetail = diagnostics.transportCode ? ` (${diagnostics.transportCode}${socketDetail})` : "";
+    throw new AiProviderError(`${normalized.message}${transportDetail}`, {
+      status: normalized.status,
+      requestId: normalized.requestId,
+      retryAfter: normalized.retryAfter,
+      providerBody: diagnostics.providerBody,
+      generationId: normalized.generationId,
+      outcomeUnknown: diagnostics.transportCode === "UND_ERR_SOCKET" && (diagnostics.socket?.bytesWritten ?? 0) > 0,
+    });
   }
 
   if (!response.ok) {
@@ -193,13 +257,29 @@ export async function generateImage(apiKey: string, prompt: string, requestedMod
     });
   }
 
-  const payload = imageGenerationResponseSchema.safeParse(await response.json());
+  const requestId = response.headers.get("x-request-id") ?? response.headers.get("x-openrouter-request-id");
+  let responseBody: unknown;
+  try {
+    responseBody = await response.json();
+  } catch {
+    throw new AiProviderError("OpenRouter returned an unreadable image response.", { status: 502, requestId });
+  }
 
-  if (!payload.success) throw new Error("OpenRouter returned an invalid image response.");
+  const payload = imageGenerationResponseSchema.safeParse(responseBody);
+
+  if (!payload.success) {
+    const issueSummary = payload.error.issues.slice(0, 4).map((issue) => {
+      const path = issue.path.length ? issue.path.join(".") : "response";
+      return `${path}: ${issue.message}`;
+    }).join("; ");
+    throw new AiProviderError(`OpenRouter returned an invalid image response. ${issueSummary}`, { status: 502, requestId });
+  }
 
   const image = payload.data.data[0];
 
-  if (!image.b64_json && !image.url) throw new Error("The AI provider returned no image data.");
+  if (!image.b64_json && !image.url) {
+    throw new AiProviderError("The AI provider returned no image data.", { status: 502, requestId });
+  }
 
   return {
     image: {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatAiModelPricing } from "@/lib/ai/model-pricing";
+import AiModelPricing from "@/components/archive/AiModelPricing";
 
 type AiCapability = "structured-text" | "image";
 
@@ -17,7 +17,14 @@ type AiModel = {
   pricing: Record<string, string> | null;
   contextLength: number | null;
   inputModalities?: string[];
+  supportedParameters?: string[];
+  parameterValues?: Record<string, string[]>;
   reason?: string;
+};
+
+export type AiModelOptions = {
+  supportedParameters: string[];
+  parameterValues: Record<string, string[]>;
 };
 
 type AiModelPickerProps = {
@@ -25,6 +32,7 @@ type AiModelPickerProps = {
   capability: AiCapability;
   value: string | null;
   onChange: (model: string) => void;
+  onModelOptionsChange?: (options: AiModelOptions | null) => void;
   requiresImageInput?: boolean;
 };
 
@@ -42,6 +50,7 @@ export default function AiModelPicker({
   capability,
   value,
   onChange,
+  onModelOptionsChange,
   requiresImageInput = false,
 }: AiModelPickerProps) {
   const catalogKey = `${campaignId ?? "none"}:${capability}:${requiresImageInput ? "vision" : "all"}`;
@@ -61,6 +70,7 @@ export default function AiModelPicker({
     let cancelled = false;
 
     if (!campaignId) {
+      onModelOptionsChange?.(null);
       return () => {
         cancelled = true;
       };
@@ -94,34 +104,32 @@ export default function AiModelPicker({
           status: result.status ?? "unavailable",
         });
 
-        if (
-          !selectedValueRef.current ||
-          !compatibleModels.some(
-            (model) => model.id === selectedValueRef.current,
-          )
-        ) {
-          const nextModel =
-            result.defaultModel &&
-            compatibleModels.some((model) => model.id === result.defaultModel)
-              ? result.defaultModel
-              : compatibleModels[0]?.id;
-          if (nextModel) onChange(nextModel);
-        }
+        const selectedEntry = compatibleModels.find((model) => model.id === selectedValueRef.current);
+        const nextModel = selectedEntry?.id ?? (
+          result.defaultModel && compatibleModels.some((model) => model.id === result.defaultModel)
+            ? result.defaultModel
+            : compatibleModels[0]?.id
+        );
+        const nextEntry = compatibleModels.find((model) => model.id === nextModel);
+        onModelOptionsChange?.(toModelOptions(nextEntry));
+        if (!selectedEntry && nextModel) onChange(nextModel);
       })
       .catch(() => {
-        if (!cancelled)
+        if (!cancelled) {
           setCatalog({
             key: catalogKey,
             models: [],
             defaultModel: null,
             status: "unavailable",
           });
+          onModelOptionsChange?.(null);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [campaignId, capability, catalogKey, onChange, requiresImageInput]);
+  }, [campaignId, capability, catalogKey, onChange, onModelOptionsChange, requiresImageInput]);
 
   const hasCurrentCatalog = Boolean(campaignId) && catalog.key === catalogKey;
   const visibleModels = hasCurrentCatalog ? catalog.models : [];
@@ -146,7 +154,11 @@ export default function AiModelPicker({
         aria-label={`${capability === "image" ? "Image" : "Text"} generation model`}
         disabled={!visibleModels.length}
         value={selectedEntry ? selectedModel : ""}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          const nextModel = event.target.value;
+          onChange(nextModel);
+          onModelOptionsChange?.(toModelOptions(visibleModels.find((model) => model.id === nextModel)));
+        }}
       >
         <option value="" disabled>
           {visibleStatus === "loading"
@@ -159,20 +171,33 @@ export default function AiModelPicker({
           </option>
         ))}
       </select>
-      <span className="text-[var(--dim)] text-[10px] tracking-[.03em] leading-[1.5] [word-spacing:.12em]">
-        {selectedEntry
-          ? formatAiModelPricing(
-              selectedEntry.capability,
-              selectedEntry.pricing,
-            )
-          : visibleStatus === "stale"
+      {selectedEntry ? (
+        <AiModelPricing
+          campaignId={campaignId}
+          modelId={selectedEntry.id}
+          capability={selectedEntry.capability}
+          pricing={selectedEntry.pricing}
+          className="text-[var(--dim)] text-[10px] tracking-[.03em] leading-[1.5] [word-spacing:.12em]"
+        />
+      ) : (
+        <span className="text-[var(--dim)] text-[10px] tracking-[.03em] leading-[1.5] [word-spacing:.12em]">
+          {visibleStatus === "stale"
             ? "Using the last verified catalog."
             : visibleStatus === "unavailable"
               ? "Live model verification is unavailable."
               : ""}
-      </span>
+        </span>
+      )}
     </div>
   );
+}
+
+function toModelOptions(model: AiModel | undefined): AiModelOptions | null {
+  if (!model) return null;
+  return {
+    supportedParameters: model.supportedParameters ?? [],
+    parameterValues: model.parameterValues ?? {},
+  };
 }
 
 function uniqueModels(models: AiModel[]) {

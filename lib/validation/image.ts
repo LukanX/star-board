@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defaultImageAspectRatio, defaultImageSize, imageAspectRatioValues, imageSizeOptions, imageSizeValues } from "@/lib/ai/image-options";
+import { defaultImageAspectRatio, imageAspectRatioValues, imageResolutionValues, imageSizeOptions, imageSizeValues } from "@/lib/ai/image-options";
 import { visualStyleTextSchema } from "@/lib/validation/visual-style";
 
 export const imagePromptMaxLength = 3000;
@@ -18,11 +18,11 @@ export const imageGenerationInputSchema = z.object({
   visualStyleOverride: visualStyleTextSchema.optional(),
   parentPlaceId: z.string().uuid().nullable().optional(),
   aspectRatio: z.enum(imageAspectRatioValues).default(defaultImageAspectRatio),
-  size: z.enum(imageSizeValues).default(defaultImageSize),
+  size: z.enum(imageSizeValues).optional(),
   refinement: z.string().trim().max(600).optional(),
   currentPrompt: z.string().trim().max(imagePromptMaxLength).optional(),
 }).superRefine(({ aspectRatio, size, targetKind, characterId, parentPlaceId, purpose, visualStyleId, visualStyleOverride }, context) => {
-  if (!imageSizeOptions[aspectRatio].some((option) => option.value === size)) {
+  if (size && !imageSizeOptions[aspectRatio].some((option) => option.value === size)) {
     context.addIssue({ code: "custom", path: ["size"], message: `Size ${size} does not match aspect ratio ${aspectRatio}.` });
   }
   if (targetKind !== "place" && parentPlaceId) {
@@ -54,9 +54,11 @@ export const imageBackgroundJobSchema = z.object({
   model: z.string().trim().min(1).max(160),
   purpose: z.enum(imagePurposes).default("entity-art"),
   aspectRatio: z.enum(imageAspectRatioValues),
-  size: z.enum(imageSizeValues),
+  size: z.enum(imageSizeValues).optional(),
+  resolution: z.enum(imageResolutionValues).optional(),
+  supportedParameters: z.array(z.string().trim().min(1).max(100)).max(64).optional(),
 }).superRefine(({ aspectRatio, size }, context) => {
-  if (!imageSizeOptions[aspectRatio].some((option) => option.value === size)) {
+  if (size && !imageSizeOptions[aspectRatio].some((option) => option.value === size)) {
     context.addIssue({ code: "custom", path: ["size"], message: `Size ${size} does not match aspect ratio ${aspectRatio}.` });
   }
 });
@@ -71,7 +73,7 @@ export const imageDraftSchema = z.object({
   mode: z.enum(["create", "refine"]),
   subject: z.string().trim().min(1).max(1200),
   aspectRatio: z.enum(imageAspectRatioValues),
-  size: z.enum(imageSizeValues),
+  size: z.enum(imageSizeValues).optional(),
   prompt: z.string().trim().min(1).max(imagePromptMaxLength),
   image: z.object({
     base64: z.string().min(1).nullable(),
