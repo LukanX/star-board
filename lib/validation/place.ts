@@ -3,7 +3,8 @@ import { z } from "zod";
 const createPlaceFields = {
   name: z.string().trim().min(1).max(160),
   kind: z.string().trim().min(1).max(80).default("location"),
-  description: z.string().trim().max(4000).default(""),
+  description: z.string().max(4000).default(""),
+  descriptionIsMarkdown: z.boolean().default(false),
   playerNotesMarkdown: z.string().max(20000).default(""),
   parentPlaceId: z.string().uuid().nullable().optional(),
   artSubject: z.string().trim().max(1600).nullable().optional(),
@@ -15,7 +16,8 @@ const createPlaceFields = {
 const updatePlaceFields = {
   name: z.string().trim().min(1).max(160),
   kind: z.string().trim().min(1).max(80),
-  description: z.string().trim().max(4000),
+  description: z.string().max(4000),
+  descriptionIsMarkdown: z.boolean(),
   playerNotesMarkdown: z.string().max(20000),
   parentPlaceId: z.string().uuid().nullable(),
   artSubject: z.string().trim().max(1600).nullable(),
@@ -33,6 +35,7 @@ export const updatePlaceSchema = z.object({
   name: updatePlaceFields.name.optional(),
   kind: updatePlaceFields.kind.optional(),
   description: updatePlaceFields.description.optional(),
+  descriptionIsMarkdown: updatePlaceFields.descriptionIsMarkdown.optional(),
   playerNotesMarkdown: updatePlaceFields.playerNotesMarkdown.optional(),
   parentPlaceId: updatePlaceFields.parentPlaceId.optional(),
   gmNotesMarkdown: z.string().max(20000).optional(),

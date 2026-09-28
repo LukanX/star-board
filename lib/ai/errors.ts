@@ -4,8 +4,9 @@ export class AiProviderError extends Error {
   readonly retryAfter: string | null;
   readonly providerBody: string | null;
   readonly generationId: string | null;
+  readonly outcomeUnknown: boolean;
 
-  constructor(message: string, options: { status?: number | null; requestId?: string | null; retryAfter?: string | null; providerBody?: string | null; generationId?: string | null } = {}) {
+  constructor(message: string, options: { status?: number | null; requestId?: string | null; retryAfter?: string | null; providerBody?: string | null; generationId?: string | null; outcomeUnknown?: boolean } = {}) {
     super(message);
     this.name = "AiProviderError";
     this.status = options.status ?? null;
@@ -13,6 +14,7 @@ export class AiProviderError extends Error {
     this.retryAfter = options.retryAfter ?? null;
     this.providerBody = options.providerBody ?? null;
     this.generationId = options.generationId ?? null;
+    this.outcomeUnknown = options.outcomeUnknown ?? false;
   }
 }
 
@@ -108,13 +110,16 @@ export function normalizeProviderError(error: unknown, fallback: string) {
 
 export function getAiProviderFailure(error: unknown, fallback: string) {
   const providerError = error instanceof AiProviderError ? error : null;
-  const status = providerError?.status && providerError.status >= 400 && providerError.status <= 599 ? providerError.status : 503;
+  const status = providerError
+    ? providerError.status && providerError.status >= 400 && providerError.status <= 599 ? providerError.status : 502
+    : 503;
 
   return {
     message: providerError?.message ?? fallback,
     status,
     requestId: providerError?.requestId ?? null,
     retryAfter: providerError?.retryAfter ?? null,
+    outcomeUnknown: providerError?.outcomeUnknown ?? false,
   };
 }
 
@@ -131,3 +136,5 @@ export function logAiProviderFailure(error: unknown, context: { kind: string; ca
     providerBody: error.providerBody,
   }));
 }
+
+export const uncertainImageOutcomeMessage = "OpenRouter connection closed after the request was sent. The image may have been billed; check OpenRouter activity before generating again.";

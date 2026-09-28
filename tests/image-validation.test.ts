@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildArtPrompt } from "@/lib/ai/prompts";
+import { getPreferredImageResolution, getSupportedImageAspectRatios } from "@/lib/ai/image-options";
 import { campaignArtKindSchema } from "@/lib/validation/art";
 import { imageDraftSchema, imageGenerationInputSchema, imagePromptMaxLength } from "@/lib/validation/image";
 
@@ -31,8 +32,33 @@ const placeContext = {
 };
 
 describe("image generation schemas", () => {
+  it("chooses the lowest supported tier at or above 1K and model-supported ratios", () => {
+    expect(getPreferredImageResolution(["512", "1K", "2K"])).toBe("1K");
+    expect(getPreferredImageResolution(["2K", "4K"])).toBe("2K");
+    expect(getPreferredImageResolution(["4K"])).toBe("4K");
+    expect(getPreferredImageResolution(["512"])).toBeUndefined();
+    expect(getSupportedImageAspectRatios(["aspect_ratio"], { aspect_ratio: ["1:1", "16:9"] })).toEqual(["1:1", "16:9"]);
+    expect(getSupportedImageAspectRatios([], {})).toEqual([]);
+    expect(getSupportedImageAspectRatios(undefined, undefined)).toEqual(["1:1"]);
+  });
+
   it("accepts a reviewed draft with a canonical UTC timestamp", () => {
     expect(imageDraftSchema.safeParse(validDraft).success).toBe(true);
+  });
+
+  it("accepts new aspect-ratio-only requests and drafts without pixel dimensions", () => {
+    const input = imageGenerationInputSchema.safeParse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      mode: "create",
+      targetKind: "npc",
+      subject: "A masked station broker",
+      aspectRatio: "16:9",
+    });
+    const draftWithoutSize = Object.fromEntries(Object.entries(validDraft).filter(([key]) => key !== "size"));
+
+    expect(input.success).toBe(true);
+    if (input.success) expect(input.data.size).toBeUndefined();
+    expect(imageDraftSchema.safeParse(draftWithoutSize).success).toBe(true);
   });
 
   it("requires either base64 image data or an image URL", () => {
@@ -143,7 +169,6 @@ describe("image generation schemas", () => {
       "A pilot with a cracked visor",
       "A long campaign style brief. ".repeat(100),
       "Make the overcoat white and add salt and pepper to the fur.",
-      "Existing visual direction. ".repeat(200),
     );
 
     expect(prompt.length).toBeLessThanOrEqual(imagePromptMaxLength);
@@ -151,19 +176,49 @@ describe("image generation schemas", () => {
     expect(prompt).toContain("Subject: A pilot with a cracked visor");
   });
 
+  it("preserves the current character subject, style, and refinement without carrying campaign history forward", () => {
+    const subject = `${"P".repeat(1189)}SUBJECT-END`;
+    const visualStyle = `${"S".repeat(1191)}STYLE-END`;
+    const refinement = `${"R".repeat(586)}REFINEMENT-END`;
+    const prompt = buildArtPrompt(
+      subject,
+      visualStyle,
+      refinement,
+      {
+        targetKind: "character",
+        characterContext: {
+          name: "Captain Nova",
+          species: "Android",
+          physicalDescription: "Blue circuit scar, silver eyes, patched jacket. ".repeat(18),
+        },
+      },
+    );
+
+    expect(prompt.length).toBeLessThanOrEqual(imagePromptMaxLength);
+    expect(prompt).toContain("Subject: P");
+    expect(prompt).toContain("Saved character: Captain Nova, Android");
+    expect(prompt).toContain("Blue circuit scar");
+    expect(prompt).toContain("STYLE-END");
+    expect(prompt).toContain("REFINEMENT-END");
+    expect(prompt).toContain("The selected campaign visual style is the rendering authority.");
+    expect(prompt).not.toContain("Campaign context:");
+    expect(prompt).not.toContain("Saved backstory:");
+  });
+
   it("includes bounded parent context while keeping the child subject visible", () => {
     const prompt = buildArtPrompt(
       "A hidden transit room",
       "A broad campaign style brief.",
       undefined,
-      undefined,
-      "place",
       {
+        targetKind: "place",
+        placeContext: {
         ...placeContext,
         parent: {
           ...placeContext.parent,
           description: "d".repeat(4000),
           playerNotes: "n".repeat(2400),
+        },
         },
       },
     );
@@ -177,7 +232,7 @@ describe("image generation schemas", () => {
   });
 
   it("directs faction artwork toward a standalone in-world insignia", () => {
-    const prompt = buildArtPrompt("The Glass Meridian", undefined, undefined, undefined, "faction");
+    const prompt = buildArtPrompt("The Glass Meridian", undefined, undefined, { targetKind: "faction" });
 
     expect(prompt).toContain("only one standalone faction symbol or in-world insignia");
     expect(prompt).toContain("Do not create characters");
@@ -186,7 +241,7 @@ describe("image generation schemas", () => {
   });
 
   it("directs enemy artwork toward one readable creature subject", () => {
-    const prompt = buildArtPrompt("A plated void predator", undefined, undefined, undefined, "enemy");
+    const prompt = buildArtPrompt("A plated void predator", undefined, undefined, { targetKind: "enemy" });
 
     expect(prompt).toContain("one readable creature");
     expect(prompt).toContain("Do not create a group");

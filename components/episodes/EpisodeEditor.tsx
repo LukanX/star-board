@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Save, X } from "lucide-react";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
+import RichMarkdownField from "@/components/markdown/RichMarkdownField";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { ApiEpisode, ApiPlace } from "@/lib/campaign/types";
@@ -178,22 +179,8 @@ export default function EpisodeEditor({
             />
           </label>
         </div>
-        <label>
-          Summary
-          <textarea
-            maxLength={4000}
-            value={draft.summary}
-            onChange={(event) => update("summary", event.target.value)}
-          />
-        </label>
-        <label>
-          Player context
-          <textarea
-            maxLength={20000}
-            value={draft.playerContextMarkdown}
-            onChange={(event) => update("playerContextMarkdown", event.target.value)}
-          />
-        </label>
+        <RichMarkdownField campaignId={campaignId} label="Summary" value={draft.summary} isMarkdown maxLength={4000} audience="player" onChange={(value) => update("summary", value)} />
+        <RichMarkdownField campaignId={campaignId} label="Player context" value={draft.playerContextMarkdown} isMarkdown maxLength={20000} audience="player" onChange={(value) => update("playerContextMarkdown", value)} />
         {error ? (
           <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">
             {error}

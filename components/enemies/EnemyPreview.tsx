@@ -1,5 +1,6 @@
 import { ArrowUpRight, LockKeyhole, Skull } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
+import NarrativeContent from "@/components/markdown/NarrativeContent";
 import RecordPortrait from "@/components/ui/RecordPortrait";
 import { archivePreviewArtworkClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
@@ -24,7 +25,12 @@ export default function EnemyPreview({ campaignId, enemy, isGM }: { campaignId: 
     </div>
     {isGM ? <div className="flex flex-wrap gap-[6px]">{(enemy.traits ?? []).map((trait) => <span className="border border-[rgba(255,92,154,.28)] px-[7px] py-[4px] text-[var(--pink)] font-mono text-[8px] tracking-[.08em]" key={trait}>{trait}</span>)}</div> : null}
     <div className="grid gap-[14px]">
-      <div className="grid gap-[7px]"><p className={`${eyebrowClassName} !mb-0`}>PLAYER-SAFE BRIEF</p><p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">{enemy.player_description || "No revealed description recorded yet."}</p></div>
+      <div className="grid gap-[7px]"><NarrativeContent
+        source={enemy.player_description || "No revealed description recorded yet."}
+        isMarkdown={enemy.player_description_is_markdown ?? false}
+        suppressAutolinkLiterals
+        className="m-0 text-[11px] leading-[1.65] [overflow-wrap:anywhere]"
+      /></div>
       {isGM ? <p className="m-0 flex items-center gap-[6px] text-[var(--pink)] font-mono text-[8px] tracking-[.07em]"><LockKeyhole size={13} /> MECHANICS ARE GM-ONLY</p> : null}
     </div>
   </div>;

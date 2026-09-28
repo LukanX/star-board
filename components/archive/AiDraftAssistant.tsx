@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, LoaderCircle, Pin, PinOff, RotateCcw, Sparkles, Undo2 } from "lucide-react";
 import AiModelPicker from "@/components/archive/AiModelPicker";
+import RichMarkdownField from "@/components/markdown/RichMarkdownField";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import type { NoteVisibility } from "@/lib/campaign/types";
 
 export type AiDraftField = {
   key: string;
@@ -45,6 +47,7 @@ type AiDraftAssistantProps = {
   showModelPicker?: boolean;
   toolLabel?: string;
   descriptionOnly?: boolean;
+  mentionAudience?: NoteVisibility;
   onBack?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   onApplyContext?: (context: Record<string, string>) => void;
@@ -109,6 +112,7 @@ function AiDraftAssistantContent({
   showModelPicker = true,
   toolLabel = "GM ART",
   descriptionOnly = false,
+  mentionAudience = "gm",
   onBack,
   onDirtyChange,
   onApplyContext,
@@ -430,20 +434,19 @@ function AiDraftAssistantContent({
           onChange={setSelectedModel}
         />
       ) : null}
-      <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
-        {descriptionOnly ? "Image description direction" : toolLabel === "PLAYER ART" ? "Portrait direction" : "GM direction"}
-        <textarea
-          className="w-full min-h-[70px] resize-y border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] leading-[1.45] focus:border-[var(--purple)] focus:shadow-[0_0_0_2px_rgba(185,146,255,.1)] placeholder:text-[#4d5a6b]"
-          maxLength={600}
-          placeholder={`What should this ${entityLabel.toLowerCase()} emphasize?`}
-          value={focus}
-          onChange={(event) => {
-            markDirty();
-            setHasStarted(true);
-            setFocus(event.target.value);
-          }}
-        />
-      </label>
+      <RichMarkdownField
+        campaignId={campaignId ?? ""}
+        label={descriptionOnly ? "Image description direction" : toolLabel === "PLAYER ART" ? "Portrait direction" : "GM direction"}
+        value={focus}
+        isMarkdown
+        maxLength={600}
+        audience={mentionAudience}
+        onChange={(value) => {
+          markDirty();
+          setHasStarted(true);
+          setFocus(value);
+        }}
+      />
       {candidate ? (
         <div className="grid gap-[10px] pt-[3px] border-t border-[rgba(185,146,255,.15)]">
           <div className="flex items-start justify-between gap-3">
@@ -474,7 +477,7 @@ function AiDraftAssistantContent({
             </p>
           ) : null}
           {fields.map((field) => (
-            <label
+            <div
               className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]"
               key={field.key}
             >
@@ -493,8 +496,19 @@ function AiDraftAssistantContent({
                   </button>
                 ) : null}
               </span>
-              {field.multiline ? (
+              {field.multiline && !field.readOnly && ["shortDescription", "description", "summary", "playerNotes", "gmNotes", "gmNotesMarkdown", "hook", "backstoryMarkdown", "physicalDescription", "playerDescription", "playerContextMarkdown"].includes(field.key) ? (
+                <RichMarkdownField
+                  campaignId={campaignId ?? ""}
+                  label={field.label}
+                  value={candidate[field.key] ?? ""}
+                  isMarkdown
+                  maxLength={field.maxLength}
+                  audience={["gmNotes", "gmNotesMarkdown", "hook"].includes(field.key) ? "gm" : mentionAudience}
+                  onChange={(value) => updateCandidate(field.key, value)}
+                />
+              ) : field.multiline ? (
                 <textarea
+                  aria-label={field.label}
                   className="w-full min-h-[70px] resize-y border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] leading-[1.45] focus:border-[var(--purple)] focus:shadow-[0_0_0_2px_rgba(185,146,255,.1)] placeholder:text-[#4d5a6b] read-only:text-[var(--muted)] read-only:bg-[rgba(255,255,255,.025)]"
                   readOnly={field.readOnly}
                   maxLength={field.maxLength}
@@ -503,6 +517,7 @@ function AiDraftAssistantContent({
                 />
               ) : (
                 <input
+                  aria-label={field.label}
                   className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--purple)] focus:shadow-[0_0_0_2px_rgba(185,146,255,.1)] placeholder:text-[#4d5a6b] read-only:text-[var(--muted)] read-only:bg-[rgba(255,255,255,.025)]"
                   readOnly={field.readOnly}
                   maxLength={field.maxLength}
@@ -510,21 +525,20 @@ function AiDraftAssistantContent({
                   onChange={(event) => updateCandidate(field.key, event.target.value)}
                 />
               )}
-            </label>
+            </div>
           ))}
-          <label className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]">
-            WHAT SHOULD CHANGE?
-            <textarea
-              className="w-full min-h-[70px] resize-y border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] leading-[1.45] focus:border-[var(--pink)] focus:shadow-[0_0_0_2px_rgba(255,92,154,.1)] placeholder:text-[#4d5a6b]"
-              maxLength={600}
-              placeholder={`Example: make this ${entityLabel.toLowerCase()} warmer, stranger, or more useful at the table.`}
-              value={feedback}
-              onChange={(event) => {
-                markDirty();
-                setFeedback(event.target.value);
-              }}
-            />
-          </label>
+          <RichMarkdownField
+            campaignId={campaignId ?? ""}
+            label="WHAT SHOULD CHANGE?"
+            value={feedback}
+            isMarkdown
+            maxLength={600}
+            audience={mentionAudience}
+            onChange={(value) => {
+              markDirty();
+              setFeedback(value);
+            }}
+          />
         </div>
       ) : (
         <div className="min-h-[65px] flex items-center gap-[9px] px-[11px] border border-dashed border-[rgba(185,146,255,.25)] text-[var(--purple)]">

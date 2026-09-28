@@ -11,7 +11,9 @@ function canonicalImageBackgroundJob(job: ImageBackgroundJob) {
     model: job.model,
     purpose: job.purpose ?? "entity-art",
     aspectRatio: job.aspectRatio,
-    size: job.size,
+    ...(job.size ? { size: job.size } : {}),
+    ...(job.resolution ? { resolution: job.resolution } : {}),
+    ...(job.supportedParameters ? { supportedParameters: job.supportedParameters } : {}),
   };
 }
 

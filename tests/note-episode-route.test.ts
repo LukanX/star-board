@@ -21,6 +21,7 @@ const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
 const episodeId = "00000000-0000-4000-8000-000000000003";
 const noteId = "00000000-0000-4000-8000-000000000004";
+const characterId = "00000000-0000-4000-8000-000000000006";
 
 type QueryResult = { data: unknown; error: unknown };
 type Query = {
@@ -102,7 +103,7 @@ describe("notes and episode routes", () => {
 
   it("creates a note assigned to an episode in the same campaign", async () => {
     const episodeQuery = createQuery({ data: { id: episodeId }, error: null });
-    const note = { id: noteId, campaign_id: campaignId, episode_id: episodeId, author_id: userId, title: "Relay log", body_markdown: "The signal repeats.", visibility: "player" };
+    const note = { id: noteId, campaign_id: campaignId, episode_id: episodeId, author_id: userId, title: "Relay log", body_markdown: "The signal repeats.", visibility: "player", revision: 1 };
     const noteQuery = createQuery({ data: note, error: null });
     const { supabase } = createSupabase({ episodes: [episodeQuery], campaign_notes: [noteQuery] });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
@@ -138,34 +139,162 @@ describe("notes and episode routes", () => {
     expect(from).toHaveBeenCalledTimes(1);
   });
 
+  it("creates a note attached to a readable campaign entity", async () => {
+    const characterQuery = createQuery({ data: { id: characterId }, error: null });
+    const note = {
+      id: noteId,
+      campaign_id: campaignId,
+      episode_id: null,
+      character_id: characterId,
+      npc_id: null,
+      place_id: null,
+      faction_id: null,
+      job_id: null,
+      enemy_id: null,
+      author_id: userId,
+      title: "Astra's log",
+      body_markdown: "The signal repeats.",
+      visibility: "player",
+      revision: 1,
+    };
+    const noteQuery = createQuery({ data: note, error: null });
+    const { supabase } = createSupabase({ characters: [characterQuery], campaign_notes: [noteQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await createNote(request({
+      title: "Astra's log",
+      bodyMarkdown: "The signal repeats.",
+      entity: { type: "character", id: characterId },
+    }), campaignParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(payload.note).toMatchObject({ entity_type: "character", entity_id: characterId, revision: 1 });
+    expect(noteQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
+      campaign_id: campaignId,
+      author_id: userId,
+      character_id: characterId,
+      episode_id: null,
+    }));
+  });
+
+  it("rejects attaching a note to an unreadable or cross-campaign entity", async () => {
+    const characterQuery = createQuery({ data: null, error: null });
+    const { supabase, from } = createSupabase({ characters: [characterQuery], campaign_notes: [] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await createNote(request({
+      title: "Hidden entity note",
+      entity: { type: "character", id: characterId },
+    }), campaignParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toContain("readable and belong to this campaign");
+    expect(from).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists only notes attached to a requested readable entity", async () => {
+    const characterQuery = createQuery({ data: { id: characterId }, error: null });
+    const notesQuery = createQuery({ data: [
+      { id: noteId, campaign_id: campaignId, episode_id: null, character_id: characterId, npc_id: null, place_id: null, faction_id: null, job_id: null, enemy_id: null, author_id: userId, title: "Astra's log", body_markdown: "Visible.", visibility: "player", revision: 1 },
+    ], error: null });
+    const profileQuery = createQuery({ data: [{ id: userId, display_name: "Pilot" }], error: null });
+    const { supabase } = createSupabase({ characters: [characterQuery], campaign_notes: [notesQuery], profiles: [profileQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    const url = `http://localhost/api/campaigns/${campaignId}/notes?entityType=character&entityId=${characterId}`;
+
+    const response = await listNotes(new Request(url), campaignParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.notes).toMatchObject([{ entity_type: "character", entity_id: characterId }]);
+    expect(notesQuery.eq).toHaveBeenCalledWith("character_id", characterId);
+  });
+
   it("clears an episode assignment without changing other note fields", async () => {
-    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: userId, visibility: "player" }, error: null });
-    const noteQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: userId, title: "Global log", body_markdown: "", visibility: "player" }, error: null });
+    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: userId, episode_id: episodeId, visibility: "player", revision: 1 }, error: null });
+    const noteQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: userId, title: "Global log", body_markdown: "", visibility: "player", revision: 2 }, error: null });
     const profileQuery = createQuery({ data: { id: userId, display_name: "Pilot" }, error: null });
     const { supabase } = createSupabase({ campaign_notes: [existingNoteQuery, noteQuery], profiles: [profileQuery] });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
 
-    const response = await updateNote(request({ episodeId: null }, "PATCH"), noteParams());
+    const response = await updateNote(request({ expectedRevision: 1, episodeId: null }, "PATCH"), noteParams());
     const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload.note).toMatchObject({ id: noteId, episode_id: null, permissions: { canEdit: true, canDelete: true } });
-    expect(noteQuery.update).toHaveBeenCalledWith({ episode_id: null, updated_by: userId });
+    expect(noteQuery.update).toHaveBeenCalledWith({ episode_id: null });
     expect(noteQuery.eq).toHaveBeenNthCalledWith(1, "id", noteId);
     expect(noteQuery.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
+    expect(noteQuery.eq).toHaveBeenNthCalledWith(3, "revision", 1);
   });
 
-  it("rejects a player from updating another player's note", async () => {
-    const noteQuery = createQuery({ data: { id: noteId, author_id: "00000000-0000-4000-8000-000000000005", visibility: "player" }, error: null });
-    const { supabase } = createSupabase({ campaign_notes: [noteQuery] });
+  it("allows a campaign member to edit another player's note without changing its scope", async () => {
+    const authorId = "00000000-0000-4000-8000-000000000005";
+    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: authorId, episode_id: null, visibility: "player", revision: 1 }, error: null });
+    const noteQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: authorId, title: "Updated log", body_markdown: "", visibility: "player", revision: 2 }, error: null });
+    const profileQuery = createQuery({ data: { id: authorId, display_name: "Archivist" }, error: null });
+    const { supabase } = createSupabase({ campaign_notes: [existingNoteQuery, noteQuery], profiles: [profileQuery] });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
 
-    const response = await updateNote(request({ title: "Tampered log" }, "PATCH"), noteParams());
+    const response = await updateNote(request({ expectedRevision: 1, title: "Updated log" }, "PATCH"), noteParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.note).toMatchObject({
+      id: noteId,
+      revision: 2,
+      permissions: { canEdit: true, canDelete: false, canChangeEpisode: false, canChangeVisibility: false },
+    });
+    expect(noteQuery.update).toHaveBeenCalledWith({ title: "Updated log" });
+    expect(noteQuery.eq).toHaveBeenCalledWith("revision", 1);
+  });
+
+  it("rejects a nonauthor player from editing an entity-attached note", async () => {
+    const authorId = "00000000-0000-4000-8000-000000000005";
+    const existingNoteQuery = createQuery({
+      data: {
+        id: noteId,
+        author_id: authorId,
+        episode_id: null,
+        visibility: "player",
+        revision: 1,
+        character_id: characterId,
+        npc_id: null,
+        place_id: null,
+        faction_id: null,
+        job_id: null,
+        enemy_id: null,
+      },
+      error: null,
+    });
+    const { supabase } = createSupabase({ campaign_notes: [existingNoteQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await updateNote(request({ expectedRevision: 1, title: "Unauthorized edit" }, "PATCH"), noteParams());
     const payload = await response.json();
 
     expect(response.status).toBe(403);
-    expect(payload.error).toBe("Note author or GM access is required.");
-    expect(noteQuery.update).not.toHaveBeenCalled();
+    expect(payload.error).toContain("Entity note author or GM");
+    expect(existingNoteQuery.update).not.toHaveBeenCalled();
+  });
+
+  it("returns the latest visible version when a save uses a stale revision", async () => {
+    const authorId = "00000000-0000-4000-8000-000000000005";
+    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: authorId, episode_id: null, visibility: "player", revision: 1 }, error: null });
+    const updateQuery = createQuery({ data: null, error: null });
+    const latestQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: authorId, title: "Latest log", body_markdown: "Saved by another member.", visibility: "player", revision: 2 }, error: null });
+    const profileQuery = createQuery({ data: { id: authorId, display_name: "Archivist" }, error: null });
+    const { supabase } = createSupabase({ campaign_notes: [existingNoteQuery, updateQuery, latestQuery], profiles: [profileQuery] });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await updateNote(request({ expectedRevision: 1, bodyMarkdown: "My draft." }, "PATCH"), noteParams());
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload.latestNote).toMatchObject({ title: "Latest log", revision: 2 });
+    expect(updateQuery.eq).toHaveBeenCalledWith("revision", 1);
   });
 
   it("rejects a player from deleting another player's note", async () => {
@@ -182,19 +311,19 @@ describe("notes and episode routes", () => {
   });
 
   it("allows a GM to update a player-authored note", async () => {
-    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: "00000000-0000-4000-8000-000000000005", visibility: "player" }, error: null });
-    const noteQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: "00000000-0000-4000-8000-000000000005", title: "Updated log", body_markdown: "", visibility: "player" }, error: null });
+    const existingNoteQuery = createQuery({ data: { id: noteId, author_id: "00000000-0000-4000-8000-000000000005", episode_id: null, visibility: "player", revision: 1 }, error: null });
+    const noteQuery = createQuery({ data: { id: noteId, campaign_id: campaignId, episode_id: null, author_id: "00000000-0000-4000-8000-000000000005", title: "Updated log", body_markdown: "", visibility: "player", revision: 2 }, error: null });
     const profileQuery = createQuery({ data: { id: "00000000-0000-4000-8000-000000000005", display_name: "Archivist" }, error: null });
     const { supabase } = createSupabase({ campaign_notes: [existingNoteQuery, noteQuery], profiles: [profileQuery] });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
     mocks.getCampaignMembership.mockResolvedValue({ role: "gm", displayName: "Director" });
 
-    const response = await updateNote(request({ title: "Updated log" }, "PATCH"), noteParams());
+    const response = await updateNote(request({ expectedRevision: 1, title: "Updated log" }, "PATCH"), noteParams());
     const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload.note).toMatchObject({ id: noteId, title: "Updated log", permissions: { canEdit: true, canDelete: true } });
-    expect(noteQuery.update).toHaveBeenCalledWith({ title: "Updated log", updated_by: userId });
+    expect(noteQuery.update).toHaveBeenCalledWith({ title: "Updated log" });
   });
 
   it("allows a GM to delete a player-authored note", async () => {
@@ -211,11 +340,11 @@ describe("notes and episode routes", () => {
   });
 
   it("rejects a player from changing their own note to GM-only visibility", async () => {
-    const noteQuery = createQuery({ data: { id: noteId, author_id: userId, visibility: "player" }, error: null });
+    const noteQuery = createQuery({ data: { id: noteId, author_id: userId, episode_id: null, visibility: "player", revision: 1 }, error: null });
     const { supabase } = createSupabase({ campaign_notes: [noteQuery] });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
 
-    const response = await updateNote(request({ visibility: "gm" }, "PATCH"), noteParams());
+    const response = await updateNote(request({ expectedRevision: 1, visibility: "gm" }, "PATCH"), noteParams());
     const payload = await response.json();
 
     expect(response.status).toBe(403);
@@ -288,7 +417,7 @@ describe("notes and episode routes", () => {
 
   it("returns episode notes with author and owner permissions", async () => {
     const episodeQuery = createQuery({ data: { id: episodeId, campaign_id: campaignId, title: "Relay", status: "active" }, error: null });
-    const notesQuery = createQuery({ data: [{ id: noteId, title: "Relay log", body_markdown: "The signal repeats.", visibility: "player", author_id: userId }], error: null });
+    const notesQuery = createQuery({ data: [{ id: noteId, title: "Relay log", body_markdown: "The signal repeats.", visibility: "player", author_id: userId, revision: 1 }], error: null });
     const profileQuery = createQuery({ data: [{ id: userId, display_name: "Pilot" }], error: null });
     const { supabase } = createSupabase({ episodes: [episodeQuery], campaign_notes: [notesQuery], profiles: [profileQuery] });
     mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });

@@ -5,14 +5,16 @@ import { useRouter } from "next/navigation";
 import { CampaignArtEditorSlot } from "@/components/archive/CampaignArtField";
 import NpcEditor from "@/components/npcs/NpcEditor";
 import NpcPublicRecord from "@/components/npcs/NpcPublicRecord";
+import EntityNotesPanel from "@/components/notes/EntityNotesPanel";
 import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
 import type { CampaignAffiliationContext } from "@/lib/campaign/affiliations-server";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import { mapApiNpc } from "@/lib/campaign/mappers";
 import type { ApiNpc, ApiPlace } from "@/lib/campaign/types";
 import type { CampaignNpcResult } from "@/lib/campaign/npcs-server";
+import type { CampaignNotesResult } from "@/lib/campaign/notes-server";
 
-export default function NpcDetailRouteView({ campaignId, initialResult, initialPlaces, initialAffiliations }: { campaignId: string; initialResult: CampaignNpcResult; initialPlaces: ApiPlace[]; initialAffiliations: CampaignAffiliationContext }) {
+export default function NpcDetailRouteView({ campaignId, initialResult, initialPlaces, initialAffiliations, entityNotes }: { campaignId: string; initialResult: CampaignNpcResult; initialPlaces: ApiPlace[]; initialAffiliations: CampaignAffiliationContext; entityNotes: CampaignNotesResult }) {
   const router = useRouter();
   const [npc, setNpc] = useState<ApiNpc>(initialResult.npc);
   const [places] = useState<ApiPlace[]>(initialPlaces);
@@ -38,5 +40,5 @@ export default function NpcDetailRouteView({ campaignId, initialResult, initialP
 
   const related = { ...initialResult.related, faction: affiliations.factions.find((faction) => faction.id === npc.faction_id) ?? null };
 
-  return <><CampaignArtEditorSlot />{editorOpen ? <NpcEditor campaignId={campaignId} places={places} factions={affiliations.factions} npc={npc} onCancel={() => setEditorOpen(false)} onSaved={(saved) => { setNpc(saved); setAffiliations((current) => ({ ...current, npcs: current.npcs.map((currentNpc) => currentNpc.id === saved.id ? { ...currentNpc, name: saved.name, species: saved.species, role: saved.role, factionId: saved.faction_id } : currentNpc) })); setEditorOpen(false); }} /> : <><NpcPublicRecord campaignId={campaignId} npc={mapApiNpc(npc, 0)} places={places} isGM={initialResult.role === "gm"} related={related} actions={initialResult.role === "gm" ? <RecordEditAction recordName={npc.name} disabled={isDeleting} onClick={() => { setError(null); setEditorOpen(true); }} /> : null} />{initialResult.role === "gm" ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap"><RecordDeleteAction recordName={npc.name} disabled={isDeleting} onClick={() => void deleteNpc()} /></div> : null}</>}{error ? <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}</>;
+  return <><CampaignArtEditorSlot />{editorOpen ? <NpcEditor campaignId={campaignId} places={places} factions={affiliations.factions} npc={npc} onCancel={() => setEditorOpen(false)} onSaved={(saved) => { setNpc(saved); setAffiliations((current) => ({ ...current, npcs: current.npcs.map((currentNpc) => currentNpc.id === saved.id ? { ...currentNpc, name: saved.name, species: saved.species, role: saved.role, factionId: saved.faction_id } : currentNpc) })); setEditorOpen(false); }} /> : <><NpcPublicRecord campaignId={campaignId} npc={mapApiNpc(npc, 0)} places={places} isGM={initialResult.role === "gm"} related={related} actions={initialResult.role === "gm" ? <RecordEditAction recordName={npc.name} disabled={isDeleting} onClick={() => { setError(null); setEditorOpen(true); }} /> : null} />{initialResult.role === "gm" ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap"><RecordDeleteAction recordName={npc.name} disabled={isDeleting} onClick={() => void deleteNpc()} /></div> : null}<EntityNotesPanel campaignId={campaignId} entity={{ type: "npc", id: npc.id }} entityLabel={npc.name} initialResult={entityNotes} /></>}{error ? <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}</>;
 }

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { createCharacterSchema } from "@/lib/validation/character";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 
 export const runtime = "nodejs";
 
-const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId } = await params;
@@ -35,7 +37,13 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unable to load campaign characters." }, { status: 503 });
     }
 
-    const characters = await addCampaignArtUrls(context.supabase, data ?? []);
+    let characters = await addCampaignArtUrls(context.supabase, data ?? []);
+    if (membership.role !== "gm") {
+      characters = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, characters, (character) => [
+        { key: "backstory_markdown", markdown: character.backstory_markdown },
+        ...(character.physical_description_is_markdown ? [{ key: "physical_description", markdown: character.physical_description }] : []),
+      ]);
+    }
     const charactersWithPermissions = characters.map((character) => ({ ...character, can_edit: membership.role === "gm" || character.owner_id === context.user.id }));
     return NextResponse.json({ role: membership.role, displayName: membership.displayName, characters: charactersWithPermissions });
   } catch {
@@ -78,6 +86,16 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Only a campaign GM can choose another character owner or leave a character unassigned." }, { status: 403 });
     }
 
+    const narrativeFields = [
+      { markdown: input.data.backstoryMarkdown, audience: "player" as const },
+      ...(input.data.physicalDescriptionIsMarkdown
+        ? [{ markdown: input.data.physicalDescription, audience: "player" as const }]
+        : []),
+    ];
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, narrativeFields))) {
+      return NextResponse.json({ error: "Character details link to an inaccessible or invalid campaign record." }, { status: 400 });
+    }
+
     const { data, error } = await context.supabase
       .from("characters")
       .insert({
@@ -90,6 +108,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         level: input.data.level,
         backstory_markdown: input.data.backstoryMarkdown,
         physical_description: input.data.physicalDescription,
+        physical_description_is_markdown: input.data.physicalDescriptionIsMarkdown,
         art_subject: input.data.artSubject ?? null,
         art_path: input.data.artPath ?? null,
         art_prompt: input.data.artPrompt ?? null,

@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Sparkles } from "lucide-react";
 import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
-import { markCampaignArtPersisted, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
+import RichMarkdownField from "@/components/markdown/RichMarkdownField";
+import { discardNewCampaignArtStudioSession, finalizeCampaignArtStudioSession, markCampaignArtPersisted, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
@@ -18,6 +19,7 @@ const emptyDraft: CharacterDraft = {
   isActive: true,
   backstoryMarkdown: "",
   physicalDescription: "",
+  physicalDescriptionIsMarkdown: false,
   artSubject: "",
   artPath: null,
   artUrl: null,
@@ -52,6 +54,7 @@ export default function CharacterEditor({
           isActive: character.is_active !== false,
           backstoryMarkdown: character.backstory_markdown,
           physicalDescription: character.physical_description,
+          physicalDescriptionIsMarkdown: character.physical_description_is_markdown ?? false,
           artSubject: character.art_subject ?? "",
           artPath: character.art_path,
           artUrl: character.art_url ?? null,
@@ -77,6 +80,7 @@ export default function CharacterEditor({
   useCampaignArtEditor({
     campaignId,
     kind: "character",
+    entityId: character?.id,
     characterId: character?.id,
     portraitAiRole: character?.portrait_ai_role ?? undefined,
     visible: !assistantOpen,
@@ -95,6 +99,7 @@ export default function CharacterEditor({
   });
   const onCancel = () => {
     if (!confirmNavigation()) return;
+    if (!character) discardNewCampaignArtStudioSession(campaignId, "character");
     clearDirty();
     parentOnCancel?.();
   };
@@ -120,6 +125,7 @@ export default function CharacterEditor({
       if (!response.ok || !result.character)
         throw new Error(result.error ?? "Character could not be saved.");
       markCampaignArtPersisted(campaignId, result.character.art_path);
+      finalizeCampaignArtStudioSession(campaignId, "character", character?.id, result.character.id);
       clearDirty();
       onSaved?.(result.character);
     } catch (saveError) {
@@ -177,6 +183,7 @@ export default function CharacterEditor({
           currentDraft={{ visualPrompt: draft.artSubject }}
           fields={[{ key: "visualPrompt", label: "Image description", maxLength: 1200, multiline: true }]}
           showModelPicker={character?.portrait_ai_role === "gm"}
+          mentionAudience={character?.portrait_ai_role === "player" ? "player" : "gm"}
           toolLabel={character?.portrait_ai_role === "player" ? "PLAYER ART" : "GM ART"}
           onApply={(candidate) => update("artSubject", candidate.visualPrompt ?? "")}
         />
@@ -249,24 +256,27 @@ export default function CharacterEditor({
           />
           ACTIVE RECORD
         </label>
-        <label>
-          Backstory
-          <textarea
-            value={draft.backstoryMarkdown}
-            onChange={(event) =>
-              update("backstoryMarkdown", event.target.value)
-            }
-          />
-        </label>
-        <label>
-          Physical appearance
-          <textarea
-            value={draft.physicalDescription}
-            onChange={(event) =>
-              update("physicalDescription", event.target.value)
-            }
-          />
-        </label>
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="Backstory"
+          value={draft.backstoryMarkdown}
+          isMarkdown
+          maxLength={20000}
+          audience="player"
+          onChange={(value) => update("backstoryMarkdown", value)}
+        />
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="Physical appearance"
+          value={draft.physicalDescription}
+          isMarkdown={draft.physicalDescriptionIsMarkdown}
+          maxLength={4000}
+          audience="player"
+          onChange={(value, isMarkdown) => {
+            update("physicalDescription", value);
+            update("physicalDescriptionIsMarkdown", isMarkdown);
+          }}
+        />
         {error ? (
           <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">
             {error}

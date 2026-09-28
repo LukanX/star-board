@@ -6,6 +6,7 @@ import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { buildPlacePrompt } from "@/lib/ai/prompts";
+import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
@@ -71,7 +72,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: placeContextResult.error }, { status: placeContextResult.invalid ? 400 : 503 });
     }
 
-    const prompt = buildPlacePrompt(input.data, aiContext.campaign, placeContextResult.context);
+    const linkedContext = await loadLinkedEntityContext(context.supabase, input.data.campaignId, input.data, "gm");
+    if ("error" in linkedContext) {
+      const failure = linkedEntityContextFailure(linkedContext.error);
+      return NextResponse.json({ error: failure.message }, { status: failure.status });
+    }
+
+    const prompt = buildPlacePrompt(input.data, aiContext.campaign, placeContextResult.context, linkedContext.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let rawDraft: unknown;
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAiModelPricing } from "@/lib/ai/model-pricing";
+import { formatAiImagePricing, formatAiModelPricing } from "@/lib/ai/model-pricing";
 
 describe("AI model pricing display", () => {
   it("shows token input and output costs for text models", () => {
@@ -12,5 +12,13 @@ describe("AI model pricing display", () => {
 
   it("reports unavailable pricing when the catalog has no usable cost fields", () => {
     expect(formatAiModelPricing("image", { request: "0" })).toBe("PRICING UNAVAILABLE");
+  });
+
+  it("shows endpoint prices with their actual providers, units, and resolution variants", () => {
+    expect(formatAiImagePricing([
+      { providerName: "Seed", providerSlug: "seed", billable: "output_image", unit: "image", costUsd: 0.045, variant: "1k" },
+      { providerName: "Google AI Studio", providerSlug: "google-ai-studio", billable: "output_image", unit: "token", costUsd: 0.00003, variant: null },
+      { providerName: "Recraft", providerSlug: "recraft", billable: "output_image", unit: "megapixel", costUsd: 0.05, variant: null },
+    ])).toBe("Seed OUTPUT IMAGE $0.0450/IMAGE (1K)  //  Google AI Studio OUTPUT IMAGE $30.00/M TOKENS  //  Recraft OUTPUT IMAGE $0.0500/MEGAPIXEL");
   });
 });

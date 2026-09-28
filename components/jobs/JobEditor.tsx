@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { LockKeyhole, Save, Sparkles, Trash2, X } from "lucide-react";
+import { Save, Sparkles, Trash2, X } from "lucide-react";
 import AiDraftAssistant, {
   type AiDraftSelectField,
 } from "@/components/archive/AiDraftAssistant";
+import RichMarkdownField from "@/components/markdown/RichMarkdownField";
 import {
+  discardNewCampaignArtStudioSession,
+  finalizeCampaignArtStudioSession,
   markCampaignArtPersisted,
   useCampaignArtEditor,
 } from "@/components/archive/CampaignArtField";
@@ -122,6 +125,7 @@ export default function JobEditor({
 
   const onCancel = () => {
     if (!confirmNavigation()) return;
+    if (!job) discardNewCampaignArtStudioSession(campaignId, "job");
     clearDirty();
     parentOnCancel?.();
   };
@@ -129,6 +133,7 @@ export default function JobEditor({
   useCampaignArtEditor({
     campaignId,
     kind: "job",
+    entityId: job?.id,
     visible: !assistantOpen,
     value: draft.artPath,
     trackUnsavedUploads: true,
@@ -274,6 +279,7 @@ export default function JobEditor({
         throw new Error(result.error ?? "Job could not be saved.");
 
       markCampaignArtPersisted(campaignId, result.job.art_path);
+      finalizeCampaignArtStudioSession(campaignId, "job", job?.id, result.job.id);
       clearDirty();
       onSaved?.(result.job);
     } catch (saveError) {
@@ -417,45 +423,10 @@ export default function JobEditor({
               </select>
             </label>
           </div>
-          <label>
-            Summary
-            <textarea
-              maxLength={4000}
-              value={draft.summary}
-              onChange={(event) => update("summary", event.target.value)}
-            />
-          </label>
-          <label>
-            Player notes
-            <textarea
-              maxLength={20000}
-              value={draft.playerNotesMarkdown}
-              onChange={(event) =>
-                update("playerNotesMarkdown", event.target.value)
-              }
-            />
-          </label>
-          <label>
-            Hook
-            <textarea
-              maxLength={1200}
-              value={draft.hook}
-              onChange={(event) => update("hook", event.target.value)}
-            />
-          </label>
-          <label>
-            GM notes{" "}
-            <span className="inline-flex items-center gap-1 text-[var(--pink)]">
-              <LockKeyhole size={11} /> PRIVATE
-            </span>
-            <textarea
-              maxLength={20000}
-              value={draft.gmNotesMarkdown}
-              onChange={(event) =>
-                update("gmNotesMarkdown", event.target.value)
-              }
-            />
-          </label>
+          <RichMarkdownField campaignId={campaignId} label="Summary" value={draft.summary} isMarkdown maxLength={4000} audience="player" onChange={(value) => update("summary", value)} />
+          <RichMarkdownField campaignId={campaignId} label="Player notes" value={draft.playerNotesMarkdown} isMarkdown maxLength={20000} audience="player" onChange={(value) => update("playerNotesMarkdown", value)} />
+          <RichMarkdownField campaignId={campaignId} label="Hook / GM ONLY" value={draft.hook} isMarkdown maxLength={1200} audience="gm" onChange={(value) => update("hook", value)} />
+          <RichMarkdownField campaignId={campaignId} label="GM notes / PRIVATE" value={draft.gmNotesMarkdown} isMarkdown maxLength={20000} audience="gm" onChange={(value) => update("gmNotesMarkdown", value)} />
           <label className="place-quick-field">
             Primary place
             <select

@@ -6,7 +6,7 @@ import {
   imageJobPollIntervalMs,
   imageJobStatusRequestTimeoutMs,
 } from "@/lib/ai/image-job-lifecycle";
-import type { ImageAspectRatio, ImageSize } from "@/lib/ai/image-options";
+import type { ImageAspectRatio, ImageResolution, ImageSize } from "@/lib/ai/image-options";
 
 export type ImageJobTargetKind = "character" | "npc" | "faction" | "job" | "place" | "enemy" | "visual-style";
 
@@ -18,7 +18,7 @@ export type ImageDraft = {
   mode: "create" | "refine";
   subject: string;
   aspectRatio: ImageAspectRatio;
-  size: ImageSize;
+  size?: ImageSize;
   prompt: string;
   provider: "openrouter";
   model: string;
@@ -40,7 +40,9 @@ export type ImageBackgroundJob = {
   mode: "create" | "refine";
   subject: string;
   aspectRatio: ImageAspectRatio;
-  size: ImageSize;
+  size?: ImageSize;
+  resolution?: ImageResolution;
+  supportedParameters?: string[];
   prompt: string;
   model: string;
   createdAt: string;
@@ -56,6 +58,7 @@ export class ImageJobCancelledError extends Error {
 
 type ImageJobStatusResponse = {
   error?: string;
+  outcomeUnknown?: boolean;
   job?: {
     status: "pending" | "running" | "complete" | "failed";
     statusUpdatedAt?: string;
@@ -158,6 +161,11 @@ export async function waitForImageBackgroundJob(
       transientFailures = 0;
 
       if (result.job?.status === "failed") {
+        if (result.outcomeUnknown) {
+          const error = new Error(result.error ?? "The image request may have been billed; check OpenRouter usage before generating again.");
+          error.name = "ImageJobOutcomeUnknownError";
+          throw error;
+        }
         throw new Error(result.error ?? "The image draft could not be generated.");
       }
 
@@ -174,7 +182,7 @@ export async function waitForImageBackgroundJob(
           mode: job.mode,
           subject: job.subject,
           aspectRatio: job.aspectRatio,
-          size: job.size,
+          ...(job.size ? { size: job.size } : {}),
           prompt: job.prompt,
           provider: "openrouter",
           model: result.job.model ?? job.model,

@@ -2,7 +2,8 @@ import { z } from "zod";
 
 const factionFields = {
   name: z.string().trim().min(1).max(160),
-  description: z.string().trim().max(4000).default(""),
+  description: z.string().max(4000).default(""),
+  descriptionIsMarkdown: z.boolean().default(false),
   status: z.string().trim().min(1).max(80).default("active"),
   playerNotesMarkdown: z.string().max(20000).default(""),
   artSubject: z.string().trim().max(1600).nullable().optional(),
@@ -28,6 +29,7 @@ export const createFactionSchema = z.object({
 export const updateFactionSchema = z.object({
   name: factionFields.name.optional(),
   description: factionFields.description.optional(),
+  descriptionIsMarkdown: z.boolean().optional(),
   status: factionFields.status.optional(),
   playerNotesMarkdown: factionFields.playerNotesMarkdown.optional(),
   gmNotesMarkdown: gmNotesMarkdown.optional(),

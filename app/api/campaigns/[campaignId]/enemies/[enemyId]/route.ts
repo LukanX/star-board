@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignRole } from "@/lib/auth/permissions";
 import { readCampaignEnemyForRole } from "@/lib/campaign/enemies-server";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { hashAonCreature } from "@/lib/enemies/import-diff";
 import { createEnemySchema, updateEnemySchema } from "@/lib/validation/enemy";
 import { createCampaignArtSignedUrl, isExternalArtPath, removeCampaignArtIfUnreferenced, validateCampaignArtPath } from "@/lib/storage/campaign-art";
@@ -22,6 +23,7 @@ function toRpcPayload(input: EnemyInput) {
     public: {
       name: input.name,
       playerDescription: input.playerDescription,
+      playerDescriptionIsMarkdown: input.playerDescriptionIsMarkdown,
       isRevealed: input.isRevealed,
       artPath: input.artPath ?? null,
     },
@@ -92,6 +94,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const mergedResult = createEnemySchema.safeParse({
       name: input.data.name ?? current.name,
       playerDescription: input.data.playerDescription ?? current.player_description,
+      playerDescriptionIsMarkdown: input.data.playerDescriptionIsMarkdown ?? current.player_description_is_markdown ?? false,
       isRevealed: input.data.isRevealed ?? current.is_revealed,
       artPath: input.data.artPath === undefined ? current.art_path : input.data.artPath,
       artUrl: input.data.artUrl,
@@ -109,6 +112,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       sourceSnapshot: input.data.sourceSnapshot === undefined ? (current.source_snapshot ?? null) : input.data.sourceSnapshot,
     });
     if (!mergedResult.success) return NextResponse.json({ error: "Enemy update is invalid.", issues: mergedResult.error.flatten() }, { status: 400 });
+
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, [
+      ...(mergedResult.data.playerDescriptionIsMarkdown
+        ? [{ markdown: mergedResult.data.playerDescription, audience: "player" as const }]
+        : []),
+      { markdown: mergedResult.data.gmNotesMarkdown, audience: "gm" },
+    ]))) {
+      return NextResponse.json({ error: "Enemy details link to an inaccessible or invalid campaign record." }, { status: 400 });
+    }
 
     if (current.origin !== "aon" && mergedResult.data.origin === "aon") {
       return NextResponse.json({ error: "Archives of Nethys imports must be reviewed through the source import endpoint." }, { status: 409 });

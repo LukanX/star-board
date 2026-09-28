@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { uncertainImageOutcomeMessage } from "@/lib/ai/errors";
 
 const mocks = vi.hoisted(() => ({
   getAuthenticatedUser: vi.fn(),
@@ -96,6 +97,20 @@ describe("GET /api/ai/image/[generationRunId]", () => {
 
     expect(response.status).toBe(200);
     expect(payload).toEqual({ job: { generationRunId, status: "failed" }, error: "Provider unavailable" });
+  });
+
+  it("identifies a charged-but-unconfirmed image job without exposing provider diagnostics", async () => {
+    const supabase = createSupabaseMock({ id: generationRunId, status: "failed", error_message: uncertainImageOutcomeMessage });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+
+    const response = await GET(new Request("http://localhost"), params());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      job: { generationRunId, status: "failed" },
+      error: uncertainImageOutcomeMessage,
+      outcomeUnknown: true,
+    });
   });
 
   it("signs the private generated image only after completion", async () => {

@@ -3,6 +3,7 @@ import type { NpcRelatedRecords } from "@/lib/campaign/detail-types";
 import { BookOpen, LockKeyhole, Map, Network, UserRound } from "lucide-react";
 import CampaignRouteLink from "@/components/campaign-shell/CampaignRouteLink";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import NarrativeContent from "@/components/markdown/NarrativeContent";
 import ArtDownloadButton from "@/components/ui/ArtDownloadButton";
 import ArchiveRecordShell from "@/components/ui/ArchiveRecordShell";
 import ArchiveRelatedList from "@/components/ui/ArchiveRelatedList";
@@ -88,9 +89,12 @@ export default function NpcPublicRecord({
           <div data-npc-detail-copy="true" className="min-w-0 grid gap-3">
             <div data-npc-public-brief="true" className="grid gap-[8px]">
               <p className={eyebrowClassName}>PUBLIC BRIEF</p>
-              <p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">
-                {npc.description || "No public description recorded yet."}
-              </p>
+              <NarrativeContent
+                source={npc.description || "No public description recorded yet."}
+                isMarkdown={npc.description_is_markdown ?? false}
+                suppressAutolinkLiterals
+                className="m-0 text-[11px] leading-[1.65] [overflow-wrap:anywhere]"
+              />
             </div>
           </div>
         </div>
@@ -104,7 +108,7 @@ export default function NpcPublicRecord({
             <MarkdownPreviewToolbar>
               <BookOpen size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span>
             </MarkdownPreviewToolbar>
-            <p>{npc.player_notes_markdown || "No player notes recorded yet."}</p>
+            <NarrativeContent source={npc.player_notes_markdown || "No player notes recorded yet."} isMarkdown />
           </MarkdownPreview>
           {isGM ? (
             <MarkdownPreview
@@ -114,7 +118,7 @@ export default function NpcPublicRecord({
               <MarkdownPreviewToolbar className="text-[var(--pink)]">
                 <LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span>
               </MarkdownPreviewToolbar>
-              <p>{npc.gm_notes_markdown || "No private notes recorded yet."}</p>
+              <NarrativeContent source={npc.gm_notes_markdown || "No private notes recorded yet."} isMarkdown />
             </MarkdownPreview>
           ) : null}
         </>

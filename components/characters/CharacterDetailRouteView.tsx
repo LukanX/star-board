@@ -6,13 +6,15 @@ import { Check } from "lucide-react";
 import { CampaignArtEditorSlot } from "@/components/archive/CampaignArtField";
 import CharacterEditor from "@/components/characters/CharacterEditor";
 import CharacterPublicRecord from "@/components/characters/CharacterPublicRecord";
+import EntityNotesPanel from "@/components/notes/EntityNotesPanel";
 import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
 import { deleteCampaignCharacter } from "@/lib/campaign/client/characters";
 import { campaignSectionPath } from "@/lib/campaign/routes";
 import { mapApiCharacter } from "@/lib/campaign/mappers";
 import type { ApiCampaignMember, ApiCharacter } from "@/lib/campaign/types";
+import type { CampaignNotesResult } from "@/lib/campaign/notes-server";
 
-export default function CharacterDetailRouteView({ campaignId, currentUserId = "", initialCharacter, members = [], role = "player" }: { campaignId: string; currentUserId?: string; initialCharacter: ApiCharacter; members?: ApiCampaignMember[]; role?: "gm" | "player" }) {
+export default function CharacterDetailRouteView({ campaignId, currentUserId = "", initialCharacter, members = [], role = "player", entityNotes }: { campaignId: string; currentUserId?: string; initialCharacter: ApiCharacter; members?: ApiCampaignMember[]; role?: "gm" | "player"; entityNotes: CampaignNotesResult }) {
   const router = useRouter();
   const [character, setCharacter] = useState(initialCharacter);
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(initialCharacter.owner_id);
@@ -136,6 +138,7 @@ export default function CharacterDetailRouteView({ campaignId, currentUserId = "
       {character.can_edit ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap">
         <RecordDeleteAction recordName={character.name} disabled={isDeleting} onClick={() => void deleteCharacter()} />
       </div> : null}
+      <EntityNotesPanel campaignId={campaignId} entity={{ type: "character", id: character.id }} entityLabel={character.name} initialResult={entityNotes} />
     </>}
     {error ? <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}
   </>;

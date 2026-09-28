@@ -155,6 +155,189 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(unchanged.data?.description).toContain("local RLS integration suite");
   });
 
+  it("allows members to edit player notes while protecting note ownership and revisions", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    if (!gmUser) throw new Error("The local RLS GM session has no user.");
+
+    const episode = await gmClient
+      .from("episodes")
+      .insert({ campaign_id: campaignId, created_by: gmUser.id, title: `Note scope ${Date.now()}` })
+      .select("id")
+      .single();
+    expect(episode.error).toBeNull();
+
+    const created = await gmClient
+      .from("campaign_notes")
+      .insert({
+        campaign_id: campaignId,
+        episode_id: null,
+        author_id: gmUser.id,
+        title: "Shared crew log",
+        body_markdown: "The relay is quiet.",
+        visibility: "player",
+        updated_by: gmUser.id,
+      })
+      .select("id, revision")
+      .single();
+    expect(created.error).toBeNull();
+    expect(created.data?.revision).toBe(1);
+
+    const sharedUpdate = await playerClient
+      .from("campaign_notes")
+      .update({ title: "Updated crew log", body_markdown: "The relay answered." })
+      .eq("id", created.data?.id)
+      .eq("revision", 1)
+      .select("id, revision, updated_by")
+      .single();
+    expect(sharedUpdate.error).toBeNull();
+    expect(sharedUpdate.data).toMatchObject({ revision: 2, updated_by: playerId });
+
+    const staleUpdate = await playerClient
+      .from("campaign_notes")
+      .update({ body_markdown: "This stale write must not win." })
+      .eq("id", created.data?.id)
+      .eq("revision", 1)
+      .select("id, revision");
+    expect(staleUpdate.error).toBeNull();
+    expect(staleUpdate.data).toEqual([]);
+
+    const protectedRevision = await playerClient
+      .from("campaign_notes")
+      .update({ revision: 99 })
+      .eq("id", created.data?.id)
+      .select("id");
+    expect(protectedRevision.error).not.toBeNull();
+
+    const protectedTimestamp = await playerClient
+      .from("campaign_notes")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", created.data?.id)
+      .select("id");
+    expect(protectedTimestamp.error).not.toBeNull();
+
+    const changeVisibility = await playerClient
+      .from("campaign_notes")
+      .update({ visibility: "gm" })
+      .eq("id", created.data?.id)
+      .eq("revision", 2)
+      .select("id");
+    expect(changeVisibility.error).not.toBeNull();
+
+    const changeEpisode = await playerClient
+      .from("campaign_notes")
+      .update({ episode_id: episode.data?.id })
+      .eq("id", created.data?.id)
+      .eq("revision", 2)
+      .select("id");
+    expect(changeEpisode.error).not.toBeNull();
+
+    const deleteNote = await playerClient
+      .from("campaign_notes")
+      .delete()
+      .eq("id", created.data?.id)
+      .select("id");
+    expect(deleteNote.error).toBeNull();
+    expect(deleteNote.data).toEqual([]);
+
+    const finalNote = await gmClient
+      .from("campaign_notes")
+      .select("title, body_markdown, visibility, episode_id, revision, updated_by")
+      .eq("id", created.data?.id)
+      .single();
+    expect(finalNote.error).toBeNull();
+    expect(finalNote.data).toMatchObject({
+      title: "Updated crew log",
+      body_markdown: "The relay answered.",
+      visibility: "player",
+      episode_id: null,
+      revision: 2,
+      updated_by: playerId,
+    });
+  });
+
+  it("restricts entity note edits to the author or GM and hides notes with unrevealed enemies", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    if (!gmUser) throw new Error("The local RLS GM session has no user.");
+
+    const character = await gmClient
+      .from("characters")
+      .insert({ campaign_id: campaignId, owner_id: playerId, name: `RLS Note Character ${Date.now()}` })
+      .select("id")
+      .single();
+    expect(character.error).toBeNull();
+
+    const characterNote = await gmClient
+      .from("campaign_notes")
+      .insert({
+        campaign_id: campaignId,
+        author_id: gmUser.id,
+        character_id: character.data?.id,
+        title: "Attached character note",
+        body_markdown: "Visible to campaign members.",
+        visibility: "player",
+      })
+      .select("id, character_id")
+      .single();
+    expect(characterNote.error).toBeNull();
+
+    const visibleCharacterNote = await playerClient
+      .from("campaign_notes")
+      .select("id, character_id")
+      .eq("id", characterNote.data?.id)
+      .single();
+    expect(visibleCharacterNote.error).toBeNull();
+
+    const nonAuthorEntityEdit = await playerClient
+      .from("campaign_notes")
+      .update({ body_markdown: "A nonauthor cannot edit an entity note." })
+      .eq("id", characterNote.data?.id)
+      .select("id");
+    expect(nonAuthorEntityEdit.error).toBeNull();
+    expect(nonAuthorEntityEdit.data).toEqual([]);
+
+    const enemy = await gmClient
+      .from("enemies")
+      .insert({ campaign_id: campaignId, author_id: gmUser.id, name: `RLS Hidden Enemy ${Date.now()}` })
+      .select("id")
+      .single();
+    expect(enemy.error).toBeNull();
+
+    const enemyNote = await gmClient
+      .from("campaign_notes")
+      .insert({
+        campaign_id: campaignId,
+        author_id: gmUser.id,
+        enemy_id: enemy.data?.id,
+        title: "Enemy field note",
+        body_markdown: "This is hidden until the enemy is revealed.",
+        visibility: "player",
+      })
+      .select("id")
+      .single();
+    expect(enemyNote.error).toBeNull();
+
+    const hiddenEnemyNote = await playerClient
+      .from("campaign_notes")
+      .select("id")
+      .eq("id", enemyNote.data?.id);
+    expect(hiddenEnemyNote.error).toBeNull();
+    expect(hiddenEnemyNote.data).toEqual([]);
+
+    const revealEnemy = await gmClient
+      .from("enemies")
+      .update({ is_revealed: true, player_description: "A shape emerges from the corridor." })
+      .eq("id", enemy.data?.id);
+    expect(revealEnemy.error).toBeNull();
+
+    const visibleAfterReveal = await playerClient
+      .from("campaign_notes")
+      .select("id")
+      .eq("id", enemyNote.data?.id)
+      .single();
+    expect(visibleAfterReveal.error).toBeNull();
+    expect(visibleAfterReveal.data?.id).toBe(enemyNote.data?.id);
+  });
+
   it("keeps visual styles GM-only and applies a ready style to the campaign snapshot", async () => {
     const originalCampaign = await gmClient.from("campaigns").select("visual_style").eq("id", campaignId).single();
     expect(originalCampaign.error).toBeNull();
@@ -962,6 +1145,29 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(gmUpdate.data?.name).toBe("GM Renamed Player Character");
   });
 
+  it("defaults legacy appearance to plain text and lets an authorized owner mark it rich", async () => {
+    const created = await playerClient.from("characters").insert({
+      campaign_id: campaignId,
+      owner_id: playerId,
+      name: "Rich Appearance Marker Character",
+      physical_description: "Tall\nSilver-eyed",
+    }).select("id, physical_description, physical_description_is_markdown").single();
+    expect(created.error).toBeNull();
+    expect(created.data?.physical_description).toBe("Tall\nSilver-eyed");
+    expect(created.data?.physical_description_is_markdown).toBe(false);
+
+    const marked = await playerClient.from("characters")
+      .update({ physical_description_is_markdown: true })
+      .eq("id", created.data?.id)
+      .eq("campaign_id", campaignId)
+      .select("physical_description, physical_description_is_markdown")
+      .single();
+    expect(marked.error).toBeNull();
+    expect(marked.data?.physical_description).toBe("Tall\nSilver-eyed");
+    expect(marked.data?.physical_description_is_markdown).toBe(true);
+
+  });
+
   it("enforces ownership transfer through the authorized RPC", async () => {
     const gmUser = (await gmClient.auth.getUser()).data.user;
     if (!gmUser) throw new Error("The local RLS GM session has no user.");
@@ -1062,6 +1268,7 @@ describeLocal("local Supabase RLS boundaries", () => {
     let gmCharacterId: string | null = null;
     let foreignCampaignId: string | null = null;
     let foreignCharacterId: string | null = null;
+    let temporaryPortraitPath: string | null = null;
     const runIds: string[] = [];
     const runBase = {
       kind: "image",
@@ -1148,6 +1355,46 @@ describeLocal("local Supabase RLS boundaries", () => {
       expect(hiddenFromOtherPlayer.error).toBeNull();
       expect(hiddenFromOtherPlayer.data).toEqual([]);
 
+      const completedTargetRun = await gmClient
+        .from("ai_generation_runs")
+        .update({ status: "complete" })
+        .eq("id", gmTargetRunId)
+        .select("id")
+        .single();
+      expect(completedTargetRun.error).toBeNull();
+
+      temporaryPortraitPath = `${campaignId}/${gmUser.id}/image-${gmTargetRunId}.png`;
+      const portraitUpload = await gmClient.storage.from("campaign-art").upload(
+        temporaryPortraitPath,
+        new Blob(["generated portrait"], { type: "image/png" }),
+        { contentType: "image/png", upsert: false },
+      );
+      expect(portraitUpload.error).toBeNull();
+
+      const mismatchedPath = await gmClient.rpc("attach_ai_generation_image", {
+        p_generation_run_id: gmTargetRunId,
+        p_image_path: `${campaignId}/${gmUser.id}/not-the-run.png`,
+        p_image_media_type: "image/png",
+      });
+      expect(mismatchedPath.error).toBeNull();
+      expect(mismatchedPath.data).toBe(false);
+
+      const attachedPortrait = await gmClient.rpc("attach_ai_generation_image", {
+        p_generation_run_id: gmTargetRunId,
+        p_image_path: temporaryPortraitPath,
+        p_image_media_type: "image/png",
+      });
+      expect(attachedPortrait.error).toBeNull();
+      expect(attachedPortrait.data).toBe(true);
+
+      const foreignPlayerAttach = await playerClient.rpc("attach_ai_generation_image", {
+        p_generation_run_id: gmTargetRunId,
+        p_image_path: temporaryPortraitPath,
+        p_image_media_type: "image/png",
+      });
+      expect(foreignPlayerAttach.error).toBeNull();
+      expect(foreignPlayerAttach.data).toBe(false);
+
       const blockedUpdate = await playerClient
         .from("ai_generation_runs")
         .update({ status: "failed" })
@@ -1206,6 +1453,7 @@ describeLocal("local Supabase RLS boundaries", () => {
       expect(hiddenAfterDelete.data).toEqual([]);
     } finally {
       if (runIds.length) await gmClient.from("ai_generation_runs").delete().in("id", runIds);
+      if (temporaryPortraitPath) await gmClient.storage.from("campaign-art").remove([temporaryPortraitPath]);
       if (ownerCharacterId) await gmClient.from("characters").delete().eq("id", ownerCharacterId);
       if (gmCharacterId) await gmClient.from("characters").delete().eq("id", gmCharacterId);
       if (foreignCharacterId) await gmClient.from("characters").delete().eq("id", foreignCharacterId);

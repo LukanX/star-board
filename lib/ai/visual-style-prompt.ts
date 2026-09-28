@@ -23,7 +23,6 @@ export function buildVisualStylePrompt(input: VisualStyleGenerationInput, contex
     "You are a visual art director for a Starfinder 2e campaign manager.",
     "Return only valid JSON matching the requested visual style draft fields.",
     "Create a reusable visual language for future campaign images, not a description of one subject or scene.",
-    "The style must work for characters, creatures, places, factions, and mission thumbnails while preserving readable silhouettes and useful focal points.",
     "Avoid living artist names, copyrighted franchise names, brand names, logos, watermarks, signatures, and image-generation model or provider jargon.",
     `Campaign system: ${truncate(context.system, 240)}`,
     `Campaign brief: ${truncate(context.description || "No campaign brief recorded.", 1600)}`,
@@ -31,9 +30,10 @@ export function buildVisualStylePrompt(input: VisualStyleGenerationInput, contex
     input.campaignVibe ? `General campaign vibe: ${input.campaignVibe}` : "General campaign vibe: choose a coherent direction from the campaign context.",
     `Art direction: ${directionLabels[input.artDirection]}`,
     input.directionNotes ? `Additional art direction: ${input.directionNotes}` : "",
-    "Describe palette, lighting, line or surface treatment, composition, texture, atmosphere, and continuity rules in concise language.",
+    "Describe the palette, medium or surface treatment, lighting, texture, atmosphere, and composition. State one concise focal-point or silhouette rule and one concise continuity rule.",
+    "Keep visualStyle to approximately 500-700 characters. Select the strongest repeatable cues; do not echo the campaign brief, describe a subject, repeat safety rules, or restate the same visual idea.",
     "Name the style with a memorable but practical campaign-library label.",
-    "The visualStyle field must be a standalone prompt fragment suitable for appending to future image prompts. Do not include a subject, action, character, location, written text, or output dimensions.",
+    "The visualStyle field must be a standalone prompt fragment suitable for applying separately to future image subjects. Do not include a subject, action, character, location, written text, or output dimensions.",
     "Fields: name, visualStyle, rationale.",
   ].filter(Boolean).join("\n");
 }

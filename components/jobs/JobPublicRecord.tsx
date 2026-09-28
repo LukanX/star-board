@@ -80,6 +80,7 @@ export default function JobPublicRecord({
           </MarkdownPreviewToolbar>
           <MarkdownContent
             source={job.summary || "No public mission brief recorded yet."}
+            preserveSoftBreaks
           />
         </MarkdownPreview>
         <MarkdownPreview>
@@ -100,6 +101,7 @@ export default function JobPublicRecord({
           </MarkdownPreviewToolbar>
           <MarkdownContent
             source={job.playerNotesMarkdown || "No player notes recorded yet."}
+            preserveSoftBreaks
           />
         </MarkdownPreview>
         {isGM ? (
@@ -109,6 +111,7 @@ export default function JobPublicRecord({
             </MarkdownPreviewToolbar>
             <MarkdownContent
               source={job.hook || "No private hook recorded yet."}
+              preserveSoftBreaks
             />
           </MarkdownPreview>
         ) : null}
@@ -119,6 +122,7 @@ export default function JobPublicRecord({
             </MarkdownPreviewToolbar>
             <MarkdownContent
               source={job.gmNotesMarkdown || "No private notes recorded yet."}
+              preserveSoftBreaks
             />
           </MarkdownPreview>
         ) : null}

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createHmac } from "node:crypto";
 import { createImageBackgroundSignature, dispatchImageBackgroundJob, parseImageBackgroundJob, verifyImageBackgroundSignature } from "@/lib/ai/image-jobs";
 
 const job = {
@@ -12,10 +13,35 @@ const job = {
 describe("image background jobs", () => {
   it("accepts an unchanged signed job and rejects a modified payload", () => {
     const signature = createImageBackgroundSignature(job, "worker-secret");
+    const legacyCanonicalJob = JSON.stringify({
+      generationRunId: job.generationRunId,
+      prompt: job.prompt,
+      model: job.model,
+      purpose: "entity-art",
+      aspectRatio: job.aspectRatio,
+      size: job.size,
+    });
 
+    expect(signature).toBe(createHmac("sha256", "worker-secret").update(legacyCanonicalJob).digest("hex"));
     expect(verifyImageBackgroundSignature(job, signature, "worker-secret")).toBe(true);
     expect(verifyImageBackgroundSignature({ ...job, model: "other/model" }, signature, "worker-secret")).toBe(false);
     expect(verifyImageBackgroundSignature(job, null, "worker-secret")).toBe(false);
+  });
+
+  it("signs aspect-only resolution options without a pixel size", () => {
+    const aspectOnlyJob = {
+      generationRunId: job.generationRunId,
+      prompt: job.prompt,
+      model: "x-ai/grok-imagine-image-2.0",
+      aspectRatio: "16:9" as const,
+      resolution: "1K" as const,
+      supportedParameters: ["aspect_ratio", "resolution"],
+    };
+    const signature = createImageBackgroundSignature(aspectOnlyJob, "worker-secret");
+
+    expect(parseImageBackgroundJob(aspectOnlyJob).success).toBe(true);
+    expect(verifyImageBackgroundSignature(aspectOnlyJob, signature, "worker-secret")).toBe(true);
+    expect(verifyImageBackgroundSignature({ ...aspectOnlyJob, resolution: "2K" }, signature, "worker-secret")).toBe(false);
   });
 
   it("validates the worker payload before dispatch", () => {

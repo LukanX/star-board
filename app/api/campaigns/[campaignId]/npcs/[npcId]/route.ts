@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership, getCampaignRole } from "@/lib/auth/permissions";
 import { addCampaignArtUrls, removeCampaignArtIfUnreferenced } from "@/lib/storage/campaign-art";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
+import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { validateCampaignFaction } from "@/lib/factions";
 import { validateCampaignPlace } from "@/lib/places";
 import { updateNpcSchema } from "@/lib/validation/npc";
@@ -9,7 +11,7 @@ type RouteContext = { params: Promise<{ campaignId: string; npcId: string }> };
 
 export const runtime = "nodejs";
 
-const npcColumns = "id, author_id, name, species, role, description, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const npcColumns = "id, author_id, name, species, role, description, description_is_markdown, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId, npcId } = await params;
@@ -45,7 +47,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const [npcWithArt] = await addCampaignArtUrls(context.supabase, [data]);
 
     if (membership.role !== "gm") {
-      return NextResponse.json({ role: membership.role, npc: npcWithArt });
+      const [npc] = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [npcWithArt], (record) => [
+        ...(record.description_is_markdown ? [{ key: "description", markdown: record.description }] : []),
+        { key: "player_notes_markdown", markdown: record.player_notes_markdown },
+      ]);
+      return NextResponse.json({ role: membership.role, npc });
     }
 
     const { data: notes, error: notesError } = await context.supabase
@@ -115,7 +121,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     const { data: previousNpc, error: previousNpcError } = await context.supabase
       .from("npcs")
-      .select("art_path")
+      .select("art_path, description, description_is_markdown")
       .eq("id", npcId)
       .eq("campaign_id", campaignId)
       .maybeSingle();
@@ -123,12 +129,27 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (previousNpcError) {
       return NextResponse.json({ error: "Unable to load NPC art." }, { status: 503 });
     }
+    if (!previousNpc) return NextResponse.json({ error: "NPC not found." }, { status: 404 });
+
+    const nextDescription = input.data.description ?? previousNpc.description;
+    const nextDescriptionIsMarkdown = input.data.descriptionIsMarkdown
+      ?? previousNpc.description_is_markdown
+      ?? false;
+    const narrativeFields = [
+      ...(nextDescriptionIsMarkdown ? [{ markdown: nextDescription, audience: "player" as const }] : []),
+      ...(input.data.playerNotesMarkdown === undefined ? [] : [{ markdown: input.data.playerNotesMarkdown, audience: "player" as const }]),
+      ...(input.data.gmNotesMarkdown === undefined ? [] : [{ markdown: input.data.gmNotesMarkdown, audience: "gm" as const }]),
+    ];
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, narrativeFields))) {
+      return NextResponse.json({ error: "NPC details link to an inaccessible or invalid campaign record." }, { status: 400 });
+    }
 
     const update = {
       ...(input.data.name === undefined ? {} : { name: input.data.name }),
       ...(input.data.species === undefined ? {} : { species: input.data.species }),
       ...(input.data.role === undefined ? {} : { role: input.data.role }),
       ...(input.data.description === undefined ? {} : { description: input.data.description }),
+      ...(input.data.descriptionIsMarkdown === undefined ? {} : { description_is_markdown: input.data.descriptionIsMarkdown }),
       ...(input.data.playerNotesMarkdown === undefined ? {} : { player_notes_markdown: input.data.playerNotesMarkdown }),
       ...(input.data.placeId === undefined ? {} : { place_id: input.data.placeId }),
       ...(input.data.factionId === undefined ? {} : { faction_id: input.data.factionId }),

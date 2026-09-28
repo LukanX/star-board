@@ -4,12 +4,18 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import AiArtStudio from "@/components/archive/AiArtStudio";
 import { ImagePlus, LoaderCircle, Sparkles, X } from "lucide-react";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import {
+  discardNewArtStudioSession,
+  finalizeArtStudioSession,
+  type ArtStudioKind,
+} from "@/components/archive/artStudioSession";
 
 type ArtKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
 
 export type CampaignArtEditorTarget = {
   campaignId: string | null;
   kind: ArtKind;
+  entityId?: string;
   characterId?: string;
   portraitAiRole?: "gm" | "player";
   visible?: boolean;
@@ -49,6 +55,33 @@ export function markCampaignArtPersisted(
   if (path) persistedArtKeys.add(persistedArtKey(campaignId, path));
 }
 
+function removeTemporaryArt(campaignId: string, paths: string[]) {
+  for (const path of paths) {
+    void fetch(
+      `/api/campaigns/${encodeURIComponent(campaignId)}/art?path=${encodeURIComponent(path)}`,
+      { method: "DELETE" },
+    ).catch(() => undefined);
+  }
+}
+
+export function finalizeCampaignArtStudioSession(
+  campaignId: string,
+  kind: ArtStudioKind,
+  previousEntityId: string | undefined,
+  savedEntityId: string,
+) {
+  const paths = finalizeArtStudioSession(
+    { campaignId, kind, entityId: previousEntityId ?? null },
+    savedEntityId,
+  );
+  removeTemporaryArt(campaignId, paths);
+}
+
+export function discardNewCampaignArtStudioSession(campaignId: string, kind: ArtStudioKind) {
+  const paths = discardNewArtStudioSession({ campaignId, kind, entityId: null });
+  removeTemporaryArt(campaignId, paths);
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -76,7 +109,7 @@ export function CampaignArtEditorSlot() {
   const target = useSyncExternalStore(subscribe, getTarget, () => null);
   return target ? (
     <div hidden={target.visible === false} aria-hidden={target.visible === false}>
-      <CampaignArtField key={`${target.kind}:${target.characterId ?? "none"}:${target.showGenerator === false ? "manual" : "generator"}`} {...target} />
+      <CampaignArtField key={`${target.kind}:${target.entityId ?? target.characterId ?? "new"}:${target.showGenerator === false ? "manual" : "generator"}`} {...target} />
     </div>
   ) : null;
 }
@@ -84,6 +117,7 @@ export function CampaignArtEditorSlot() {
 export default function CampaignArtField({
   campaignId,
   kind,
+  entityId,
   characterId,
   portraitAiRole,
   showGenerator = true,
@@ -92,7 +126,6 @@ export default function CampaignArtField({
   trackUnsavedUploads = false,
   url,
   subject,
-  currentPrompt,
   onSubjectChange,
   onChange,
   onUrlChange,
@@ -310,11 +343,11 @@ export default function CampaignArtField({
           <AiArtStudio
             campaignId={campaignId}
             kind={kind}
+            entityId={entityId}
             characterId={characterId}
             portraitAiRole={portraitAiRole}
             parentPlaceId={parentPlaceId}
             subject={subject}
-            currentPrompt={currentPrompt}
             onSubjectChange={onSubjectChange}
             onBusyChange={setIsArtStudioBusy}
             onApproved={(asset) => {

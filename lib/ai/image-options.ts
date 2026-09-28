@@ -1,5 +1,7 @@
 export const imageAspectRatioValues = ["1:1", "3:4", "4:3", "16:9"] as const;
 export type ImageAspectRatio = (typeof imageAspectRatioValues)[number];
+export const imageResolutionValues = ["1K", "2K", "4K"] as const;
+export type ImageResolution = (typeof imageResolutionValues)[number];
 
 export const imageSizeValues = [
   "1024x1024",
@@ -41,3 +43,16 @@ export const imageSizeOptions: Record<ImageAspectRatio, readonly ImageSizeOption
 
 export const defaultImageAspectRatio: ImageAspectRatio = "1:1";
 export const defaultImageSize: ImageSize = "1024x1024";
+
+export function getPreferredImageResolution(supportedResolutions: readonly string[] | undefined): ImageResolution | undefined {
+  return imageResolutionValues.find((resolution) => supportedResolutions?.includes(resolution));
+}
+
+export function getSupportedImageAspectRatios(supportedParameters: readonly string[] | undefined, parameterValues: Record<string, string[]> | undefined): ImageAspectRatio[] {
+  if (!supportedParameters) return [defaultImageAspectRatio];
+  if (!supportedParameters.includes("aspect_ratio")) return [];
+
+  const supportedValues = parameterValues?.aspect_ratio;
+  if (!supportedValues) return [...imageAspectRatioValues];
+  return imageAspectRatioValues.filter((aspectRatio) => supportedValues.includes(aspectRatio));
+}

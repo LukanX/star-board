@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CampaignArtEditorSlot } from "@/components/archive/CampaignArtField";
 import JobEditor from "@/components/jobs/JobEditor";
 import JobPublicRecord from "@/components/jobs/JobPublicRecord";
+import EntityNotesPanel from "@/components/notes/EntityNotesPanel";
 import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
 import { recordDetailMetaClassName } from "@/components/ui/recordStyles";
 import { fetchCampaignJobs } from "@/lib/campaign/client/jobs";
@@ -18,6 +19,7 @@ import type {
   Mission,
 } from "@/lib/campaign/types";
 import type { CampaignJobResult } from "@/lib/campaign/jobs-server";
+import type { CampaignNotesResult } from "@/lib/campaign/notes-server";
 
 export default function JobDetailRouteView({
   campaignId,
@@ -25,12 +27,14 @@ export default function JobDetailRouteView({
   initialNpcs,
   initialFactions,
   initialPlaces,
+  entityNotes,
 }: {
   campaignId: string;
   initialResult: CampaignJobResult;
   initialNpcs: ApiNpc[];
   initialFactions: ApiFaction[];
   initialPlaces: ApiPlace[];
+  entityNotes: CampaignNotesResult;
 }) {
   const router = useRouter();
   const [job, setJob] = useState<Mission>(() =>
@@ -198,6 +202,7 @@ export default function JobDetailRouteView({
           {statusMessage}
         </p>
       ) : null}
+      {!editorOpen ? <EntityNotesPanel campaignId={campaignId} entity={{ type: "job", id: job.id }} entityLabel={job.title} initialResult={entityNotes} /> : null}
       {editorOpen ? (
         <JobEditor
           campaignId={campaignId}

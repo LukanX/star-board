@@ -11,7 +11,7 @@ import { mapApiNote } from "@/lib/campaign/mappers";
 import type { CampaignNotesResult } from "@/lib/campaign/notes-server";
 import type { CampaignNote, CampaignNoteEpisode } from "@/lib/campaign/types";
 
-type NoteFilter = "all" | "global" | "episodes" | "gm";
+type NoteFilter = "all" | "global" | "episodes" | "entities" | "gm";
 
 export default function NotesRouteView({
   campaignId,
@@ -77,20 +77,23 @@ export default function NotesRouteView({
   };
 
   const filteredNotes = notes.filter((note) => {
-    if (filter === "global") return note.episode_id === null;
+    if (filter === "global") return note.episode_id === null && note.entity_type === null;
     if (filter === "episodes") return note.episode_id !== null;
+    if (filter === "entities") return note.entity_type !== null;
     if (filter === "gm") return note.visibility === "gm";
     return true;
   });
-  const count = (scope: "all" | "global" | "episodes" | "gm") => {
+  const count = (scope: "all" | "global" | "episodes" | "entities" | "gm") => {
     if (scope === "all") return notes.length.toString().padStart(2, "0");
     return notes
       .filter((note) =>
         scope === "global"
-          ? note.episode_id === null
+          ? note.episode_id === null && note.entity_type === null
           : scope === "episodes"
             ? note.episode_id !== null
-            : note.visibility === "gm",
+            : scope === "entities"
+              ? note.entity_type !== null
+              : note.visibility === "gm",
       )
       .length.toString()
       .padStart(2, "0");
@@ -155,6 +158,13 @@ export default function NotesRouteView({
             type="button"
           >
             EPISODES <span>{count("episodes")}</span>
+          </button>
+          <button
+            className={`inline-flex items-center gap-[6px] px-0 pb-[5px] border-0 border-b border-transparent bg-transparent text-[var(--dim)] font-mono text-[8px] tracking-[.12em] cursor-pointer [&>span]:text-[#5a6778] ${filter === "entities" ? "border-[var(--cyan)] text-[var(--cyan)] [&>span]:text-[var(--cyan)]" : ""}`}
+            onClick={() => setFilter("entities")}
+            type="button"
+          >
+            ENTITIES <span>{count("entities")}</span>
           </button>
         </div>
         {isGM ? (

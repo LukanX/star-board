@@ -693,10 +693,11 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
     createdNpcId = createPayload.npc?.id ?? null;
     expect(createdNpcId).toBeTruthy();
 
-    await page.reload();
+    await page.reload({ waitUntil: "domcontentloaded" });
     const npcCard = page.getByRole("button", {
       name: `Select ${npcName}`,
     });
+    await expect(npcCard).toBeVisible();
     await expect(npcCard).toHaveClass(/cursor-pointer/);
     await expect(npcCard).toHaveClass(/hover:bg-\[rgba\(98,232,255,\.045\)\]/);
     await expect(npcCard).toHaveClass(/focus-visible:outline-1/);
@@ -715,7 +716,7 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
     const npcDetailPath = `/campaigns/${campaign.campaignId}/npcs/${createdNpcId}`;
     await page.goto(npcDetailPath);
     await expect(page).toHaveURL(new RegExp(`${npcDetailPath}$`));
-    await page.reload();
+    await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(new RegExp(`${npcDetailPath}$`));
 
     const preview = page.locator("[data-npc-detail-preview]");
@@ -772,9 +773,10 @@ test("keeps NPC public detail layout in route-owned utilities", async ({
       await page.request.delete(
         new URL(
           `/api/campaigns/${campaign.campaignId}/npcs/${createdNpcId}`,
-          page.url(),
+          "http://127.0.0.1:3100",
         ).toString(),
-      );
+        { timeout: 2000 },
+      ).catch(() => null);
     }
   }
 });

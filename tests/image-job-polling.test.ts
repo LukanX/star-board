@@ -47,6 +47,20 @@ describe("image background polling", () => {
     await expect(waitForImageBackgroundJob(job, { fetchImpl, wait: waitImmediately, now: freshNow })).rejects.toThrow("Provider unavailable");
   });
 
+  it("keeps a possibly billed background failure distinct from a confirmed failure", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(response({
+      job: { status: "failed" },
+      error: "The image may have been billed; check OpenRouter activity before generating again.",
+      outcomeUnknown: true,
+    }));
+
+    await expect(waitForImageBackgroundJob(job, { fetchImpl, wait: waitImmediately, now: freshNow })).rejects.toMatchObject({
+      name: "ImageJobOutcomeUnknownError",
+      message: expect.stringContaining("may have been billed"),
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("allows three transient failures before stopping", async () => {
     const fetchImpl = vi.fn()
       .mockRejectedValueOnce(new Error("network down"))

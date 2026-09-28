@@ -16,5 +16,7 @@ describe("character portrait prompt", () => {
     expect(prompt).toContain("Backstory: Nova survived a derelict ship");
     expect(prompt).toContain("Physical appearance: Tall, silver-eyed");
     expect(prompt).toContain("Assess both the backstory and physical appearance together.");
+    expect(prompt).not.toContain("Campaign visual style: Retro-futurist");
+    expect(prompt).toContain("Leave rendering medium, palette, lighting recipe, and global style rules to the selected campaign visual style");
   });
 });

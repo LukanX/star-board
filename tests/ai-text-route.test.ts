@@ -123,7 +123,7 @@ describe("structured AI assistance routes", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toMatchObject({ name: "Kept Name", species: "Android", role: "Smuggler" });
-    expect(mocks.buildNpcPrompt).toHaveBeenCalledWith(expect.objectContaining({ feedback: "Make the character warmer without changing their identity.", protectedFields: ["name", "species"] }), expect.anything());
+    expect(mocks.buildNpcPrompt).toHaveBeenCalledWith(expect.objectContaining({ feedback: "Make the character warmer without changing their identity.", protectedFields: ["name", "species"] }), expect.anything(), "");
   });
 
   it("returns a validated faction draft and records metadata", async () => {
@@ -135,7 +135,7 @@ describe("structured AI assistance routes", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
-    expect(mocks.buildFactionPrompt).toHaveBeenCalledWith(expect.objectContaining({ campaignId, focus: "Make it useful as a mission giver." }), expect.objectContaining({ system: "Starfinder 2e" }));
+    expect(mocks.buildFactionPrompt).toHaveBeenCalledWith(expect.objectContaining({ campaignId, focus: "Make it useful as a mission giver." }), expect.objectContaining({ system: "Starfinder 2e" }), "");
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "faction", status: "complete", model: "openai/gpt-4o-mini", provider: "openrouter", effectiveModel: "openrouter/fallback", generationId: "text-run-1", inputTokens: 12, outputTokens: 34, costUsd: 0.001 }));
   });
 
@@ -167,7 +167,7 @@ describe("structured AI assistance routes", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.loadMissionAiReferences).toHaveBeenCalledWith(expect.anything(), campaignId, expect.objectContaining({ giverType: "npc", giverId, placeId }));
-    expect(mocks.buildMissionPrompt).toHaveBeenCalledWith(expect.objectContaining({ giverType: "npc", giverId, placeId }), expect.objectContaining({ system: "Starfinder 2e" }), references);
+    expect(mocks.buildMissionPrompt).toHaveBeenCalledWith(expect.objectContaining({ giverType: "npc", giverId, placeId }), expect.objectContaining({ system: "Starfinder 2e" }), references, "");
   });
 
   it("rejects a missing selected mission reference before calling the provider", async () => {

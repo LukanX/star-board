@@ -8,10 +8,11 @@ import { canUseCharacterPortraitAi, loadCharacterPortraitAccess, type CharacterP
 import { getAuthenticatedUser, requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
+import { defaultImageAspectRatio, getPreferredImageResolution, getSupportedImageAspectRatios } from "@/lib/ai/image-options";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { imageDraftSchema, imageGenerationInputSchema } from "@/lib/validation/image";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
-import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
+import { getAiProviderFailure, logAiProviderFailure, uncertainImageOutcomeMessage } from "@/lib/ai/errors";
 import { dispatchImageBackgroundJob, markImageBackgroundDispatchFailed } from "@/lib/ai/image-jobs";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 import { campaignArtBucket, createCampaignArtSignedUrl } from "@/lib/storage/campaign-art";
@@ -28,7 +29,7 @@ type ImageRequestContext = {
   role: "gm" | "player";
 };
 
-async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSignedUrl>[0], campaignId: string, userId: string, generationRunId: string, image: Awaited<ReturnType<typeof generateImage>>["image"]) {
+async function storeTemporaryImage(supabase: Parameters<typeof createCampaignArtSignedUrl>[0], campaignId: string, userId: string, generationRunId: string, image: Awaited<ReturnType<typeof generateImage>>["image"], prefix: "image" | "style-preview") {
   const mediaType = image.mediaType in imageMediaTypes ? image.mediaType as keyof typeof imageMediaTypes : null;
   if (!mediaType) throw new Error("The AI provider returned an unsupported image type.");
 
@@ -45,7 +46,7 @@ async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSi
 
   if (!body) throw new Error("The AI provider returned no image data.");
 
-  const path = `${campaignId}/${userId}/style-preview-${generationRunId}.${imageMediaTypes[mediaType]}`;
+  const path = `${campaignId}/${userId}/${prefix}-${generationRunId}.${imageMediaTypes[mediaType]}`;
   const { error: uploadError } = await supabase.storage.from(campaignArtBucket).upload(path, body, {
     cacheControl: "3600",
     contentType: mediaType,
@@ -54,7 +55,16 @@ async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSi
 
   if (uploadError) throw new Error("The generated style preview could not be stored.");
 
-  return { path, mediaType, signedUrl: await createCampaignArtSignedUrl(supabase, path) };
+  try {
+    return { path, mediaType, signedUrl: await createCampaignArtSignedUrl(supabase, path) };
+  } catch (error) {
+    await supabase.storage.from(campaignArtBucket).remove([path]);
+    throw error;
+  }
+}
+
+async function storeStylePreview(supabase: Parameters<typeof createCampaignArtSignedUrl>[0], campaignId: string, userId: string, generationRunId: string, image: Awaited<ReturnType<typeof generateImage>>["image"]) {
+  return storeTemporaryImage(supabase, campaignId, userId, generationRunId, image, "style-preview");
 }
 
 export const runtime = "nodejs";
@@ -66,6 +76,15 @@ function shouldUseBackgroundImageGeneration(request: Request, env: ReturnType<ty
     || hostname.endsWith(".netlify.app");
 
   return isNetlifyRequest || env.NETLIFY_IMAGE_GENERATION === "background";
+}
+
+function logUnexpectedImageFailure(stage: string, model: string | null, error: unknown) {
+  console.error(JSON.stringify({
+    event: "ai_image_unexpected_failure",
+    stage,
+    model,
+    errorName: error instanceof Error ? error.name : "unknown",
+  }));
 }
 
 export async function POST(request: Request) {
@@ -82,6 +101,9 @@ export async function POST(request: Request) {
   if (!input.success) {
     return NextResponse.json({ error: "Image request is invalid.", issues: input.error.flatten() }, { status: 400 });
   }
+
+  let diagnosticStage = "campaign-access";
+  let diagnosticModel = input.data.model ?? null;
 
   try {
     let context: ImageRequestContext;
@@ -131,11 +153,23 @@ export async function POST(request: Request) {
 
     const supabase = context.supabase;
 
+    diagnosticStage = "campaign-credential";
     let campaignCredential;
     try {
       campaignCredential = await resolveCampaignCredential(input.data.campaignId);
     } catch (error) {
-      return campaignCredentialErrorResponse(error, "Art generation is temporarily unavailable.");
+      if (!(error instanceof Error && error.name === "CampaignCredentialError")) {
+        logUnexpectedImageFailure(diagnosticStage, diagnosticModel, error);
+      }
+      const response = campaignCredentialErrorResponse(error, "Art generation is temporarily unavailable.");
+      if (response.status === 503) {
+        const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+        return NextResponse.json({ ...body, diagnosticStage }, {
+          status: response.status,
+          headers: { "X-Star-Board-Diagnostic-Stage": diagnosticStage },
+        });
+      }
+      return response;
     }
 
     if (characterAccess && !canUseCharacterPortraitAi(characterAccess, campaignCredential.status.allowPlayerAi)) {
@@ -144,6 +178,7 @@ export async function POST(request: Request) {
 
     const env = getServerEnv();
 
+    diagnosticStage = "image-model-catalog";
     const catalog = await getAiModelCatalog(campaignCredential.apiKey, "image");
     const availableModels = catalog.models.filter((model) => model.compatible);
     const settingsResult = await loadCampaignAiSettings(supabase, input.data.campaignId, availableModels.map((model) => model.id));
@@ -156,10 +191,34 @@ export async function POST(request: Request) {
       if (error instanceof AiModelSelectionError) return NextResponse.json({ error: error.message }, { status: 400 });
       throw error;
     }
+    diagnosticModel = selectedModel.id;
 
+    const selectedModelDetails = availableModels.find((model) => model.id === selectedModel.id);
+    if (!selectedModelDetails) {
+      return NextResponse.json({ error: "The selected image model is no longer available." }, { status: 400 });
+    }
+    const supportedParameters = selectedModelDetails.supportedParameters ?? [];
+    const requestedSize = supportedParameters.includes("size") ? input.data.size : undefined;
+    const supportedAspectRatios = getSupportedImageAspectRatios(selectedModelDetails.supportedParameters, selectedModelDetails.parameterValues);
+    if (supportedAspectRatios.length && !supportedAspectRatios.includes(input.data.aspectRatio)) {
+      return NextResponse.json({ error: `The selected model does not support ${input.data.aspectRatio} aspect ratio.` }, { status: 400 });
+    }
+    if (!supportedAspectRatios.length && input.data.aspectRatio !== defaultImageAspectRatio) {
+      return NextResponse.json({ error: "The selected model chooses its own aspect ratio." }, { status: 400 });
+    }
+
+    const imageResolution = getPreferredImageResolution(selectedModelDetails.parameterValues?.resolution);
+    const imageRequestOptions = {
+      aspectRatio: input.data.aspectRatio,
+      ...(requestedSize ? { size: requestedSize } : {}),
+      ...(imageResolution ? { resolution: imageResolution } : {}),
+      supportedParameters,
+    };
+
+    diagnosticStage = "campaign-context";
     const { data: campaign, error: campaignError } = await supabase
       .from("campaigns")
-      .select("system, description, visual_style")
+      .select("visual_style")
       .eq("id", input.data.campaignId)
       .maybeSingle();
 
@@ -188,10 +247,6 @@ export async function POST(request: Request) {
       visualStyle = savedStyle.visual_style;
     }
 
-    const campaignPromptContext = [
-      `Campaign system: ${campaign.system}`,
-      `Campaign brief: ${campaign.description}`,
-    ].filter(Boolean).join(". ");
     const placeContextResult = input.data.targetKind === "place" && input.data.parentPlaceId
       ? await loadPlaceAiContext(supabase, input.data.campaignId, input.data.parentPlaceId)
       : { context: undefined };
@@ -205,24 +260,22 @@ export async function POST(request: Request) {
       input.data.subject,
       visualStyle,
       input.data.refinement,
-      input.data.currentPrompt,
-      input.data.targetKind,
-      placeContextResult.context,
-      campaignPromptContext,
-      characterAccess
-        ? {
-            name: characterAccess.character.name,
-            species: characterAccess.character.species,
-            className: characterAccess.character.class_name,
-            level: characterAccess.character.level,
-            backstoryMarkdown: characterAccess.character.backstory_markdown,
-            physicalDescription: characterAccess.character.physical_description,
-          }
-        : undefined,
+      {
+        targetKind: input.data.targetKind,
+        placeContext: placeContextResult.context,
+        characterContext: characterAccess
+          ? {
+              name: characterAccess.character.name,
+              species: characterAccess.character.species,
+              physicalDescription: characterAccess.character.physical_description,
+            }
+          : undefined,
+      },
     );
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundImageGeneration(request, env)) {
+      diagnosticStage = "background-dispatch";
       if (!env.SUPABASE_SECRET_KEY) {
         return NextResponse.json({ error: "Async image generation is not configured. Add SUPABASE_SECRET_KEY to the Netlify environment." }, { status: 503 });
       }
@@ -243,7 +296,7 @@ export async function POST(request: Request) {
           effective_model: selectedModel.id,
           target_kind: input.data.targetKind,
           aspect_ratio: input.data.aspectRatio,
-          size: input.data.size,
+          size: requestedSize ?? null,
           status: "pending",
           ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
         })
@@ -260,7 +313,9 @@ export async function POST(request: Request) {
         model: selectedModel.id,
         purpose: input.data.purpose,
         aspectRatio: input.data.aspectRatio,
-        size: input.data.size,
+        ...(requestedSize ? { size: requestedSize } : {}),
+        ...(imageResolution ? { resolution: imageResolution } : {}),
+        supportedParameters,
       };
 
       try {
@@ -284,7 +339,7 @@ export async function POST(request: Request) {
           purpose: input.data.purpose,
           subject: input.data.subject,
           aspectRatio: input.data.aspectRatio,
-          size: input.data.size,
+          ...(requestedSize ? { size: requestedSize } : {}),
           prompt,
           createdAt: new Date(generationRun.created_at).toISOString(),
           statusUpdatedAt: new Date(generationRun.status_updated_at ?? generationRun.created_at).toISOString(),
@@ -295,12 +350,14 @@ export async function POST(request: Request) {
       }, { status: 202 });
     }
 
+    diagnosticStage = "provider-generation";
     let response;
 
     try {
-      response = await generateImage(campaignCredential.apiKey, prompt, selectedModel.id, { aspectRatio: input.data.aspectRatio, size: input.data.size });
+      response = await generateImage(campaignCredential.apiKey, prompt, selectedModel.id, imageRequestOptions);
     } catch (error: unknown) {
       logAiProviderFailure(error, { kind: "image", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
+      const failure = getAiProviderFailure(error, "Art generation is temporarily unavailable.");
       await supabase.from("ai_generation_runs").insert({
         campaign_id: input.data.campaignId,
         requested_by: context.user.id,
@@ -313,17 +370,23 @@ export async function POST(request: Request) {
         image_subject: input.data.subject,
         target_kind: input.data.targetKind,
         aspect_ratio: input.data.aspectRatio,
-        size: input.data.size,
+        size: requestedSize ?? null,
         provider: "openrouter",
         effective_model: selectedModel.id,
         status: "failed",
+        ...(failure.outcomeUnknown ? { error_message: uncertainImageOutcomeMessage } : {}),
         ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
       });
-      const failure = getAiProviderFailure(error, "Art generation is temporarily unavailable.");
       const headers = failure.retryAfter ? { "Retry-After": failure.retryAfter } : undefined;
-      return NextResponse.json({ error: failure.message, ...(failure.requestId ? { providerRequestId: failure.requestId } : {}) }, { status: failure.status, ...(headers ? { headers } : {}) });
+      return NextResponse.json({
+        error: failure.message,
+        diagnosticStage: "provider-generation",
+        ...(failure.outcomeUnknown ? { outcomeUnknown: true } : {}),
+        ...(failure.requestId ? { providerRequestId: failure.requestId } : {}),
+      }, { status: failure.status, ...(headers ? { headers } : {}) });
     }
 
+    diagnosticStage = "image-storage";
     const image = response.image;
 
     if (!image.base64 && !image.url) {
@@ -363,7 +426,7 @@ export async function POST(request: Request) {
         target_kind: input.data.targetKind,
         ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
         aspect_ratio: input.data.aspectRatio,
-        size: input.data.size,
+        size: requestedSize ?? null,
         generation_id: response.generationId,
         input_tokens: response.usage?.inputTokens,
         output_tokens: response.usage?.outputTokens,
@@ -396,9 +459,30 @@ export async function POST(request: Request) {
         await supabase.from("ai_generation_runs").update({ status: "failed", error_message: "The style preview could not be stored." }).eq("id", generationRun.id);
         return NextResponse.json({ error: "The style preview could not be stored." }, { status: 503 });
       }
+    } else {
+      let storedImage: Awaited<ReturnType<typeof storeTemporaryImage>> | null = null;
+      try {
+        storedImage = await storeTemporaryImage(supabase, input.data.campaignId, context.user.id, generationRun.id, image, "image");
+        const { data: attached, error: metadataError } = await supabase.rpc("attach_ai_generation_image", {
+          p_generation_run_id: generationRun.id,
+          p_image_path: storedImage.path,
+          p_image_media_type: storedImage.mediaType,
+        });
+        if (metadataError || !attached) {
+          throw new Error("The generated image metadata could not be saved.");
+        }
+        temporaryPath = storedImage.path;
+        imageDraft = { base64: null, url: storedImage.signedUrl, mediaType: storedImage.mediaType };
+      } catch {
+        if (storedImage) {
+          await supabase.storage.from(campaignArtBucket).remove([storedImage.path]);
+        }
+        return NextResponse.json({ error: "The generated image could not be stored for review." }, { status: 503 });
+      }
     }
 
     const createdAt = new Date(generationRun.created_at).toISOString();
+    diagnosticStage = "draft-validation";
     const draft = imageDraftSchema.safeParse({
       generationRunId: generationRun.id,
       targetKind: input.data.targetKind,
@@ -407,7 +491,7 @@ export async function POST(request: Request) {
       mode: input.data.mode,
       subject: input.data.subject,
       aspectRatio: input.data.aspectRatio,
-      size: input.data.size,
+      ...(requestedSize ? { size: requestedSize } : {}),
       prompt,
       image: imageDraft,
       provider: "openrouter",
@@ -421,7 +505,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ draft: draft.data, model: response.model });
-  } catch {
-    return NextResponse.json({ error: "Art generation is temporarily unavailable." }, { status: 503 });
+  } catch (error: unknown) {
+    logUnexpectedImageFailure(diagnosticStage, diagnosticModel, error);
+    return NextResponse.json({ error: "Art generation is temporarily unavailable.", diagnosticStage }, { status: 503 });
   }
 }

@@ -1,5 +1,6 @@
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
+import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { ApiEnemy, EnemyFilters } from "@/lib/campaign/types";
 import { enemyStatBlockSchema, type EnemyStatBlockV1 } from "@/lib/validation/enemy";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,7 +17,7 @@ export type CampaignEnemyResult = {
   enemy: ApiEnemy;
 };
 
-export const enemyPublicColumns = "id, campaign_id, author_id, name, player_description, is_revealed, art_path, created_at, updated_at";
+export const enemyPublicColumns = "id, campaign_id, author_id, name, player_description, player_description_is_markdown, is_revealed, art_path, created_at, updated_at";
 export const enemyDetailSummaryColumns = "enemy_id, campaign_id, level, size, rarity, traits, family, origin";
 export const enemyDetailColumns = "enemy_id, campaign_id, level, size, rarity, traits, family, stat_block, gm_notes_markdown, origin, art_subject, art_prompt, art_provider, source_provider, source_external_id, source_content_hash, source_snapshot, created_at, updated_at";
 
@@ -26,6 +27,7 @@ type EnemyPublicRow = {
   author_id: string;
   name: string;
   player_description: string;
+  player_description_is_markdown: boolean;
   is_revealed: boolean;
   art_path: string | null;
   created_at: string;
@@ -75,6 +77,7 @@ function toEnemy(publicRow: EnemyPublicRow, detail?: EnemyDetailRow | null, artU
     author_id: publicRow.author_id,
     name: publicRow.name,
     player_description: publicRow.player_description,
+    player_description_is_markdown: publicRow.player_description_is_markdown ?? false,
     is_revealed: publicRow.is_revealed,
     art_path: publicRow.art_path,
     art_url: artUrl,
@@ -146,10 +149,14 @@ export async function readCampaignEnemiesForRole(
   const publicRows = (data ?? []) as EnemyPublicRow[];
   const details = role === "gm" ? await readEnemyDetails(supabase, campaignId, publicRows.map((enemy) => enemy.id), enemyDetailSummaryColumns) : new Map<string, EnemyDetailRow>();
   const withArt = await addCampaignArtUrls(supabase, publicRows, true);
-  return sortEnemies(
+  const sortedEnemies = sortEnemies(
     withArt.map((row) => toEnemy(row, details.get(row.id), row.art_url ?? null)).filter((enemy) => matchesFilters(enemy, filters)),
     filters.sort,
   );
+  if (role === "gm") return sortedEnemies;
+  return maskPlayerFacingEntityMarkdownBatch(supabase, campaignId, sortedEnemies, (enemy) => [
+    { key: "player_description", markdown: enemy.player_description },
+  ]);
 }
 
 export async function getCampaignEnemies(campaignId: string, filters: EnemyFilters = {}): Promise<CampaignEnemiesResult | null> {
@@ -178,7 +185,12 @@ export async function readCampaignEnemyForRole(
 
   const detail = role === "gm" ? (await readEnemyDetails(supabase, campaignId, [enemyId])).get(enemyId) ?? null : null;
   const [withArt] = await addCampaignArtUrls(supabase, [data as EnemyPublicRow], true);
-  return toEnemy(withArt, detail, withArt.art_url ?? null);
+  const enemy = toEnemy(withArt, detail, withArt.art_url ?? null);
+  if (role === "gm") return enemy;
+  const [visibleEnemy] = await maskPlayerFacingEntityMarkdownBatch(supabase, campaignId, [enemy], (record) => [
+    { key: "player_description", markdown: record.player_description },
+  ]);
+  return visibleEnemy;
 }
 
 export async function getCampaignEnemy(campaignId: string, enemyId: string): Promise<CampaignEnemyResult | null> {

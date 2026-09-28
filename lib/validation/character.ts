@@ -8,6 +8,7 @@ const characterFieldSchema = z.object({
   isActive: z.boolean(),
   backstoryMarkdown: z.string().max(20000),
   physicalDescription: z.string().max(4000),
+  physicalDescriptionIsMarkdown: z.boolean().optional(),
   artSubject: z.string().trim().max(1600).nullable().optional(),
   artPath: z.string().trim().max(500).nullable().optional(),
   artPrompt: z.string().trim().max(4000).nullable().optional(),
@@ -21,6 +22,7 @@ export const characterFieldsSchema = characterFieldSchema.extend({
   isActive: z.boolean().default(true),
   backstoryMarkdown: z.string().max(20000).default(""),
   physicalDescription: z.string().max(4000).default(""),
+  physicalDescriptionIsMarkdown: z.boolean().default(false),
   ownerId: z.string().uuid().nullable().optional(),
 });
 

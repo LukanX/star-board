@@ -43,11 +43,20 @@ describe("OpenRouter model discovery", () => {
     mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ data: [
       { id: "openai/gpt-5-image-mini", name: "GPT-5 Image mini", architecture: { output_modalities: ["text", "image"] }, supported_parameters: ["structured_outputs"] },
       { id: "google/gemini-2.5-flash-image", name: "Gemini 2.5 Flash Image", architecture: { output_modalities: ["image"] } },
+      { id: "x-ai/grok-imagine-image-2.0", name: "Grok Imagine Image 2.0", architecture: { output_modalities: ["image"] }, supported_parameters: {
+        aspect_ratio: { type: "enum", values: ["1:1", "16:9"] },
+        resolution: { type: "enum", values: ["1K", "2K"] },
+      } },
     ] }), { status: 200 }));
 
     const result = await getAiModelCatalog("test-key", "image");
+    const grok = result.models.find((model) => model.id === "x-ai/grok-imagine-image-2.0");
 
-    expect(result.models.map((model) => model.id)).toEqual(["openai/gpt-5-image-mini", "google/gemini-2.5-flash-image"]);
+    expect(result.models.map((model) => model.id)).toEqual(["openai/gpt-5-image-mini", "google/gemini-2.5-flash-image", "x-ai/grok-imagine-image-2.0"]);
+    expect(grok).toMatchObject({
+      supportedParameters: ["aspect_ratio", "resolution"],
+      parameterValues: { aspect_ratio: ["1:1", "16:9"], resolution: ["1K", "2K"] },
+    });
     expect(mocks.fetch).toHaveBeenCalledWith("https://openrouter.ai/api/v1/images/models?sort=most-popular", expect.anything());
   });
 

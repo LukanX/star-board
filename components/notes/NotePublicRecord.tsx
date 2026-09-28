@@ -10,7 +10,7 @@ import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/M
 import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 import { recordDetailClassName, recordDetailMetaClassName, recordMetaClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
-import { campaignEntityPath, campaignSectionPath } from "@/lib/campaign/routes";
+import { campaignEntityPath, campaignSectionPath, type EntitySection } from "@/lib/campaign/routes";
 import type {
   ApiCampaignNote,
   CampaignNoteEpisode,
@@ -28,6 +28,7 @@ export default function NotePublicRecord({
   actions?: ReactNode;
 }) {
   const visibilityLabel = note.visibility === "gm" ? "GM NOTE" : "PLAYER NOTE";
+  const entitySection = (note.entity_type === "character" ? "characters" : note.entity_type === "npc" ? "npcs" : note.entity_type) as EntitySection;
 
   return (
     <section
@@ -54,7 +55,14 @@ export default function NotePublicRecord({
                 note.updated_at || note.created_at,
               ).toLocaleDateString()}
             </span>
-            {episode ? (
+            {note.entity_type && note.entity_id ? (
+              <Link
+                className={`${recordMetaClassName} text-[var(--cyan)]`}
+                href={campaignEntityPath(campaignId, entitySection, note.entity_id)}
+              >
+                {note.entity_type.toUpperCase()} <span aria-hidden="true">{"//"}</span> OPEN RELATED RECORD
+              </Link>
+            ) : episode ? (
               <Link
                 className={`${recordMetaClassName} text-[var(--cyan)]`}
                 href={campaignEntityPath(campaignId, "episodes", episode.id)}

@@ -4,8 +4,10 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { LockKeyhole, Save, Trash2, X } from "lucide-react";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
+import RichNoteBody from "@/components/notes/RichNoteBody";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import type { NoteEntitySubject } from "@/lib/campaign/note-subject";
 import type {
   ApiCampaignNote,
   CampaignNoteEpisode,
@@ -26,7 +28,7 @@ const emptyDraft: NoteDraft = {
   episodeId: null,
 };
 
-function toDraft(note?: ApiCampaignNote): NoteDraft {
+function toDraft(note?: ApiCampaignNote, initialEpisodeId?: string): NoteDraft {
   return note
     ? {
         title: note.title,
@@ -34,7 +36,7 @@ function toDraft(note?: ApiCampaignNote): NoteDraft {
         visibility: note.visibility,
         episodeId: note.episode_id,
       }
-    : { ...emptyDraft };
+    : { ...emptyDraft, episodeId: initialEpisodeId ?? null };
 }
 
 export default function NoteEditor({
@@ -42,6 +44,9 @@ export default function NoteEditor({
   role,
   episodes,
   note,
+  entity,
+  initialEpisodeId,
+  fixedEpisodeId,
   onCancel: parentOnCancel,
   onSaved,
   onDeleted,
@@ -50,13 +55,20 @@ export default function NoteEditor({
   role: "gm" | "player";
   episodes: CampaignNoteEpisode[];
   note?: ApiCampaignNote;
+  entity?: NoteEntitySubject;
+  initialEpisodeId?: string;
+  fixedEpisodeId?: string;
   onCancel: () => void;
   onSaved: (note: ApiCampaignNote) => void;
   onDeleted?: (noteId: string) => void;
 }) {
-  const [draft, setDraft] = useState<NoteDraft>(() => toDraft(note));
+  const [draft, setDraft] = useState<NoteDraft>(() => toDraft(note, initialEpisodeId));
+  const [baseRevision, setBaseRevision] = useState<number | null>(() => note?.revision ?? null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflictNote, setConflictNote] = useState<ApiCampaignNote | null>(null);
+  const [draftCopied, setDraftCopied] = useState(false);
+  const [bodyEditorKey, setBodyEditorKey] = useState(0);
   const isGM = role === "gm";
   const { setDirty, clearDirty } = useDirtyForm();
 
@@ -83,14 +95,22 @@ export default function NoteEditor({
       const response = await fetch(path, {
         method: note ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(note ? { ...draft, expectedRevision: baseRevision } : { ...draft, ...(entity ? { entity } : {}) }),
       });
       const result = (await response.json()) as {
         error?: string;
         note?: ApiCampaignNote;
+        latestNote?: ApiCampaignNote;
       };
+      if (response.status === 409) {
+        setConflictNote(result.latestNote ?? null);
+        setError(result.error ?? "The note changed. Your draft is still here.");
+        return;
+      }
       if (!response.ok || !result.note)
         throw new Error(result.error ?? "Campaign note could not be saved.");
+      setBaseRevision(result.note.revision);
+      setConflictNote(null);
       clearDirty();
       onSaved(result.note);
     } catch (saveError: unknown) {
@@ -102,6 +122,26 @@ export default function NoteEditor({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const copyDraft = async () => {
+    try {
+      await navigator.clipboard.writeText(`${draft.title}\n\n${draft.bodyMarkdown}`);
+      setDraftCopied(true);
+    } catch {
+      setError("Clipboard access is unavailable. Your draft is still in the editor.");
+    }
+  };
+
+  const reloadLatest = () => {
+    if (!conflictNote || !window.confirm("Discard your draft and load the latest saved note?")) return;
+    setDraft(toDraft(conflictNote, initialEpisodeId));
+    setBaseRevision(conflictNote.revision);
+    setConflictNote(null);
+    setDraftCopied(false);
+    setBodyEditorKey((current) => current + 1);
+    setError(null);
+    clearDirty();
   };
 
   const remove = async () => {
@@ -144,7 +184,7 @@ export default function NoteEditor({
         <div>
           <p className={eyebrowClassName}>{isGM ? "GM / PLAYER NOTE" : "PLAYER NOTE"}</p>
           <h2 className="mt-[6px] text-[19px]">
-            {note ? `Edit ${note.title}` : "Add a campaign note"}
+            {note ? `Edit ${note.title}` : entity ? "Add an entity note" : "Add a campaign note"}
           </h2>
         </div>
         <button
@@ -171,32 +211,39 @@ export default function NoteEditor({
             onChange={(event) => update("title", event.target.value)}
           />
         </label>
-        <label>
-          Note body
-          <textarea
-            maxLength={20000}
-            placeholder="Record what the campaign should remember."
-            value={draft.bodyMarkdown}
-            onChange={(event) => update("bodyMarkdown", event.target.value)}
+        <div className="grid gap-[7px] text-[var(--dim)] font-mono text-[8px] tracking-[.12em]">
+          <div className="flex items-center justify-between gap-3">
+            <span>Note body</span>
+            <span aria-live="polite">{draft.bodyMarkdown.length}/20000</span>
+          </div>
+          <RichNoteBody
+            key={`${bodyEditorKey}:${draft.visibility}`}
+            initialMarkdown={draft.bodyMarkdown}
+            campaignId={campaignId}
+            noteId={note?.id}
+            audience={draft.visibility}
+            onChange={(bodyMarkdown) => update("bodyMarkdown", bodyMarkdown)}
           />
-        </label>
-        <label>
-          Episode
-          <select
-            className={editorSelectClassName}
-            value={draft.episodeId ?? ""}
-            onChange={(event) =>
-              update("episodeId", event.target.value || null)
-            }
-          >
-            <option value="">Global campaign note</option>
-            {episodes.map((episode) => (
-              <option key={episode.id} value={episode.id}>
-                {episode.title} ({episode.status})
-              </option>
-            ))}
-          </select>
-        </label>
+        </div>
+        {!entity && !fixedEpisodeId && (!note || note.permissions.canChangeEpisode) ? (
+          <label>
+            Episode
+            <select
+              className={editorSelectClassName}
+              value={draft.episodeId ?? ""}
+              onChange={(event) =>
+                update("episodeId", event.target.value || null)
+              }
+            >
+              <option value="">Global campaign note</option>
+              {episodes.map((episode) => (
+                <option key={episode.id} value={episode.id}>
+                  {episode.title} ({episode.status})
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {isGM ? (
           <label
             data-note-visibility-toggle="true"
@@ -214,6 +261,25 @@ export default function NoteEditor({
               <LockKeyhole size={13} /> GM ONLY
             </span>
           </label>
+        ) : null}
+        {conflictNote ? (
+          <section className="grid gap-2 border border-[var(--amber)] bg-[rgba(255,188,84,.06)] p-3" aria-label="Latest saved note">
+            <p className="m-0 text-[var(--amber)] font-mono text-[8px] tracking-[.12em]">
+              LATEST SAVED VERSION // REVISION {conflictNote.revision}
+            </p>
+            <strong className="text-[var(--ink)] text-[11px]">{conflictNote.title}</strong>
+            <pre className="m-0 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[var(--muted)] font-mono text-[10px] leading-[1.5]">
+              {conflictNote.body_markdown || "(empty note body)"}
+            </pre>
+            <div className="flex flex-wrap items-center gap-3">
+              <button className="text-action border-0 bg-transparent p-0 font-mono text-[8px] tracking-[.1em] text-[var(--cyan)] cursor-pointer" disabled={isSaving} onClick={() => void copyDraft()} type="button">
+                {draftCopied ? "DRAFT COPIED" : "COPY MY DRAFT"}
+              </button>
+              <button className="text-action border-0 bg-transparent p-0 font-mono text-[8px] tracking-[.1em] text-[var(--amber)] cursor-pointer" disabled={isSaving} onClick={reloadLatest} type="button">
+                RELOAD LATEST
+              </button>
+            </div>
+          </section>
         ) : null}
         {error ? (
           <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">

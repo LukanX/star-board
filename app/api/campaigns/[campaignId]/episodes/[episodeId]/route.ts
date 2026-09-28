@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { validateCampaignPlace } from "@/lib/places";
+import { maskHiddenNoteEntityLinksBatch, maskPlayerFacingEntityMarkdownBatch, validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { updateEpisodeSchema } from "@/lib/validation/episode";
 
 type RouteContext = { params: Promise<{ campaignId: string; episodeId: string }> };
@@ -47,7 +48,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const { data: notes, error: notesError } = await context.supabase
       .from("campaign_notes")
-      .select("id, title, body_markdown, visibility, author_id, created_at, updated_at")
+      .select("id, title, body_markdown, visibility, author_id, created_at, updated_at, revision")
       .eq("campaign_id", campaignId)
       .eq("episode_id", episodeId)
       .order("updated_at", { ascending: false });
@@ -67,16 +68,28 @@ export async function GET(_request: Request, { params }: RouteContext) {
     }
 
     const authors = new Map((authorsResult.data ?? []).map((author) => [author.id, author.display_name]));
-    const episodeNotes = visibleNotes.map((note) => ({
+    const maskedBodies = await maskHiddenNoteEntityLinksBatch(
+      context.supabase,
+      campaignId,
+      visibleNotes.map((note) => ({ markdown: note.body_markdown, visibility: note.visibility })),
+    );
+    const episodeNotes = visibleNotes.map((note, index) => ({
       ...note,
+      body_markdown: maskedBodies[index] ?? note.body_markdown,
       author: { id: note.author_id, displayName: authors.get(note.author_id) ?? "Crew member" },
       permissions: {
-        canEdit: note.author_id === context.user.id || membership.role === "gm",
+        canEdit: note.visibility === "player" || membership.role === "gm",
         canDelete: note.author_id === context.user.id || membership.role === "gm",
       },
     }));
 
-    return NextResponse.json({ role: membership.role, displayName: membership.displayName, episode: { ...episode, noteCount: episodeNotes.length }, notes: episodeNotes });
+    const [visibleEpisode] = membership.role === "gm"
+      ? [episode]
+      : await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [episode], (record) => [
+        { key: "summary", markdown: record.summary },
+        { key: "player_context_markdown", markdown: record.player_context_markdown },
+      ]);
+    return NextResponse.json({ role: membership.role, displayName: membership.displayName, episode: { ...visibleEpisode, noteCount: episodeNotes.length }, notes: episodeNotes });
   } catch {
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
@@ -113,6 +126,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     if (membership.role !== "gm") {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
+    }
+
+    if (!(await validateCampaignEntityLinkFields(context.supabase, campaignId, [
+      ...(input.data.summary === undefined ? [] : [{ markdown: input.data.summary, audience: "player" as const }]),
+      ...(input.data.playerContextMarkdown === undefined ? [] : [{ markdown: input.data.playerContextMarkdown, audience: "player" as const }]),
+    ]))) {
+      return NextResponse.json({ error: "Episode details link to an inaccessible or invalid campaign record." }, { status: 400 });
     }
 
     const placeResult = await validateCampaignPlace(context.supabase, campaignId, input.data.placeId);

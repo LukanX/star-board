@@ -100,7 +100,7 @@ describe("campaign Episodes server reads", () => {
 
     expect(result?.episode).toMatchObject({ id: episodeId, noteCount: 1 });
     expect(result?.notes).toHaveLength(1);
-    expect(result?.notes[0]).toMatchObject({ id: "note-player", author: { id: authorId, displayName: "GM" }, permissions: { canEdit: false, canDelete: false } });
+    expect(result?.notes[0]).toMatchObject({ id: "note-player", author: { id: authorId, displayName: "GM" }, permissions: { canEdit: true, canDelete: false } });
     expect(episodeQuery.eq).toHaveBeenNthCalledWith(1, "id", episodeId);
     expect(episodeQuery.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
   });

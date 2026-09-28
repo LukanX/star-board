@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { FileText, LockKeyhole, Map } from "lucide-react";
 import MarkdownPreview, { MarkdownPreviewToolbar } from "@/components/markdown/MarkdownPreview";
+import NarrativeContent from "@/components/markdown/NarrativeContent";
 import ArtDownloadButton from "@/components/ui/ArtDownloadButton";
 import ArchiveRecordShell from "@/components/ui/ArchiveRecordShell";
 import ArchiveRelatedList from "@/components/ui/ArchiveRelatedList";
@@ -87,17 +88,18 @@ export default function PlacePublicRecord({
         <>
           <div data-place-public-brief="true" className="grid gap-[8px]">
             <p className={eyebrowClassName}>PUBLIC BRIEF</p>
-            <p className="m-0 text-[var(--muted)] text-[11px] leading-[1.65] [overflow-wrap:anywhere]">
-              {place.description || "No public description recorded yet."}
-            </p>
+            <NarrativeContent
+              source={place.description || "No public description recorded yet."}
+              isMarkdown={place.description_is_markdown ?? false}
+              suppressAutolinkLiterals
+              className="m-0 text-[11px] leading-[1.65] [overflow-wrap:anywhere]"
+            />
           </div>
           <MarkdownPreview data-place-public-preview="true">
             <MarkdownPreviewToolbar data-place-public-toolbar="true">
               <FileText size={14} /> PLAYER NOTES <span>PLAYER VISIBLE</span>
             </MarkdownPreviewToolbar>
-            <p>
-              {place.player_notes_markdown || "No player notes recorded yet."}
-            </p>
+            <NarrativeContent source={place.player_notes_markdown || "No player notes recorded yet."} isMarkdown />
           </MarkdownPreview>
           {isGM ? (
             <MarkdownPreview
@@ -107,9 +109,7 @@ export default function PlacePublicRecord({
               <MarkdownPreviewToolbar className="text-[var(--pink)]">
                 <LockKeyhole size={14} /> GM NOTES <span>PRIVATE</span>
               </MarkdownPreviewToolbar>
-              <p>
-                {place.gm_notes_markdown || "No private notes recorded yet."}
-              </p>
+              <NarrativeContent source={place.gm_notes_markdown || "No private notes recorded yet."} isMarkdown />
             </MarkdownPreview>
           ) : null}
         </>

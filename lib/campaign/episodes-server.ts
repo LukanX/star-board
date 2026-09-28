@@ -1,4 +1,5 @@
 import { getAuthenticatedUser, getCampaignMembership, type CampaignMembership } from "@/lib/auth/permissions";
+import { maskHiddenNoteEntityLinksBatch, maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { ApiEpisode, EpisodeNote } from "@/lib/campaign/types";
 
 export type CampaignEpisode = ApiEpisode;
@@ -63,7 +64,13 @@ export async function getCampaignEpisodes(campaignId: string): Promise<CampaignE
     }
   }
 
-  const episodes = (episodesResult.data ?? []) as EpisodeRow[];
+  let episodes = (episodesResult.data ?? []) as EpisodeRow[];
+  if (context.membership.role !== "gm") {
+    episodes = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, episodes, (episode) => [
+      { key: "summary", markdown: episode.summary },
+      { key: "player_context_markdown", markdown: episode.player_context_markdown },
+    ]);
+  }
   return {
     role: context.membership.role,
     displayName: context.membership.displayName,
@@ -87,7 +94,7 @@ export async function getCampaignEpisode(campaignId: string, episodeId: string):
 
   const { data: noteData, error: notesError } = await context.supabase
     .from("campaign_notes")
-    .select("id, title, body_markdown, visibility, author_id, created_at, updated_at")
+    .select("id, title, body_markdown, visibility, author_id, created_at, updated_at, revision")
     .eq("campaign_id", campaignId)
     .eq("episode_id", episodeId)
     .order("updated_at", { ascending: false });
@@ -105,16 +112,28 @@ export async function getCampaignEpisode(campaignId: string, episodeId: string):
   if (authorsResult.error) throw new Error(`Unable to read episode note authors: ${authorsResult.error.message}`);
 
   const authors = new Map((authorsResult.data ?? []).map((author) => [author.id, author.display_name]));
-  const episodeNotes: EpisodeNote[] = notes.map((note) => ({
+  const maskedBodies = await maskHiddenNoteEntityLinksBatch(
+    context.supabase,
+    campaignId,
+    notes.map((note) => ({ markdown: note.body_markdown, visibility: note.visibility })),
+  );
+  const episodeNotes: EpisodeNote[] = notes.map((note, index) => ({
     ...note,
+    body_markdown: maskedBodies[index] ?? note.body_markdown,
     author: { id: note.author_id, displayName: authors.get(note.author_id) ?? "Crew member" },
     permissions: {
-      canEdit: note.author_id === context.user.id || context.membership.role === "gm",
+      canEdit: note.visibility === "player" || context.membership.role === "gm",
       canDelete: note.author_id === context.user.id || context.membership.role === "gm",
     },
   }));
 
-  const episode = episodeData as EpisodeRow;
+  let episode = episodeData as EpisodeRow;
+  if (context.membership.role !== "gm") {
+    [episode] = await maskPlayerFacingEntityMarkdownBatch(context.supabase, campaignId, [episode], (record) => [
+      { key: "summary", markdown: record.summary },
+      { key: "player_context_markdown", markdown: record.player_context_markdown },
+    ]);
+  }
   return {
     role: context.membership.role,
     displayName: context.membership.displayName,

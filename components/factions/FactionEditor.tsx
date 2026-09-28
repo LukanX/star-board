@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { LockKeyhole, Sparkles, Users, X } from "lucide-react";
+import { Sparkles, Users, X } from "lucide-react";
 import AiDraftAssistant from "@/components/archive/AiDraftAssistant";
+import RichMarkdownField from "@/components/markdown/RichMarkdownField";
 import {
+  discardNewCampaignArtStudioSession,
+  finalizeCampaignArtStudioSession,
   markCampaignArtPersisted,
   useCampaignArtEditor,
 } from "@/components/archive/CampaignArtField";
@@ -19,6 +22,7 @@ import { flattenPlaceTree } from "@/lib/places";
 type FactionDraft = {
   name: string;
   description: string;
+  descriptionIsMarkdown: boolean;
   status: string;
   playerNotesMarkdown: string;
   gmNotesMarkdown: string;
@@ -34,6 +38,7 @@ type FactionDraft = {
 const emptyFactionDraft: FactionDraft = {
   name: "",
   description: "",
+  descriptionIsMarkdown: false,
   status: "active",
   playerNotesMarkdown: "",
   gmNotesMarkdown: "",
@@ -51,6 +56,7 @@ function toDraft(faction: ApiFaction | undefined, npcs: CampaignAffiliationNpc[]
     ? {
         name: faction.name,
         description: faction.description,
+        descriptionIsMarkdown: faction.description_is_markdown ?? false,
         status: faction.status,
         playerNotesMarkdown: faction.player_notes_markdown,
         gmNotesMarkdown: faction.gm_notes_markdown ?? "",
@@ -91,7 +97,7 @@ export default function FactionEditor({
     setDirty();
     setDraftState(updater);
   };
-  const update = (field: keyof FactionDraft, value: string | null) =>
+  const update = (field: keyof FactionDraft, value: string | null | boolean) =>
     setDraft((current) => ({ ...current, [field]: value }));
   const toggleMember = (npc: CampaignAffiliationNpc) => {
     const isMember = draft.memberNpcIds.includes(npc.id);
@@ -110,6 +116,7 @@ export default function FactionEditor({
   };
   const onCancel = () => {
     if (!confirmNavigation()) return;
+    if (!faction) discardNewCampaignArtStudioSession(campaignId, "faction");
     clearDirty();
     parentOnCancel?.();
   };
@@ -117,6 +124,7 @@ export default function FactionEditor({
   useCampaignArtEditor({
     campaignId,
     kind: "faction",
+    entityId: faction?.id,
     visible: !assistantOpen,
     value: draft.artPath,
     trackUnsavedUploads: true,
@@ -152,6 +160,7 @@ export default function FactionEditor({
       if (!response.ok || !result.faction)
         throw new Error(result.error ?? "Faction could not be saved.");
       markCampaignArtPersisted(campaignId, result.faction.art_path);
+      finalizeCampaignArtStudioSession(campaignId, "faction", faction?.id, result.faction.id);
       clearDirty();
       onSaved?.(result.faction, result.memberNpcIds ?? draft.memberNpcIds);
     } catch (saveError) {
@@ -254,6 +263,7 @@ export default function FactionEditor({
             name: candidate.name ?? current.name,
             status: candidate.status ?? current.status,
             description: candidate.description ?? current.description,
+            descriptionIsMarkdown: candidate.description === undefined ? current.descriptionIsMarkdown : true,
             playerNotesMarkdown: candidate.playerNotes ?? current.playerNotesMarkdown,
             gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
             artSubject: candidate.visualPrompt ?? current.artSubject,
@@ -285,22 +295,36 @@ export default function FactionEditor({
             />
           </label>
         </div>
-        <label>
-          Public description
-          <textarea
-            maxLength={4000}
-            value={draft.description}
-            onChange={(event) => update("description", event.target.value)}
-          />
-        </label>
-        <label>
-          Player notes
-          <textarea maxLength={20000} value={draft.playerNotesMarkdown} onChange={(event) => update("playerNotesMarkdown", event.target.value)} />
-        </label>
-        <label>
-          GM notes <span className="inline-flex items-center gap-1 text-[var(--pink)]"><LockKeyhole size={11} /> PRIVATE</span>
-          <textarea maxLength={20000} value={draft.gmNotesMarkdown} onChange={(event) => update("gmNotesMarkdown", event.target.value)} />
-        </label>
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="Public description"
+          value={draft.description}
+          isMarkdown={draft.descriptionIsMarkdown}
+          maxLength={4000}
+          audience="player"
+          onChange={(value, isMarkdown) => {
+            update("description", value);
+            update("descriptionIsMarkdown", isMarkdown);
+          }}
+        />
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="Player notes"
+          value={draft.playerNotesMarkdown}
+          isMarkdown
+          maxLength={20000}
+          audience="player"
+          onChange={(value) => update("playerNotesMarkdown", value)}
+        />
+        <RichMarkdownField
+          campaignId={campaignId}
+          label="GM notes / PRIVATE"
+          value={draft.gmNotesMarkdown}
+          isMarkdown
+          maxLength={20000}
+          audience="gm"
+          onChange={(value) => update("gmNotesMarkdown", value)}
+        />
         <fieldset className="grid gap-[10px] border border-[rgba(98,232,255,.25)] bg-[rgba(98,232,255,.025)] p-[13px]">
           <legend className="px-1 text-[var(--dim)] font-mono text-[8px] tracking-[.12em]">NPC ROSTER</legend>
           {npcs.length ? <div className="grid gap-[7px]">{npcs.map((npc) => {

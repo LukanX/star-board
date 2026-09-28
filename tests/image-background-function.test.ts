@@ -19,7 +19,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/ai/client", () => ({ generateImage: mocks.generateImage }));
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceRoleClient: mocks.getSupabaseServiceRoleClient }));
-vi.mock("@/lib/ai/errors", () => ({
+vi.mock("@/lib/ai/errors", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/ai/errors")>(),
   getAiProviderFailure: mocks.getAiProviderFailure,
   logAiProviderFailure: mocks.logAiProviderFailure,
 }));
@@ -175,6 +176,22 @@ describe("generate-image-background", () => {
     expect(response.status).toBe(202);
     expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "failed", status_updated_at: expect.any(String), error_message: "OpenRouter timed out" }));
     expect(mocks.logAiProviderFailure).toHaveBeenCalled();
+  });
+
+  it("records an uncertain, potentially billed image instead of a definite provider failure", async () => {
+    const { supabase, completionQuery } = createSupabaseMock();
+    mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
+    mocks.generateImage.mockRejectedValue(new Error("The socket closed after the provider accepted the request"));
+    mocks.getAiProviderFailure.mockReturnValueOnce({ message: "fetch failed", outcomeUnknown: true });
+
+    const response = await handler(createRequest());
+
+    expect(response.status).toBe(202);
+    expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: "failed",
+      error_message: expect.stringContaining("may have been billed"),
+    }));
+    expect(mocks.generateImage).toHaveBeenCalledTimes(1);
   });
 
   it("does not start a job that was already claimed or missed its pending deadline", async () => {

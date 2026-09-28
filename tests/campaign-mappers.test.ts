@@ -82,7 +82,7 @@ describe("campaign mappers", () => {
   });
 
   test("cycles note and episode accents", () => {
-    const note = { id: "note", campaign_id: "campaign", episode_id: null, author_id: "user", title: "N", body_markdown: "", visibility: "player", created_at: "", updated_at: "", updated_by: null, author: { id: "user", displayName: "User" }, permissions: { canEdit: true, canDelete: false } } satisfies ApiCampaignNote;
+    const note = { id: "note", campaign_id: "campaign", episode_id: null, entity_type: null, entity_id: null, author_id: "user", title: "N", body_markdown: "", visibility: "player", created_at: "", updated_at: "", updated_by: null, revision: 1, author: { id: "user", displayName: "User" }, permissions: { canEdit: true, canDelete: false, canChangeEpisode: false, canChangeVisibility: false } } satisfies ApiCampaignNote;
     const episode = { id: "episode", campaign_id: "campaign", source_job_id: null, place_id: null, created_by: "user", title: "E", summary: "", player_context_markdown: "", status: "planned", started_at: null, completed_at: null, created_at: "", updated_at: "", noteCount: 0 } satisfies ApiEpisode;
     expect([0, 1, 2, 3].map((index) => mapApiNote(note, index).accent)).toEqual(["cyan", "pink", "amber", "purple"]);
     expect([0, 1, 2].map((index) => mapApiEpisode(episode, index).accent)).toEqual(["cyan", "pink", "amber"]);
@@ -97,6 +97,6 @@ describe("campaign mappers", () => {
 
   test("converts a character to a draft while preserving nullable art fields", () => {
     const mapped = mapApiCharacter(character({ art_subject: null, art_path: null, art_url: null, art_prompt: null, art_provider: null }), 0);
-    expect(toCharacterDraft(mapped)).toEqual({ name: "Ari", species: "Human", className: "Pilot", level: 3, isActive: true, backstoryMarkdown: "Past", physicalDescription: "Tall", artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null });
+    expect(toCharacterDraft(mapped)).toEqual({ name: "Ari", species: "Human", className: "Pilot", level: 3, isActive: true, backstoryMarkdown: "Past", physicalDescription: "Tall", physicalDescriptionIsMarkdown: false, artSubject: "", artPath: null, artUrl: null, artPrompt: null, artProvider: null });
   });
 });

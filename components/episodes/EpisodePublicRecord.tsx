@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Clock3,
+  CirclePlus,
   FileText,
   FolderKanban,
   LockKeyhole,
@@ -13,7 +14,7 @@ import { MarkdownContent } from "@/components/markdown/MarkdownContent";
 import StatusPill from "@/components/ui/StatusPill";
 import { recordDetailClassName, recordDetailMetaClassName, recordListClassName, recordMainClassName, recordMetaClassName, recordRowClassName, recordTitleRowClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
-import { campaignSectionPath } from "@/lib/campaign/routes";
+import { campaignEntityPath, campaignSectionPath } from "@/lib/campaign/routes";
 import type {
   ApiPlace,
   EpisodeNote,
@@ -27,12 +28,14 @@ export default function EpisodePublicRecord({
   notes,
   places,
   actions,
+  onAddNote,
 }: {
   campaignId: string;
   episode: EpisodeRecord;
   notes: EpisodeNote[];
   places: ApiPlace[];
   actions?: ReactNode;
+  onAddNote?: () => void;
 }) {
   const placeLabel = getPlaceBreadcrumb(places, episode.place_id);
 
@@ -82,6 +85,7 @@ export default function EpisodePublicRecord({
           </MarkdownPreviewToolbar>
           <MarkdownContent
             source={episode.summary || "No public episode brief recorded yet."}
+            preserveSoftBreaks
           />
         </MarkdownPreview>
         <MarkdownPreview>
@@ -95,6 +99,7 @@ export default function EpisodePublicRecord({
               episode.summary ||
               "No public episode context recorded yet."
             }
+            preserveSoftBreaks
           />
         </MarkdownPreview>
       </div>
@@ -104,7 +109,10 @@ export default function EpisodePublicRecord({
             <p className={eyebrowClassName}>CAMPAIGN MEMORY</p>
             <h3 id="episode-notes-title">Episode notes</h3>
           </div>
-          <span className={recordDetailMetaClassName}>{notes.length} visible</span>
+          <div className="flex items-center gap-3">
+            <span className={recordDetailMetaClassName}>{notes.length} visible</span>
+            {onAddNote ? <button className="inline-flex h-8 items-center justify-center gap-2 border border-[var(--line)] bg-[rgba(255,255,255,.035)] px-3 text-[var(--muted)] font-mono text-[8px] tracking-[.1em] hover:border-[var(--cyan)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--cyan)]" onClick={onAddNote} type="button"><CirclePlus aria-hidden="true" size={14} /> ADD NOTE</button> : null}
+          </div>
         </div>
         {notes.length ? (
           <div className={recordListClassName}>
@@ -112,7 +120,7 @@ export default function EpisodePublicRecord({
               <article className={recordRowClassName} key={note.id}>
                 <div className={recordMainClassName}>
                   <div className={recordTitleRowClassName}>
-                    <h4>{note.title}</h4>
+                    <h4><Link className="text-inherit hover:text-[var(--cyan)]" href={campaignEntityPath(campaignId, "notes", note.id)}>{note.title}</Link></h4>
                     <span className={recordMetaClassName}>
                       {note.visibility === "gm" ? (
                         <>

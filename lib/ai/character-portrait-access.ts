@@ -12,6 +12,7 @@ export type CharacterPortraitRecord = {
   level: number;
   backstory_markdown: string;
   physical_description: string;
+  physical_description_is_markdown: boolean;
 };
 
 export type CharacterPortraitAccess = {
@@ -39,7 +40,7 @@ export async function loadCharacterPortraitAccess(
       .maybeSingle(),
     supabase
       .from("characters")
-      .select("id, campaign_id, owner_id, name, species, class_name, level, backstory_markdown, physical_description")
+      .select("id, campaign_id, owner_id, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown")
       .eq("campaign_id", campaignId)
       .eq("id", characterId)
       .maybeSingle(),
