@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { buildVisualStylePrompt } from "@/lib/ai/visual-style-prompt";
 import {
   visualStyleDraftOutputSchema,
+  visualStyleGenerationInputSchema,
   visualStyleNameSchema,
   visualStyleTextSchema,
   visualStyleWizardInputSchema,
@@ -31,5 +33,15 @@ describe("visual style validation", () => {
     expect(() => visualStyleNameSchema.parse("x".repeat(81))).toThrow();
     expect(() => visualStyleTextSchema.parse("x".repeat(1201))).toThrow();
     expect(() => visualStyleWizardInputSchema.parse({ campaignVibe: "x".repeat(601) })).toThrow();
+  });
+
+  it("asks for a compact reusable style fragment instead of repeated prompt boilerplate", () => {
+    const prompt = buildVisualStylePrompt(visualStyleGenerationInputSchema.parse({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      artDirection: "inked-illustration",
+    }), { system: "Starfinder 2e", description: "A hopeful frontier campaign." });
+
+    expect(prompt).toContain("Keep visualStyle to approximately 500-700 characters.");
+    expect(prompt).toContain("The visualStyle field must be a standalone prompt fragment");
   });
 });

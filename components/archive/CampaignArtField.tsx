@@ -126,7 +126,6 @@ export default function CampaignArtField({
   trackUnsavedUploads = false,
   url,
   subject,
-  currentPrompt,
   onSubjectChange,
   onChange,
   onUrlChange,
@@ -349,7 +348,6 @@ export default function CampaignArtField({
             portraitAiRole={portraitAiRole}
             parentPlaceId={parentPlaceId}
             subject={subject}
-            currentPrompt={currentPrompt}
             onSubjectChange={onSubjectChange}
             onBusyChange={setIsArtStudioBusy}
             onApproved={(asset) => {

@@ -218,7 +218,7 @@ export async function POST(request: Request) {
     diagnosticStage = "campaign-context";
     const { data: campaign, error: campaignError } = await supabase
       .from("campaigns")
-      .select("system, description, visual_style")
+      .select("visual_style")
       .eq("id", input.data.campaignId)
       .maybeSingle();
 
@@ -247,10 +247,6 @@ export async function POST(request: Request) {
       visualStyle = savedStyle.visual_style;
     }
 
-    const campaignPromptContext = [
-      `Campaign system: ${campaign.system}`,
-      `Campaign brief: ${campaign.description}`,
-    ].filter(Boolean).join(". ");
     const placeContextResult = input.data.targetKind === "place" && input.data.parentPlaceId
       ? await loadPlaceAiContext(supabase, input.data.campaignId, input.data.parentPlaceId)
       : { context: undefined };
@@ -264,20 +260,17 @@ export async function POST(request: Request) {
       input.data.subject,
       visualStyle,
       input.data.refinement,
-      input.data.currentPrompt,
-      input.data.targetKind,
-      placeContextResult.context,
-      campaignPromptContext,
-      characterAccess
-        ? {
-            name: characterAccess.character.name,
-            species: characterAccess.character.species,
-            className: characterAccess.character.class_name,
-            level: characterAccess.character.level,
-            backstoryMarkdown: characterAccess.character.backstory_markdown,
-            physicalDescription: characterAccess.character.physical_description,
-          }
-        : undefined,
+      {
+        targetKind: input.data.targetKind,
+        placeContext: placeContextResult.context,
+        characterContext: characterAccess
+          ? {
+              name: characterAccess.character.name,
+              species: characterAccess.character.species,
+              physicalDescription: characterAccess.character.physical_description,
+            }
+          : undefined,
+      },
     );
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 

@@ -20,6 +20,7 @@ test("keeps generated image drafts and refinement notes through style changes an
   const childName = `Art Session Child ${timestamp}`;
   const visualStyleId = "00000000-0000-4000-8000-000000000091";
   const refinement = "Keep the blue lanterns and change the camera angle.";
+  const latestRefinement = "Keep the blue lanterns and widen the camera angle.";
   const temporaryPaths: string[] = [];
   const imageRequests: ImageRequestBody[] = [];
   const statusRunIds: string[] = [];
@@ -172,6 +173,18 @@ test("keeps generated image drafts and refinement notes through style changes an
     });
     expect(Object.prototype.hasOwnProperty.call(imageRequests[1], "currentPrompt")).toBe(false);
 
+    await page.getByLabel("Focused refinement").fill(latestRefinement);
+    await page.getByRole("button", { name: /^(GENERATE DRAFT|REFINE DRAFT)$/ }).click();
+    await expect(thumbnails).toHaveCount(3);
+    expect(imageRequests).toHaveLength(3);
+    expect(imageRequests[2]).toMatchObject({
+      mode: "refine",
+      visualStyleId,
+      refinement: latestRefinement,
+      subject: "A hidden transit room with blue lanterns.",
+    });
+    expect(Object.prototype.hasOwnProperty.call(imageRequests[2], "currentPrompt")).toBe(false);
+
     await thumbnails.nth(0).click();
     await expect(thumbnails.nth(0)).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText(/OPENAI\/GPT-IMAGE-1 \/ 1:1/)).toBeVisible();
@@ -197,17 +210,21 @@ test("keeps generated image drafts and refinement notes through style changes an
       const value = sessionStorage.getItem(key);
       return value ? JSON.parse(value) as { drafts: unknown[] } : null;
     }, newSessionKey);
-    expect(storedNewSession?.drafts).toHaveLength(2);
+    expect(storedNewSession?.drafts).toHaveLength(3);
     await page.reload();
     await page.getByRole("button", { name: `Add child under ${parentName}`, exact: true }).click();
     const restoredPlaceForm = page.locator("form.character-form");
     await restoredPlaceForm.getByLabel("Name").fill(childName);
     await restoredPlaceForm.getByLabel("Kind").fill("room");
     await page.getByRole("button", { name: "GENERATE ART", exact: true }).click();
-    await expect.poll(() => statusRunIds.length).toBeGreaterThanOrEqual(2);
-    expect(statusRunIds).toEqual(expect.arrayContaining(["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"]));
-    await expect(page.getByRole("button", { name: /Select generated image/ })).toHaveCount(2);
-    await expect(page.getByLabel("Focused refinement")).toHaveValue(refinement);
+    await expect.poll(() => statusRunIds.length).toBeGreaterThanOrEqual(3);
+    expect(statusRunIds).toEqual(expect.arrayContaining([
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+    ]));
+    await expect(page.getByRole("button", { name: /Select generated image/ })).toHaveCount(3);
+    await expect(page.getByLabel("Focused refinement")).toHaveValue(latestRefinement);
     await expect(page.getByLabel("Visual style for image generation")).toHaveValue(visualStyleId);
 
     const saveResponse = page.waitForResponse((response) =>
@@ -222,13 +239,13 @@ test("keeps generated image drafts and refinement notes through style changes an
     if (!savedPlaceId) throw new Error("The E2E art-session child Place was not saved.");
     createdPlaceIds.push(savedPlaceId);
 
-    await expect.poll(async () => page.evaluate((key) => sessionStorage.getItem(key), `${sessionPrefix}${encodeURIComponent(campaign.campaignId)}:place:${savedPlaceId}`)).toContain(refinement);
+    await expect.poll(async () => page.evaluate((key) => sessionStorage.getItem(key), `${sessionPrefix}${encodeURIComponent(campaign.campaignId)}:place:${savedPlaceId}`)).toContain(latestRefinement);
     const savedSession = await page.evaluate((key) => {
       const value = sessionStorage.getItem(key);
       return value ? JSON.parse(value) as { drafts: unknown[]; refinement: string } : null;
     }, `${sessionPrefix}${encodeURIComponent(campaign.campaignId)}:place:${savedPlaceId}`);
-    expect(savedSession).toMatchObject({ drafts: [], refinement });
-    await expect.poll(() => deletedTemporaryPaths.length).toBe(2);
+    expect(savedSession).toMatchObject({ drafts: [], refinement: latestRefinement });
+    await expect.poll(() => deletedTemporaryPaths.length).toBe(3);
     expect(deletedTemporaryPaths).toEqual(expect.arrayContaining(temporaryPaths));
   } finally {
     for (const placeId of [...createdPlaceIds].reverse()) {

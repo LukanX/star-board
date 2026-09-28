@@ -13,18 +13,24 @@ const ENEMY_ART_INSTRUCTION =
 export type CharacterArtContext = {
   name: string;
   species: string;
-  className: string;
-  level: number;
-  backstoryMarkdown: string;
   physicalDescription: string;
 };
 
-function campaignLines(context?: CampaignAiContext) {
-  return context ? [
+type ArtPromptOptions = {
+  targetKind?: ImageGenerationInput["targetKind"];
+  placeContext?: PlaceAiContext;
+  characterContext?: CharacterArtContext;
+};
+
+function campaignLines(context?: CampaignAiContext, includeVisualStyle = true) {
+  if (!context) return [];
+
+  const lines = [
     `Campaign system: ${context.system}`,
     `Campaign brief: ${context.description || "No campaign brief recorded."}`,
-    `Campaign visual style: ${context.visualStyle}`,
-  ] : [];
+  ];
+  if (includeVisualStyle) lines.push(`Campaign visual style: ${context.visualStyle}`);
+  return lines;
 }
 
 function linkedEntityLines(context?: string) {
@@ -76,9 +82,9 @@ function placeContextLines(context?: PlaceAiContext) {
 
 function truncatePromptPart(value: string, maxLength: number) {
   if (maxLength <= 0) return "";
-  return value.length > maxLength
-    ? `${value.slice(0, Math.max(0, maxLength - 3))}...`
-    : value;
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 3) return value.slice(0, maxLength);
+  return `${value.slice(0, maxLength - 3)}...`;
 }
 
 function boundedPlaceArtContext(context: PlaceAiContext | undefined, maxLength: number) {
@@ -123,7 +129,7 @@ export function buildMissionPrompt(input: MissionGenerationInput, context?: Camp
     input.mode === "refine" ? "Treat the current editor draft as the source of truth and make only the requested changes." : "",
     "Use the selected mission giver and location as authoritative campaign context. Keep player notes spoiler-light and put secrets in gmNotes.",
     "Write a playable hook with a clear complication.",
-    "thumbnailDescription must describe one compelling, readable scene for a job-board thumbnail. Keep it subject-specific; do not include provider names, image dimensions, logos, or text.",
+    "thumbnailDescription must describe one compelling, readable scene for a job-board thumbnail. Keep it to subject-specific visible content; the selected campaign visual style is applied separately. Do not include a rendering medium, palette recipe, global lighting recipe, provider names, image dimensions, logos, or text.",
     "Fields: title, summary, playerNotes, gmNotes, hook, suggestedGiverType, suggestedGiverName, thumbnailDescription.",
   ].filter(Boolean).join("\n");
 }
@@ -148,7 +154,7 @@ export function buildNpcPrompt(input: NpcGenerationInput, context?: CampaignAiCo
     input.currentDraft ? `Current editor draft: ${JSON.stringify(input.currentDraft)}` : "",
     input.mode === "refine" ? "Treat the current editor draft as the source of truth and make only the requested changes." : "",
     "Write player notes without spoilers and put secrets, leverage, and future reveals in gmNotes.",
-    "visualPrompt must be a concise, subject-specific portrait description for later image generation. Do not include provider names, image dimensions, logos, or text.",
+    "visualPrompt must be a concise, subject-specific portrait description for later image generation. Describe visible traits, clothing, gear, pose, expression, and a concrete scene cue. Leave rendering medium, palette, lighting recipe, and global style rules to the selected campaign visual style applied separately during image generation. Do not include provider names, image dimensions, logos, or text.",
     "Fields: name, species, role, shortDescription, playerNotes, gmNotes, motivation, visualPrompt.",
   ].filter(Boolean).join("\n");
 }
@@ -157,7 +163,7 @@ export function buildCharacterPrompt(input: Omit<CharacterGenerationInput, "char
   return [
     "You are a character portrait prompt writer for a Starfinder 2e campaign manager.",
     "Return only valid JSON matching the requested character visual prompt fields.",
-    ...campaignLines(context),
+    ...campaignLines(context, false),
     ...linkedEntityLines(linkedContext),
     `Mode: ${input.mode}`,
     input.name ? `Character name: ${input.name}` : "",
@@ -172,7 +178,7 @@ export function buildCharacterPrompt(input: Omit<CharacterGenerationInput, "char
     input.currentDraft ? `Current editor draft: ${JSON.stringify(input.currentDraft)}` : "",
     input.mode === "refine" ? "Treat the current editor draft as the source of truth and make only the requested changes." : "",
     "Assess both the backstory and physical appearance together. Treat the physical appearance as authoritative, and use the backstory to suggest lived-in details, clothing, gear, expression, and portrait mood without contradicting the written appearance.",
-    "visualPrompt must be a concise, subject-specific portrait description for later image generation. Describe one character, visible traits, clothing, relevant gear, pose or expression, and a fitting setting or lighting cue. Do not include provider names, image dimensions, logos, written text, or watermarks.",
+    "visualPrompt must be a concise, subject-only portrait description for later image generation. Describe one character's visible traits, clothing, relevant gear, pose or expression, and a concrete setting cue. Leave rendering medium, palette, lighting recipe, and global style rules to the selected campaign visual style applied separately during image generation. Do not include provider names, image dimensions, logos, written text, or watermarks.",
     "Fields: visualPrompt.",
   ].filter(Boolean).join("\n");
 }
@@ -193,7 +199,7 @@ export function buildFactionPrompt(input: FactionGenerationInput, context?: Camp
     input.mode === "refine" ? "Treat the current editor draft as the source of truth and make only the requested changes." : "",
     "Write a distinct organization with a clear public identity, operating status, pressure point, and relationship to the campaign. Keep the description suitable for players.",
     "Write player notes without spoilers and put secrets, leverage, and future reveals in gmNotes. Do not invent or discuss the faction's linked NPC roster.",
-    "visualPrompt must be a concise, subject-specific description of one standalone faction symbol or insignia for later image generation. Prioritize a centered emblem on a clean field; do not describe characters, headquarters, landscapes, banners, environments, action scenes, or written text. Do not include provider names or image dimensions.",
+    "visualPrompt must be a concise, subject-specific description of one standalone faction symbol or insignia for later image generation. Prioritize a centered emblem on a clean field; do not describe characters, headquarters, landscapes, banners, environments, action scenes, or written text. The selected campaign visual style is applied separately; do not include a rendering medium or global palette recipe.",
     "Fields: name, status, description, playerNotes, gmNotes, visualPrompt.",
   ].filter(Boolean).join("\n");
 }
@@ -218,7 +224,7 @@ export function buildPlacePrompt(input: PlaceGenerationInput, context?: Campaign
     "The kind field is a campaign-specific label, not a fixed genre category. Treat the selected hierarchy and immediate parent's public context as authoritative. Write one distinct child that fits the parent without copying it or inventing a whole automatic subtree.",
     "Preserve visible continuity with the immediate parent through compatible architecture, materials, atmosphere, and scale while adding child-specific detail.",
     "Write player notes without spoilers and put secrets, threats, and future reveals in gmNotes.",
-    "visualPrompt must be a concise, subject-specific description for later image generation. Do not include provider names, image dimensions, logos, or text.",
+    "visualPrompt must be a concise, subject-specific description for later image generation. Describe the place and concrete visible details only; the selected campaign visual style is applied separately. Do not include a rendering medium, palette recipe, global lighting recipe, provider names, image dimensions, logos, or text.",
     "Fields: name, kind, description, playerNotes, gmNotes, visualPrompt.",
   ].filter(Boolean).join("\n");
 }
@@ -243,7 +249,7 @@ export function buildEnemyPrompt(input: EnemyGenerationInput, context?: Campaign
     input.mode === "refine" ? "Treat the current editor draft as the source of truth and make only the requested changes." : "",
     "Produce one complete, internally consistent creature stat block. Include perception and senses, languages, skills, all six ability modifiers, items, AC, saving throws, HP, immunities, resistances, weaknesses, movement, melee/ranged strikes, spellcasting groups, and passive/defensive/offensive special abilities when appropriate.",
     "Use empty arrays or null only when a field genuinely does not apply. Never invent a second creature, encounter, family roster, or sidebar.",
-    "Keep gmNotesMarkdown private and spoiler-safe playerDescription brief. artSubject must describe one standalone creature for later artwork and must not include text, logos, stat blocks, or a group.",
+    "Keep gmNotesMarkdown private and spoiler-safe playerDescription brief. artSubject must describe one standalone creature's visible details only; the selected campaign visual style is applied separately. Do not include a rendering medium, palette recipe, global lighting recipe, text, logos, stat blocks, or a group.",
     "Fields: name, playerDescription, level, size, rarity, traits, family, statBlock, gmNotesMarkdown, artSubject.",
   ].filter(Boolean).join("\n");
 }
@@ -265,38 +271,67 @@ export function buildEnemyBriefPrompt(input: EnemyBriefGenerationInput, context?
     input.feedback ? `Revision feedback: ${input.feedback}` : "",
     input.protectedFields?.length ? `Keep these fields unchanged: ${input.protectedFields.join(", ")}` : "",
     "playerDescription is the only player-visible prose: describe appearance, broad identity, and an immediately useful impression without revealing tactics, exact numbers, weaknesses, resistances, spells, secret motivations, or GM notes.",
-    "artSubject must describe only one readable creature subject for artwork. Do not include a group, encounter scene, stat block, written text, logos, or provider names.",
+    "artSubject must describe only one readable creature's visible details; the selected campaign visual style is applied separately. Do not include a rendering medium, palette recipe, global lighting recipe, group, encounter scene, stat block, written text, logos, or provider names.",
     "Fields: playerDescription, artSubject.",
   ].filter(Boolean).join("\n");
 }
 
-export function buildArtPrompt(subject: string, visualStyle?: string, refinement?: string, currentPrompt?: string, targetKind?: ImageGenerationInput["targetKind"], placeContext?: PlaceAiContext, campaignContext?: string, characterContext?: CharacterArtContext) {
+export function buildArtPrompt(subject: string, visualStyle?: string, refinement?: string, options: ArtPromptOptions = {}) {
+  const { targetKind, placeContext, characterContext } = options;
   const targetInstruction = targetKind === "faction" ? FACTION_ART_INSTRUCTION : targetKind === "enemy" ? ENEMY_ART_INSTRUCTION : targetKind === "visual-style" ? "Style preview artwork should show one clear, neutral campaign subject chosen to reveal palette, lighting, texture, and composition. Do not add written text or logos." : "";
-  const boundedCampaignContext = campaignContext ? truncatePromptPart(`Campaign context: ${campaignContext}`, 700) : "";
-  const boundedCharacterContext = targetKind === "character" && characterContext
-    ? [
-        "The saved character identity and appearance are authoritative. Treat the editable subject as visual direction only and never contradict the saved record.",
-        `Saved character: ${characterContext.name}${characterContext.species ? `, ${characterContext.species}` : ""}${characterContext.className ? `, ${characterContext.className}` : ""}, level ${characterContext.level}.`,
-        `Saved backstory: ${truncatePromptPart(characterContext.backstoryMarkdown || "No backstory recorded.", 900)}`,
-        `Saved physical appearance: ${truncatePromptPart(characterContext.physicalDescription || "No physical appearance recorded.", 900)}`,
-      ].join(" ")
+  const isCharacterArt = targetKind === "character" && characterContext;
+  const characterAuthorityInstruction = isCharacterArt
+    ? "Saved character identity and appearance are authoritative; do not contradict them."
     : "";
-  const fixedPrompt = [ART_SAFETY_INSTRUCTION, targetInstruction, boundedCampaignContext, `Subject: ${subject}`, boundedCharacterContext].filter(Boolean).join(" ");
-  let remaining = Math.max(0, imagePromptMaxLength - fixedPrompt.length);
-  const styleBudget = Math.min(1200, remaining);
-  const boundedStyle = visualStyle ? truncatePromptPart(`Campaign visual style: ${visualStyle}`, styleBudget) : "";
-  remaining -= boundedStyle.length + (boundedStyle ? 1 : 0);
-  const refinementBudget = Math.min(600, Math.max(0, remaining));
-  const boundedRefinement = refinement ? truncatePromptPart(`Focused refinement request: ${refinement}`, refinementBudget) : "";
-  remaining -= boundedRefinement.length + (boundedRefinement ? 1 : 0);
-  const placeContextBudget = targetKind === "place" ? Math.max(0, remaining) : 0;
+  const characterName = isCharacterArt ? truncatePromptPart(characterContext.name, 120) : "";
+  const characterSpecies = isCharacterArt ? truncatePromptPart(characterContext.species, 80) : "";
+  const savedCharacter = isCharacterArt
+    ? `Saved character: ${characterName}${characterSpecies ? `, ${characterSpecies}` : ""}.`
+    : "";
+  const physicalDescription = isCharacterArt
+    ? truncatePromptPart(characterContext.physicalDescription, 240)
+    : "";
+  const savedAppearance = physicalDescription ? `Saved physical appearance: ${physicalDescription}` : "";
+  const boundedStyle = visualStyle?.trim()
+    ? `Campaign visual style: ${truncatePromptPart(visualStyle.trim(), 1200)}`
+    : "";
+  const styleAuthorityInstruction = boundedStyle
+    ? "The selected campaign visual style is the rendering authority. Follow it for medium, palette, linework, texture, and lighting; preserve the subject's concrete identity, colors, clothing, gear, pose, and scene."
+    : "";
+  const boundedRefinement = refinement?.trim()
+    ? `Focused refinement request: ${truncatePromptPart(refinement.trim(), 600)}`
+    : "";
+  const reservedSections = [
+    ART_SAFETY_INSTRUCTION,
+    targetInstruction,
+    characterAuthorityInstruction,
+    savedCharacter,
+    savedAppearance,
+    styleAuthorityInstruction,
+    boundedStyle,
+    boundedRefinement,
+  ].filter(Boolean);
+  const subjectBudget = Math.max(
+    0,
+    Math.min(1200, imagePromptMaxLength - reservedSections.join(" ").length - 1 - "Subject: ".length),
+  );
+  const boundedSubject = truncatePromptPart(subject, subjectBudget);
+  const promptParts = [
+    ART_SAFETY_INSTRUCTION,
+    targetInstruction,
+    characterAuthorityInstruction,
+    `Subject: ${boundedSubject}`,
+    savedCharacter,
+    savedAppearance,
+    styleAuthorityInstruction,
+    boundedStyle,
+    boundedRefinement,
+  ].filter(Boolean);
+  const promptWithoutPlaceContext = promptParts.join(" ");
+  const placeContextBudget = targetKind === "place"
+    ? Math.max(0, imagePromptMaxLength - promptWithoutPlaceContext.length - 1)
+    : 0;
   const boundedPlaceContext = boundedPlaceArtContext(placeContext, placeContextBudget);
-  remaining -= boundedPlaceContext.length + (boundedPlaceContext ? 1 : 0);
-  const currentPromptLabel = "Refine this existing visual direction: ";
-  const currentPromptBudget = Math.max(0, remaining - (currentPrompt ? currentPromptLabel.length + 1 : 0));
-  const boundedCurrentPrompt = currentPrompt && currentPromptBudget > 0
-    ? `${currentPromptLabel}${currentPrompt.slice(0, currentPromptBudget)}`
-    : "";
 
-  return [fixedPrompt, boundedStyle, boundedRefinement, boundedPlaceContext, boundedCurrentPrompt].filter(Boolean).join(" ").slice(0, imagePromptMaxLength);
+  return [...promptParts, boundedPlaceContext].filter(Boolean).join(" ");
 }

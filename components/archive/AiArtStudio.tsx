@@ -44,7 +44,6 @@ type AiArtStudioProps = {
   portraitAiRole?: "gm" | "player";
   parentPlaceId?: string | null;
   subject?: string;
-  currentPrompt?: string | null;
   onSubjectChange?: (subject: string) => void;
   onBusyChange?: (busy: boolean) => void;
   onApproved: (asset: ImageAsset) => void;
@@ -136,7 +135,6 @@ function AiArtStudioContent({
   portraitAiRole,
   parentPlaceId,
   subject,
-  currentPrompt,
   onSubjectChange,
   onBusyChange,
   onApproved,
@@ -170,6 +168,7 @@ function AiArtStudioContent({
     ?? selectedAspectRatio;
   const isCharacterPortrait = kind === "character" && Boolean(characterId);
   const canCustomizePortrait = !isCharacterPortrait || portraitAiRole === "gm";
+  const effectiveSelectedStyleId = canCustomizePortrait ? selectedStyleId : null;
   const sessionKey = campaignId
     ? artStudioSessionKey({ campaignId, kind, entityId: entityId ?? characterId ?? null })
     : null;
@@ -177,7 +176,7 @@ function AiArtStudioContent({
   const generationContextPlaceId = kind === "place" ? parentPlaceId ?? null : null;
   const canRefineSelectedDraft = Boolean(
     selectedEntry
-    && selectedEntry.styleId === selectedStyleId
+    && selectedEntry.styleId === effectiveSelectedStyleId
     && selectedEntry.contextPlaceId === generationContextPlaceId,
   );
 
@@ -214,8 +213,8 @@ function AiArtStudioContent({
       .then(({ session, gallery: restoredGallery, selectedDraft }) => {
         if (cancelled) return;
         setRefinement(session.refinement);
-        setSelectedStyleId(session.selectedStyleId);
-        setStyleSelectionChanged(session.styleSelectionChanged);
+        setSelectedStyleId(canCustomizePortrait ? session.selectedStyleId : null);
+        setStyleSelectionChanged(canCustomizePortrait && session.styleSelectionChanged);
         setGallery(restoredGallery);
         setDraft(selectedDraft?.draft ?? null);
         setIsSessionReady(true);
@@ -224,7 +223,7 @@ function AiArtStudioContent({
     return () => {
       cancelled = true;
     };
-  }, [campaignId, kind, entityId, characterId]);
+  }, [campaignId, kind, entityId, characterId, canCustomizePortrait]);
 
   useEffect(() => {
     if (!campaignId || !isSessionReady || sessionDisabledRef.current) return;
@@ -233,13 +232,13 @@ function AiArtStudioContent({
       {
         version: 1,
         refinement,
-        selectedStyleId,
-        styleSelectionChanged,
+        selectedStyleId: effectiveSelectedStyleId,
+        styleSelectionChanged: canCustomizePortrait && styleSelectionChanged,
         selectedGenerationRunId: draft?.generationRunId ?? null,
         drafts: gallery.map((entry) => draftMetadataForSession(entry.draft, entry.styleId, entry.contextPlaceId)),
       },
     );
-  }, [campaignId, kind, entityId, characterId, isSessionReady, refinement, selectedStyleId, styleSelectionChanged, draft, gallery]);
+  }, [campaignId, kind, entityId, characterId, canCustomizePortrait, isSessionReady, refinement, effectiveSelectedStyleId, styleSelectionChanged, draft, gallery]);
 
   useEffect(() => {
     const handleSessionChange = (event: Event) => {
@@ -258,15 +257,15 @@ function AiArtStudioContent({
       if (!campaignId) return;
       const updated = readArtStudioSession({ campaignId, kind, entityId: entityId ?? characterId ?? null });
       setRefinement(updated.refinement);
-      setSelectedStyleId(updated.selectedStyleId);
-      setStyleSelectionChanged(updated.styleSelectionChanged);
+      setSelectedStyleId(canCustomizePortrait ? updated.selectedStyleId : null);
+      setStyleSelectionChanged(canCustomizePortrait && updated.styleSelectionChanged);
       setDraft(null);
       setGallery([]);
     };
 
     window.addEventListener(artStudioSessionEvent, handleSessionChange);
     return () => window.removeEventListener(artStudioSessionEvent, handleSessionChange);
-  }, [sessionKey, campaignId, kind, entityId, characterId]);
+  }, [sessionKey, campaignId, kind, entityId, characterId, canCustomizePortrait]);
 
   useEffect(() => {
     onBusyChange?.(isGenerating || isApproving);
@@ -298,12 +297,9 @@ function AiArtStudioContent({
 
     if (!isSessionReady) return;
 
-    const requestedStyleId = selectedStyleId;
+    const requestedStyleId = effectiveSelectedStyleId;
     const requestedContextPlaceId = generationContextPlaceId;
     const requestedMode = canRefineSelectedDraft ? "refine" : "create";
-    const requestedPrompt = selectedEntry
-      ? (canRefineSelectedDraft ? selectedEntry.draft.prompt : undefined)
-      : (styleSelectionChanged ? undefined : currentPrompt ?? undefined);
 
     if (subjectDraft.length > 1200) {
       setError("Visual direction must be 1200 characters or fewer.");
@@ -337,13 +333,12 @@ function AiArtStudioContent({
           mode: requestedMode,
           targetKind: kind,
           characterId: characterId ?? undefined,
-          visualStyleId: canCustomizePortrait ? selectedStyleId ?? undefined : undefined,
+          visualStyleId: requestedStyleId ?? undefined,
           parentPlaceId: parentPlaceId ?? undefined,
           model: canCustomizePortrait ? selectedModel ?? undefined : undefined,
           subject: subjectDraft,
           aspectRatio,
           refinement: refinement.trim() || undefined,
-          currentPrompt: requestedPrompt,
         }),
       });
       const result = (await response.json()) as {
@@ -498,7 +493,7 @@ function AiArtStudioContent({
     ? `data:${draft.image.mediaType};base64,${draft.image.base64}`
     : (draft?.image.url ?? null);
   const previewAspectRatio = draft?.aspectRatio.replace(":", " / ") ?? "1 / 1";
-  const selectedStyleName = styles.find((style) => style.id === selectedStyleId)?.name;
+  const selectedStyleName = styles.find((style) => style.id === effectiveSelectedStyleId)?.name;
 
   return (
     <section className="grid gap-[10px] p-[13px] border border-[rgba(255,92,154,.3)] bg-[linear-gradient(120deg,rgba(255,92,154,.07),rgba(185,146,255,.035))]">

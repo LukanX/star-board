@@ -88,6 +88,17 @@ function createSupabaseMock() {
   campaignQuery.select.mockReturnValue(campaignQuery);
   campaignQuery.eq.mockReturnValue(campaignQuery);
 
+  const styleQuery = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    maybeSingle: vi.fn().mockResolvedValue({
+      data: { visual_style: "Custom campaign image style", status: "ready" },
+      error: null,
+    }),
+  };
+  styleQuery.select.mockReturnValue(styleQuery);
+  styleQuery.eq.mockReturnValue(styleQuery);
+
   const generationInsert = {
     insert: vi.fn(),
     select: vi.fn(),
@@ -109,15 +120,24 @@ function createSupabaseMock() {
   const storageFrom = vi.fn().mockReturnValue({ upload, remove, createSignedUrl });
   const attachImage = vi.fn().mockResolvedValue({ data: true, error: null });
 
+  let generationRunQueryCount = 0;
+  const from = vi.fn((table: string) => {
+    if (table === "campaigns") return campaignQuery;
+    if (table === "campaign_visual_styles") return styleQuery;
+    if (table === "ai_generation_runs") {
+      generationRunQueryCount += 1;
+      return generationRunQueryCount === 1 ? generationInsert : generationUpdate;
+    }
+    return generationUpdate;
+  });
+
   return {
-    from: vi.fn()
-      .mockReturnValueOnce(campaignQuery)
-      .mockReturnValueOnce(generationInsert)
-      .mockReturnValue(generationUpdate),
+    from,
     storage: { from: storageFrom },
     rpc: attachImage,
     generationInsert,
     generationUpdate,
+    styleQuery,
     upload,
     remove,
     attachImage,
@@ -196,6 +216,7 @@ describe("POST /api/ai/image", () => {
       targetKind: "character",
       characterId: savedCharacterAccess.access.character.id,
       subject: "A calm three-quarter portrait with a bright workshop glow.",
+      currentPrompt: "OLD-COMPOSED-PROMPT",
     }));
     const payload = await response.json();
 
@@ -205,14 +226,46 @@ describe("POST /api/ai/image", () => {
       temporaryPath: `${campaignId}/${userId}/image-00000000-0000-4000-8000-000000000003.png`,
       image: { base64: null, url: "https://storage.example/image.png", mediaType: "image/png" },
     });
-    expect(mocks.generateImage.mock.calls[0][1]).toContain("Saved character: Nova Vex, Android, Mechanic, level 3.");
+    expect(mocks.generateImage.mock.calls[0][1]).toContain("Saved character: Nova Vex, Android.");
+    expect(mocks.generateImage.mock.calls[0][1]).not.toContain("A tense frontier campaign");
+    expect(mocks.generateImage.mock.calls[0][1]).not.toContain("A survivor of the derelict ship Meridian.");
     expect(mocks.generateImage.mock.calls[0][1]).toContain("blue circuit scar");
+    expect(mocks.generateImage.mock.calls[0][1]).toContain("Campaign visual style: Cinematic sci-fi realism");
+    expect(mocks.generateImage.mock.calls[0][1]).not.toContain("OLD-COMPOSED-PROMPT");
     expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({ target_character_id: savedCharacterAccess.access.character.id }));
     expect(supabase.attachImage).toHaveBeenCalledWith("attach_ai_generation_image", {
       p_generation_run_id: "00000000-0000-4000-8000-000000000003",
       p_image_path: `${campaignId}/${userId}/image-00000000-0000-4000-8000-000000000003.png`,
       p_image_media_type: "image/png",
     });
+  });
+
+  it("uses a GM-selected saved visual style for a character portrait", async () => {
+    const supabase = createSupabaseMock();
+    const visualStyleId = "00000000-0000-4000-8000-000000000005";
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.loadCharacterPortraitAccess.mockResolvedValue({
+      access: { ...savedCharacterAccess.access, role: "gm" as const },
+    });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.generateImage.mockResolvedValue({ image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" }, model: "openai/gpt-image-1" });
+
+    const response = await POST(createRequest({
+      campaignId,
+      mode: "create",
+      targetKind: "character",
+      characterId: savedCharacterAccess.access.character.id,
+      visualStyleId,
+      subject: "A calm three-quarter portrait.",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.generateImage.mock.calls[0][1]).toContain("Campaign visual style: Custom campaign image style");
+    expect(mocks.generateImage.mock.calls[0][1]).not.toContain("Cinematic sci-fi realism");
+    expect(supabase.styleQuery.eq).toHaveBeenCalledWith("id", visualStyleId);
+    expect(supabase.styleQuery.eq).toHaveBeenCalledWith("campaign_id", campaignId);
   });
 
   it("rejects a player portrait when Player AI is disabled", async () => {

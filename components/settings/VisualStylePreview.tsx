@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, RefreshCw, Save, Sparkles } from "lucide-react";
 import AiModelPicker from "@/components/archive/AiModelPicker";
 import { waitForImageBackgroundJob, type ImageBackgroundJob, type ImageDraft } from "@/lib/ai/image-job-polling";
+import { imageGenerationRequestTimeoutMs } from "@/lib/ai/image-job-lifecycle";
 import { defaultImageAspectRatio } from "@/lib/ai/image-options";
 
 export type VisualStylePreviewRecord = {
@@ -26,6 +27,7 @@ type VisualStylePreviewProps = {
 
 type ImageResponse = {
   error?: string;
+  outcomeUnknown?: boolean;
   draft?: ImageDraft;
   job?: ImageBackgroundJob;
 };
@@ -43,10 +45,12 @@ export default function VisualStylePreview({ campaignId, style, visualStyleOverr
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [draft, setDraft] = useState<ImageDraft | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [outcomeUnknown, setOutcomeUnknown] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const draftRetainedRef = useRef(false);
+  const activeGenerationRef = useRef<AbortController | null>(null);
 
   const markDraftRetained = () => {
     draftRetainedRef.current = true;
@@ -66,10 +70,26 @@ export default function VisualStylePreview({ campaignId, style, visualStyleOverr
     };
   }, [campaignId, draft, saved]);
 
+  useEffect(() => {
+    return () => activeGenerationRef.current?.abort();
+  }, [campaignId, style?.id, style?.revision, visualStyleOverride]);
+
   const generate = async () => {
+    if (activeGenerationRef.current) return;
+    if (outcomeUnknown && !window.confirm("The previous image request may have been billed without returning a preview. Check OpenRouter usage before generating again. Start another potentially charged request?")) return;
+
     setIsGenerating(true);
     setError(null);
     setSaved(false);
+    const generationController = new AbortController();
+    let requestTimedOut = false;
+    let responseReceived = false;
+    let backgroundJobAccepted = false;
+    const requestTimeoutId = window.setTimeout(() => {
+      requestTimedOut = true;
+      generationController.abort();
+    }, imageGenerationRequestTimeoutMs);
+    activeGenerationRef.current = generationController;
 
     try {
       if (draft?.temporaryPath) void removeTemporaryArt(campaignId, draft.temporaryPath);
@@ -78,6 +98,7 @@ export default function VisualStylePreview({ campaignId, style, visualStyleOverr
       const response = await fetch("/api/ai/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: generationController.signal,
         body: JSON.stringify({
           campaignId,
           mode: "create",
@@ -90,19 +111,42 @@ export default function VisualStylePreview({ campaignId, style, visualStyleOverr
           aspectRatio: defaultImageAspectRatio,
         }),
       });
+      responseReceived = true;
       const result = (await response.json()) as ImageResponse;
       if (response.status === 202 && result.job) {
-        const nextDraft = await waitForImageBackgroundJob(result.job);
+        backgroundJobAccepted = true;
+        const nextDraft = await waitForImageBackgroundJob(result.job, { signal: generationController.signal });
+        if (generationController.signal.aborted) return;
+        setOutcomeUnknown(false);
         updateDraft(nextDraft);
       } else if (!response.ok || !result.draft) {
+        if (result.outcomeUnknown) setOutcomeUnknown(true);
         throw new Error(result.error ?? "The style preview could not be generated.");
       } else {
+        if (generationController.signal.aborted) return;
+        setOutcomeUnknown(false);
         updateDraft(result.draft);
       }
     } catch (generationError: unknown) {
-      setError(generationError instanceof Error ? generationError.message : "The style preview could not be generated.");
+      if (generationController.signal.aborted && !requestTimedOut) return;
+      const errorName = generationError instanceof Error ? generationError.name : "";
+      const errorMessage = generationError instanceof Error ? generationError.message : "The style preview could not be generated.";
+      const uncertainBackgroundFailure = backgroundJobAccepted && (
+        errorMessage === "The image generation status could not be reached. Try again shortly."
+        || errorMessage === "Image generation is taking longer than expected. Check the art studio again shortly."
+      );
+      if (requestTimedOut || !responseReceived || errorName === "ImageJobOutcomeUnknownError" || uncertainBackgroundFailure) {
+        setOutcomeUnknown(true);
+      }
+      setError(requestTimedOut
+        ? "The image preview request timed out. It may still complete; check OpenRouter usage before retrying."
+        : errorMessage);
     } finally {
-      setIsGenerating(false);
+      window.clearTimeout(requestTimeoutId);
+      if (activeGenerationRef.current === generationController) {
+        activeGenerationRef.current = null;
+        setIsGenerating(false);
+      }
     }
   };
 
