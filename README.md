@@ -23,6 +23,8 @@ Star Board is a persistent Starfinder 2e campaign operations console for GMs and
 
 The cockpit reads campaign records from Supabase. It does not seed demo jobs, characters, NPCs, factions, Places, notes, episodes, or members in the browser. Empty collections render empty states, and selecting a campaign from `/campaigns` opens its canonical `/campaigns/[campaignId]` route. The root route still redirects legacy `/?campaignId=...` links to that canonical destination. The authenticated shell includes sign-out controls in both the cockpit and campaign selector.
 
+Missions can exist without a designated giver. New missions default to **No giver**; GMs can assign an NPC or faction later, or clear an existing assignment. AI drafts respect **No giver** and remain review-before-save. Deleting an assigned NPC or faction leaves the mission unassigned. Apply `0038_optional_job_giver.sql` before using this workflow.
+
 ## Supabase setup
 
 ### Local Supabase
@@ -51,7 +53,7 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0027_visual_style_save_previews.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0038_optional_job_giver.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth URL Configuration, set the Site URL to the deployed origin and add the deployed `/auth/callback` URL to the allowed redirect URLs. Keep localhost URLs only as additional development redirects.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying. This public variable is embedded during the Next.js build, so changing it in Netlify requires a new deploy.
 6. In the hosted Reset Password email template, use `{{ .ConfirmationURL }}` for the action link. Do not hardcode `localhost` or construct the action link from `{{ .SiteURL }}` when the app supplies a redirect URL.

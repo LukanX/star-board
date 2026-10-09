@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
-import { loadCampaignAiContext, loadMissionAiReferences, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, loadCampaignNarrativeAiContext, loadMissionAiReferences, recordAiGeneration } from "@/lib/ai/assistance";
 import { generateJson } from "@/lib/ai/client";
 import { buildMissionPrompt } from "@/lib/ai/prompts";
 import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
@@ -66,6 +66,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: aiContext.error }, { status: aiContext.notFound ? 404 : 503 });
     }
 
+    const narrativeContext = await loadCampaignNarrativeAiContext(context.supabase, input.data.campaignId, aiContext.campaign);
+    if ("error" in narrativeContext) return NextResponse.json({ error: narrativeContext.error }, { status: 503 });
+
     const missionReferences = await loadMissionAiReferences(context.supabase, input.data.campaignId, input.data);
 
     if ("error" in missionReferences) {
@@ -78,7 +81,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: failure.message }, { status: failure.status });
     }
 
-    const prompt = buildMissionPrompt(input.data, aiContext.campaign, missionReferences.references, linkedContext.context);
+    const prompt = buildMissionPrompt(input.data, narrativeContext.campaign, missionReferences.references, linkedContext.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let rawDraft: unknown;
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
@@ -96,7 +99,8 @@ export async function POST(request: Request) {
 
     const draft = missionDraftSchema.safeParse(rawDraft);
 
-    if (!draft.success) {
+    const noGiver = input.data.giverType === "none" || (!input.data.giverType && !input.data.giver);
+    if (!draft.success || (noGiver && (draft.data.suggestedGiverType !== "none" || draft.data.suggestedGiverName !== ""))) {
       await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "mission", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult?.model ?? selectedModel.id, generationId: providerResult?.generationId, inputTokens: providerResult?.usage?.inputTokens, outputTokens: providerResult?.usage?.outputTokens, costUsd: providerResult?.usage?.cost, status: "failed" });
       return NextResponse.json({ error: "The AI response did not match the mission draft format." }, { status: 502 });
     }
@@ -109,7 +113,7 @@ export async function POST(request: Request) {
       ),
     );
 
-    if (!reviewedDraft.success) {
+    if (!reviewedDraft.success || (noGiver && (reviewedDraft.data.suggestedGiverType !== "none" || reviewedDraft.data.suggestedGiverName !== ""))) {
       await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "mission", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult?.model ?? selectedModel.id, generationId: providerResult?.generationId, inputTokens: providerResult?.usage?.inputTokens, outputTokens: providerResult?.usage?.outputTokens, costUsd: providerResult?.usage?.cost, status: "failed" });
       return NextResponse.json({ error: "The reviewed mission draft is outside the allowed field limits." }, { status: 502 });
     }

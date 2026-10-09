@@ -121,6 +121,118 @@ test("organizes campaign settings into tabs and bounds model selection", async (
   expect(pageWidth.scrollWidth).toBeLessThanOrEqual(pageWidth.clientWidth);
 });
 
+test("saves, reloads, and clears campaign narrative setting and style tags", async ({ page, campaign }) => {
+  await page.goto(`/campaigns/${campaign.campaignId}/settings`);
+
+  const setting = page.getByRole("textbox", { name: /^CAMPAIGN SETTING/ });
+  const tags = page.locator("[data-campaign-narrative-settings]");
+  await setting.fill("A research station beyond the Drift.");
+  await page.getByRole("checkbox", { name: "Space Opera" }).check();
+
+  const customTag = page.getByLabel("CUSTOM TAG");
+  await customTag.fill("space opera");
+  await customTag.press("Enter");
+  await expect(tags.locator('p[role="alert"]')).toContainText("unique, ignoring case");
+  await customTag.fill("Found family");
+  await customTag.press("Enter");
+  await expect(customTag).toHaveValue("");
+  await expect(tags.getByRole("listitem")).toContainText("Found family");
+
+  const saveResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" && response.url().endsWith(`/api/campaigns/${campaign.campaignId}/narrative-settings`),
+  );
+  await page.getByRole("button", { name: "SAVE NARRATIVE SETTINGS", exact: true }).click();
+  const saveResponse = await saveResponsePromise;
+  expect(saveResponse.status()).toBe(200);
+
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: /^CAMPAIGN SETTING/ })).toHaveValue("A research station beyond the Drift.");
+  await expect(page.getByRole("checkbox", { name: "Space Opera" })).toBeChecked();
+  await expect(page.locator("[data-campaign-narrative-settings]").getByRole("listitem")).toContainText("Found family");
+
+  await page.getByRole("textbox", { name: /^CAMPAIGN SETTING/ }).fill("");
+  await page.getByRole("checkbox", { name: "Space Opera" }).uncheck();
+  await page.getByRole("button", { name: "Remove narrative style tag Found family" }).click();
+  const clearResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" && response.url().endsWith(`/api/campaigns/${campaign.campaignId}/narrative-settings`),
+  );
+  await page.getByRole("button", { name: "SAVE NARRATIVE SETTINGS", exact: true }).click();
+  expect((await clearResponsePromise).status()).toBe(200);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: /^CAMPAIGN SETTING/ })).toHaveValue("");
+  await expect(page.getByRole("checkbox", { name: "Space Opera" })).not.toBeChecked();
+  await expect(page.locator("[data-campaign-narrative-settings]").getByRole("listitem")).toHaveCount(0);
+  const pageWidth = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+  expect(pageWidth.scrollWidth).toBeLessThanOrEqual(pageWidth.clientWidth);
+});
+
+test("keeps campaign detail and narrative context dirty states independent", async ({ page, campaign }) => {
+  await page.goto(`/campaigns/${campaign.campaignId}/settings`);
+  const detailsTab = page.getByRole("tab", { name: /CAMPAIGN DETAILS/ });
+  const visualsTab = page.getByRole("tab", { name: /VISUAL STYLES/ });
+  const campaignName = page.getByLabel("CAMPAIGN NAME");
+  const campaignSetting = page.getByRole("textbox", { name: /^CAMPAIGN SETTING/ });
+  await page.route(`**/api/campaigns/${campaign.campaignId}/narrative-settings`, async (route) => {
+    if (route.request().method() !== "PATCH") return route.continue();
+    const narrativeSettings = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ narrativeSettings }) });
+  });
+  await page.route(`**/api/campaigns/${campaign.campaignId}`, async (route) => {
+    if (route.request().method() !== "PATCH") return route.continue();
+    const details = route.request().postDataJSON() as { name: string; description: string };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ campaign: { id: campaign.campaignId, ...details } }),
+    });
+  });
+
+  await campaignName.fill("Unsaved details remain dirty");
+  await campaignSetting.fill("Narrative context to save first.");
+  const narrativeSave = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" && response.url().endsWith(`/api/campaigns/${campaign.campaignId}/narrative-settings`),
+  );
+  await page.getByRole("button", { name: "SAVE NARRATIVE SETTINGS", exact: true }).click();
+  expect((await narrativeSave).status()).toBe(200);
+
+  page.once("dialog", (dialog) => void dialog.dismiss());
+  await visualsTab.click();
+  await expect(detailsTab).toHaveAttribute("aria-selected", "true");
+
+  await campaignSetting.fill("Narrative context remains dirty now.");
+  const saveDetails = () => page.waitForResponse((response) =>
+    response.request().method() === "PATCH" && response.url() === new URL(`/api/campaigns/${campaign.campaignId}`, page.url()).toString(),
+  );
+  const detailsSave = saveDetails();
+  await page.getByRole("button", { name: "SAVE DETAILS", exact: true }).click();
+  expect((await detailsSave).status()).toBe(200);
+
+  page.once("dialog", (dialog) => void dialog.dismiss());
+  await visualsTab.click();
+  await expect(detailsTab).toHaveAttribute("aria-selected", "true");
+
+  await campaignName.fill(campaign.campaignName);
+  const restoreDetails = saveDetails();
+  await page.getByRole("button", { name: "SAVE DETAILS", exact: true }).click();
+  expect((await restoreDetails).status()).toBe(200);
+
+  page.once("dialog", (dialog) => void dialog.dismiss());
+  await visualsTab.click();
+  await expect(detailsTab).toHaveAttribute("aria-selected", "true");
+
+  await campaignSetting.fill("");
+  const clearNarrative = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" && response.url().endsWith(`/api/campaigns/${campaign.campaignId}/narrative-settings`),
+  );
+  await page.getByRole("button", { name: "SAVE NARRATIVE SETTINGS", exact: true }).click();
+  expect((await clearNarrative).status()).toBe(200);
+
+  await visualsTab.click();
+  await expect(visualsTab).toHaveAttribute("aria-selected", "true");
+});
+
 test("preserves campaign creation action sizing", async ({ page }) => {
   await page.goto("/campaigns");
 

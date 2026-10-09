@@ -1,10 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPlaceAncestors } from "@/lib/places";
+import { loadCampaignNarrativeSettings } from "@/lib/campaign/narrative-settings";
 
 export type CampaignAiContext = {
   system: string;
   description: string;
   visualStyle: string;
+};
+
+export type CampaignNarrativeAiContext = CampaignAiContext & {
+  setting?: string;
+  styleTags?: string[];
 };
 
 export type MissionAiReferences = {
@@ -45,7 +51,7 @@ export type PlaceAiContext = {
 };
 
 type MissionAiReferenceInput = {
-  giverType?: "npc" | "faction";
+  giverType?: "none" | "npc" | "faction";
   giverId?: string;
   placeId?: string | null;
 };
@@ -70,6 +76,23 @@ export async function loadCampaignAiContext(supabase: SupabaseClient, campaignId
       description: campaign.description,
       visualStyle: campaign.visual_style,
     },
+  };
+}
+
+export async function loadCampaignNarrativeAiContext(
+  supabase: SupabaseClient,
+  campaignId: string,
+  campaign: CampaignAiContext,
+) {
+  const result = await loadCampaignNarrativeSettings(supabase, campaignId);
+  if ("error" in result) return { error: "Campaign narrative context could not be loaded." as const };
+
+  return {
+    campaign: {
+      ...campaign,
+      setting: result.settings.setting,
+      styleTags: result.settings.styleTags,
+    } satisfies CampaignNarrativeAiContext,
   };
 }
 
@@ -118,7 +141,7 @@ export async function loadMissionAiReferences(supabase: SupabaseClient, campaign
   let placeResult: { data: Record<string, string> | null; error: unknown } | null = null;
   let placeTreeResult: { data: Array<Record<string, string | null>> | null; error: unknown } | null = null;
 
-  if (input.giverType && input.giverId) {
+  if (input.giverType && input.giverType !== "none" && input.giverId) {
     giverResult = await supabase
       .from(input.giverType === "npc" ? "npcs" : "factions")
       .select(input.giverType === "npc" ? "name, species, role, description, player_notes_markdown" : "name, status, description")

@@ -12,6 +12,7 @@ type CampaignDetails = {
   description: string;
 };
 
+const dirtySource = "campaign-details-settings";
 const fieldClassName =
   "w-full min-w-0 border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-3 text-[var(--ink)] outline-none transition-[border,box-shadow] placeholder:text-[#4d5a6b] focus:border-[var(--cyan)] focus:shadow-[0_0_0_2px_rgba(98,232,255,.1)]";
 const labelClassName = "grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]";
@@ -38,9 +39,9 @@ export default function CampaignDetailsSettings({
     setSaved(false);
     setError(null);
     if (nextDetails.name === baseline.name && nextDetails.description === baseline.description) {
-      clearDirty();
+      clearDirty(dirtySource);
     } else {
-      setDirty();
+      setDirty(dirtySource);
     }
   };
 
@@ -80,7 +81,7 @@ export default function CampaignDetailsSettings({
 
       setDetails(result.campaign);
       setBaseline(result.campaign);
-      clearDirty();
+      clearDirty(dirtySource);
       setSaved(true);
       router.refresh();
     } catch (saveError: unknown) {

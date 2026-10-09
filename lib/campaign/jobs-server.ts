@@ -1,10 +1,11 @@
 import { getAuthenticatedUser, getCampaignMembership, type CampaignMembership } from "@/lib/auth/permissions";
 import type { ApiJob } from "@/lib/campaign/types";
+import { resolveJobGiver } from "@/lib/campaign/job-giver";
 import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
 
 export type CampaignJob = Omit<ApiJob, "giver"> & {
-  giver: ApiJob["giver"] & { id: string | null };
+  giver: (NonNullable<ApiJob["giver"]> & { id: string }) | null;
 };
 
 export type CampaignJobsResult = {
@@ -90,10 +91,7 @@ async function enrichJobs(
 
   const enrichedJobs = jobsWithArt.map((job) => {
     const votes = votesByJob.get(job.id) ?? { count: 0, voted: false };
-    const giverId = job.giver_npc_id ?? job.giver_faction_id;
-    const giver = job.giver_npc_id
-      ? { type: "NPC" as const, id: giverId, name: npcs.get(job.giver_npc_id) ?? "Unknown contact" }
-      : { type: "FACTION" as const, id: giverId, name: factions.get(job.giver_faction_id ?? "") ?? "Unknown faction" };
+    const giver = resolveJobGiver(job, npcs, factions);
     const { hook, ...publicJob } = job;
 
     return {

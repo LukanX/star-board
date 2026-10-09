@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, LoaderCircle, Pin, PinOff, RotateCcw, Sparkles, Undo2 } from "lucide-react";
 import AiModelPicker from "@/components/archive/AiModelPicker";
 import RichMarkdownField from "@/components/markdown/RichMarkdownField";
@@ -28,6 +28,7 @@ type DraftCheckpoint = {
   candidate: Record<string, string>;
   protectedFields: string[];
   contextValues: Record<string, string>;
+  requestContextKey: string | null;
 };
 
 type AiDraftAssistantProps = {
@@ -40,6 +41,9 @@ type AiDraftAssistantProps = {
   contextFields?: AiDraftSelectField[];
   stageContextFields?: boolean;
   requestFields?: Record<string, string | number | null | undefined>;
+  renderContextControls?: (state: { isGenerating: boolean }) => ReactNode;
+  prepareRequestFields?: () => Record<string, unknown>;
+  requestContextKey?: string;
   identityKey?: string;
   currentDraft?: Record<string, string>;
   protectedFieldKeys?: string[];
@@ -106,6 +110,9 @@ function AiDraftAssistantContent({
   contextFields,
   stageContextFields = false,
   requestFields,
+  renderContextControls,
+  prepareRequestFields,
+  requestContextKey,
   currentDraft,
   protectedFieldKeys = [],
   open = true,
@@ -130,6 +137,7 @@ function AiDraftAssistantContent({
     contextValuesForFields(contextFields),
   );
   const [candidateContextValues, setCandidateContextValues] = useState<Record<string, string>>({});
+  const [candidateRequestContextKey, setCandidateRequestContextKey] = useState<string | null>(null);
   const [checkpoint, setCheckpoint] = useState<DraftCheckpoint | null>(null);
   const [protectedFields, setProtectedFields] = useState<string[]>(() => [
     ...protectedFieldKeys,
@@ -163,7 +171,8 @@ function AiDraftAssistantContent({
     ? protectedFields
     : protectedFieldKeys;
   const candidateContextChanged = Boolean(
-    stageContextFields && candidate && !sameContextValues(candidateContextValues, visibleContextValues),
+    (stageContextFields && candidate && !sameContextValues(candidateContextValues, visibleContextValues))
+      || (candidate && requestContextKey !== undefined && candidateRequestContextKey !== requestContextKey),
   );
 
   const candidateFromResult = (
@@ -176,7 +185,7 @@ function AiDraftAssistantContent({
       ]),
     ) as Record<string, string>;
 
-  const requestFor = (revision: boolean) => {
+  const requestFor = (revision: boolean, additionalFields: Record<string, unknown>) => {
     const seedValues = revision && candidate
       ? valuesForFields(briefFields, candidate)
       : visibleBriefValues;
@@ -189,6 +198,7 @@ function AiDraftAssistantContent({
       ...(stageContextFields
         ? Object.fromEntries(Object.entries(visibleContextValues).filter(([, value]) => value))
         : {}),
+      ...additionalFields,
       ...seedValues,
       model: selectedModel ?? undefined,
       focus: revision ? undefined : focus.trim() || undefined,
@@ -214,11 +224,15 @@ function AiDraftAssistantContent({
     setError(null);
 
     try {
+      const additionalFields = prepareRequestFields?.() ?? {};
+      const generatedContextKey = requestContextKey === undefined
+        ? null
+        : JSON.stringify(additionalFields);
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: requestController.signal,
-        body: JSON.stringify(requestFor(revision)),
+        body: JSON.stringify(requestFor(revision, additionalFields)),
       });
       const result = (await response.json()) as {
         error?: string;
@@ -238,11 +252,17 @@ function AiDraftAssistantContent({
       if (requestId !== requestIdRef.current) return;
 
       if (candidate) {
-        setCheckpoint({ candidate, protectedFields: [...protectedFields], contextValues: { ...candidateContextValues } });
+        setCheckpoint({
+          candidate,
+          protectedFields: [...protectedFields],
+          contextValues: { ...candidateContextValues },
+          requestContextKey: candidateRequestContextKey,
+        });
       }
       const nextCandidate = candidateFromResult(result.draft);
       setLastModel(result.model ?? selectedModel);
       setCandidate(nextCandidate);
+      setCandidateRequestContextKey(generatedContextKey);
       setCandidateContextValues({ ...visibleContextValues });
       setFeedback("");
       setBriefValues(valuesForFields(briefFields, nextCandidate));
@@ -282,6 +302,7 @@ function AiDraftAssistantContent({
   const undo = () => {
     if (!checkpoint || isGenerating) return;
     setCandidate(checkpoint.candidate);
+    setCandidateRequestContextKey(checkpoint.requestContextKey);
     setCandidateContextValues(checkpoint.contextValues);
     setStagedContextValues(checkpoint.contextValues);
     setProtectedFields(checkpoint.protectedFields);
@@ -302,6 +323,7 @@ function AiDraftAssistantContent({
     if (stageContextFields) onApplyContext?.(visibleContextValues);
     setBriefValues(valuesForFields(briefFields, candidate));
     setCandidate(null);
+    setCandidateRequestContextKey(null);
     setCandidateContextValues({});
     setStagedContextValues({ ...visibleContextValues });
     setCheckpoint(null);
@@ -389,6 +411,7 @@ function AiDraftAssistantContent({
           </div>
         </div>
       ) : null}
+      {!descriptionOnly ? renderContextControls?.({ isGenerating }) : null}
       {!descriptionOnly && briefFields?.length ? (
         <div className="grid gap-[10px] p-[11px] border border-[rgba(185,146,255,.2)] bg-[rgba(10,17,24,.48)]">
           <div>
@@ -473,7 +496,7 @@ function AiDraftAssistantContent({
           </div>
           {candidateContextChanged ? (
             <p className="m-0 text-[var(--amber)] text-[10px]" role="status">
-              The selected campaign context changed. Generate again before using this draft.
+              The selected generation context changed. Generate again before using this draft.
             </p>
           ) : null}
           {fields.map((field) => (

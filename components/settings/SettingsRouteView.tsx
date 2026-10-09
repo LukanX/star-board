@@ -5,10 +5,12 @@ import { FileText, Palette, Sparkles } from "lucide-react";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import CampaignAiSettings from "@/components/settings/CampaignAiSettings";
 import CampaignDetailsSettings from "@/components/settings/CampaignDetailsSettings";
+import CampaignNarrativeSettingsPanel from "@/components/settings/CampaignNarrativeSettings";
 import CampaignVisualStyles from "@/components/settings/CampaignVisualStyles";
 import OpenRouterConnectionSettings from "@/components/settings/OpenRouterConnectionSettings";
 import type { OpenRouterCallbackOutcome } from "@/components/settings/openRouterOutcome";
 import PageLayout from "@/components/ui/PageLayout";
+import type { CampaignNarrativeSettings as CampaignNarrativeSettingsData } from "@/lib/campaign/narrative-settings";
 
 type CampaignDetails = {
   name: string;
@@ -26,10 +28,12 @@ const settingsTabs = [
 export default function SettingsRouteView({
   campaignId,
   initialCampaign,
+  initialNarrativeSettings,
   initialOpenRouterOutcome,
 }: {
   campaignId: string;
   initialCampaign: CampaignDetails;
+  initialNarrativeSettings: CampaignNarrativeSettingsData;
   initialOpenRouterOutcome?: OpenRouterCallbackOutcome | null;
 }) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialOpenRouterOutcome ? "ai" : "details");
@@ -113,7 +117,12 @@ export default function SettingsRouteView({
           role="tabpanel"
           tabIndex={0}
         >
-          {activeTab === "details" ? <CampaignDetailsSettings campaignId={campaignId} initialCampaign={initialCampaign} /> : null}
+          {activeTab === "details" ? (
+            <div className="grid gap-5">
+              <CampaignDetailsSettings campaignId={campaignId} initialCampaign={initialCampaign} />
+              <CampaignNarrativeSettingsPanel campaignId={campaignId} initialSettings={initialNarrativeSettings} />
+            </div>
+          ) : null}
           {activeTab === "visuals" ? <CampaignVisualStyles campaignId={campaignId} /> : null}
           {activeTab === "ai" ? (
             <div className="grid gap-5">

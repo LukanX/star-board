@@ -58,6 +58,21 @@ const references = {
 };
 
 describe("mission AI references", () => {
+  it("does not query giver references for an unassigned mission", async () => {
+    const from = vi.fn();
+    const result = await loadMissionAiReferences({ from } as never, campaignId, { giverType: "none" });
+    expect(result).toEqual({ references: {} });
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it.each(["create", "refine"] as const)("makes no giver authoritative for %s prompts", (mode) => {
+    const input = missionGenerationInputSchema.parse({ campaignId, mode, giverType: "none" });
+    const prompt = buildMissionPrompt(input, campaign);
+    expect(prompt).toContain("Do not invent or suggest a giver");
+    expect(prompt).toContain('suggestedGiverType as "none"');
+    expect(prompt).toContain("suggestedGiverName as an empty string");
+  });
+
   it("loads campaign-scoped NPC and place context with hierarchy", async () => {
     const supabase = createSupabase({
       npcs: [{ data: { name: references.giver.name, species: references.giver.species, role: references.giver.role, description: references.giver.description, player_notes_markdown: references.giver.playerNotes }, error: null }],

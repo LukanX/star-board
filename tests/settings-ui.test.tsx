@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/components/settings/CampaignDetailsSettings", () => ({
   default: ({ campaignId }: { campaignId: string }) => <div data-settings-child="details">{campaignId}</div>,
 }));
+vi.mock("@/components/settings/CampaignNarrativeSettings", () => ({
+  default: ({ campaignId }: { campaignId: string }) => <div data-settings-child="narrative">{campaignId}</div>,
+}));
 vi.mock("@/components/settings/CampaignVisualStyles", () => ({
   default: ({ campaignId }: { campaignId: string }) => <div data-settings-child="visuals">{campaignId}</div>,
 }));
@@ -23,7 +26,7 @@ describe("settings route tabs", () => {
   it("renders campaign details as the default accessible tab", () => {
     const markup = renderToStaticMarkup(
       <DirtyFormProvider>
-        <SettingsRouteView campaignId="campaign-42" initialCampaign={{ name: "Signal Lost", description: "A missing ship." }} />
+        <SettingsRouteView campaignId="campaign-42" initialCampaign={{ name: "Signal Lost", description: "A missing ship." }} initialNarrativeSettings={{ setting: "", styleTags: [] }} />
       </DirtyFormProvider>,
     );
 
@@ -33,6 +36,7 @@ describe("settings route tabs", () => {
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('data-settings-tab-panel="details"');
     expect(markup).toContain('data-settings-child="details"');
+    expect(markup).toContain('data-settings-child="narrative"');
     expect(markup).not.toContain('data-settings-child="visuals"');
     expect(markup).not.toContain('data-settings-child="ai"');
   });
@@ -43,6 +47,7 @@ describe("settings route tabs", () => {
         <SettingsRouteView
           campaignId="campaign-42"
           initialCampaign={{ name: "Signal Lost", description: "A missing ship." }}
+          initialNarrativeSettings={{ setting: "", styleTags: [] }}
           initialOpenRouterOutcome={{ reason: "configuration", status: "error" }}
         />
       </DirtyFormProvider>,

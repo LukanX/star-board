@@ -23,6 +23,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Start at the owning route, component, server helper, or nearest test. Follow established feature patterns before adding an abstraction or dependency.
 - Keep changes narrow. Do not refactor adjacent features unless the requested behavior depends on that work.
 - Treat the worktree as potentially dirty. Never reset, revert, overwrite, or clean unrelated user changes.
+- Prefer `rtk` wrappers for supported terminal commands to keep output concise, for example `rtk git status`, `rtk rg ...`, `rtk npm run test`, `rtk vitest run ...`, and `rtk playwright ...`. Use the native command when RTK has no wrapper or its filtered output would hide information needed for diagnosis.
 - Never edit generated output in `.next/`, `.next-deploy/`, `.next-playwright/`, `.netlify/`, or `next-env.d.ts`.
 - Do not deploy, alter hosted environment variables, or push migrations to hosted Supabase without explicit authorization.
 

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
 import { NextResponse } from "next/server";
-import { loadCampaignAiContext, loadPlaceAiContext, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, loadCampaignNarrativeAiContext, loadPlaceAiContext, recordAiGeneration } from "@/lib/ai/assistance";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
@@ -66,6 +66,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: aiContext.error }, { status: aiContext.notFound ? 404 : 503 });
     }
 
+    const narrativeContext = await loadCampaignNarrativeAiContext(context.supabase, input.data.campaignId, aiContext.campaign);
+    if ("error" in narrativeContext) return NextResponse.json({ error: narrativeContext.error }, { status: 503 });
+
     const placeContextResult = await loadPlaceAiContext(context.supabase, input.data.campaignId, input.data.parentPlaceId);
 
     if ("error" in placeContextResult) {
@@ -78,7 +81,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: failure.message }, { status: failure.status });
     }
 
-    const prompt = buildPlacePrompt(input.data, aiContext.campaign, placeContextResult.context, linkedContext.context);
+    const prompt = buildPlacePrompt(input.data, narrativeContext.campaign, placeContextResult.context, linkedContext.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let rawDraft: unknown;
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;

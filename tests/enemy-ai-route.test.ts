@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getServerEnv: vi.fn(),
   requireCampaignGM: vi.fn(),
   loadCampaignAiContext: vi.fn(),
+  loadCampaignNarrativeAiContext: vi.fn(),
   recordAiGeneration: vi.fn(),
   buildEnemyPrompt: vi.fn(() => "enemy-prompt"),
   loadCampaignAiSettings: vi.fn(),
@@ -18,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/ai/client", () => ({ generateJson: mocks.generateJson }));
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
-vi.mock("@/lib/ai/assistance", () => ({ loadCampaignAiContext: mocks.loadCampaignAiContext, recordAiGeneration: mocks.recordAiGeneration }));
+vi.mock("@/lib/ai/assistance", () => ({ loadCampaignAiContext: mocks.loadCampaignAiContext, loadCampaignNarrativeAiContext: mocks.loadCampaignNarrativeAiContext, recordAiGeneration: mocks.recordAiGeneration }));
 vi.mock("@/lib/ai/prompts", () => ({ buildEnemyPrompt: mocks.buildEnemyPrompt }));
 vi.mock("@/lib/ai/campaign-settings", () => ({ loadCampaignAiSettings: mocks.loadCampaignAiSettings }));
 vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModelCatalog }));
@@ -107,6 +108,7 @@ describe("POST /api/ai/enemy", () => {
     mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: {}, user: { id: userId }, role: "gm" });
     mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Cinematic sci-fi realism" } });
+    mocks.loadCampaignNarrativeAiContext.mockImplementation((_supabase, _campaignId, campaign) => ({ campaign: { ...campaign, setting: "", styleTags: [] } }));
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true }] });
     mocks.recordAiGeneration.mockResolvedValue({ error: null });
@@ -133,6 +135,7 @@ describe("POST /api/ai/enemy", () => {
   it("queues on Netlify without waiting for structured generation", async () => {
     const supabase = createSupabaseMock();
     mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.loadCampaignNarrativeAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Cinematic sci-fi realism", setting: "SAVED_ENEMY_SETTING", styleTags: ["Survival"] } });
 
     const response = await POST(request(baseInput, previewUrl));
     const payload = await response.json();
@@ -148,6 +151,7 @@ describe("POST /api/ai/enemy", () => {
     });
     expect(mocks.generateJson).not.toHaveBeenCalled();
     expect(mocks.recordAiGeneration).not.toHaveBeenCalled();
+    expect(mocks.buildEnemyPrompt).toHaveBeenCalledWith(expect.objectContaining({ campaignId }), expect.objectContaining({ setting: "SAVED_ENEMY_SETTING", styleTags: ["Survival"] }), "");
     expect(mocks.dispatchEnemyBackgroundJob).toHaveBeenCalledWith(previewUrl, {
       generationRunId,
       prompt: "enemy-prompt",
