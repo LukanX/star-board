@@ -61,6 +61,21 @@ describe("campaign Jobs server reads", () => {
     mocks.addCampaignArtUrls.mockImplementation(async (_supabase: unknown, records: Array<Record<string, unknown>>) => records.map((record) => ({ ...record, art_url: "https://signed.example/relay.png" })));
   });
 
+  it.each(["gm", "player"])("keeps unassigned list and detail reads explicit for %s", async (role) => {
+    const unassigned = { ...job, giver_npc_id: null, giver_faction_id: null };
+    mocks.getCampaignMembership.mockResolvedValue({ role, displayName: role });
+    for (const detail of [false, true]) {
+      const supabase = { from: vi.fn().mockReturnValueOnce(createQuery(detail ? unassigned : [unassigned])).mockReturnValueOnce(createQuery([])).mockReturnValueOnce(createQuery([])).mockReturnValueOnce(createQuery([])).mockReturnValueOnce(createQuery([])) };
+      mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+      const record = detail ? (await getCampaignJob(campaignId, jobId))?.job : (await getCampaignJobs(campaignId))?.jobs[0];
+      expect(record?.giver).toBeNull();
+      if (role === "player") {
+        expect(record).not.toHaveProperty("hook");
+        expect(record).not.toHaveProperty("gm_notes_markdown");
+      }
+    }
+  });
+
   it("returns null without querying when the user is unauthenticated", async () => {
     mocks.getAuthenticatedUser.mockResolvedValue(null);
 

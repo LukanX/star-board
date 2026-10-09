@@ -43,6 +43,19 @@ describe("job list privacy", () => {
     mocks.addCampaignArtUrls.mockImplementation(async (_supabase: unknown, records: Array<Record<string, unknown>>) => records.map((record) => ({ ...record, art_url: null })));
   });
 
+  it("returns no giver explicitly without leaking private fields", async () => {
+    const job = { id: userId, title: "Self-directed", summary: "", player_notes_markdown: "", giver_npc_id: null, giver_faction_id: null, status: "open", hook: "Private", art_path: null };
+    const supabase = { from: vi.fn().mockReturnValueOnce(createQuery([job])).mockReturnValueOnce(createQuery([])).mockReturnValueOnce(createQuery([])).mockReturnValueOnce(createQuery([])) };
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player", displayName: "Player" });
+    const response = await listJobs(new Request("http://localhost"), params());
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.jobs[0].giver).toBeNull();
+    expect(payload.jobs[0]).not.toHaveProperty("hook");
+    expect(payload.jobs[0]).not.toHaveProperty("gm_notes_markdown");
+  });
+
   it("does not expose GM hooks to players", async () => {
     const job = { id: "00000000-0000-4000-8000-000000000003", title: "The Relay", summary: "Recover a lost signal.", player_notes_markdown: "A public brief.", giver_npc_id: "00000000-0000-4000-8000-000000000004", giver_faction_id: null, status: "open", hook: "The signal is bait.", art_subject: null, art_path: null, art_prompt: null, art_provider: null };
     const jobsQuery = createQuery([job]);

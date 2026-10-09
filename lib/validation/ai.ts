@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { enemyAiCurrentDraftSchema, enemyAiDraftSchema, enemyAiProtectedFieldSchema, enemyBriefDraftSchema, enemyRaritySchema, enemySizeSchema } from "@/lib/validation/enemy";
+import { narrativeStyleTagsSchema } from "@/lib/validation/campaign-narrative-settings";
 
 const campaignContextSchema = z.object({
   campaignId: z.string().uuid(),
@@ -115,18 +116,23 @@ function validateProtectedFields(
 
 export const missionGenerationInputSchema = campaignContextSchema.extend({
   mode: z.enum(["create", "refine"]),
+  styleTags: narrativeStyleTagsSchema.optional(),
   model: z.string().trim().min(1).max(160).optional(),
   feedback: z.string().trim().max(600).optional(),
   protectedFields: z.array(missionProtectedFieldSchema).max(8).optional(),
   title: z.string().trim().max(160).optional(),
-  giverType: z.enum(["npc", "faction"]).optional(),
+  giverType: z.enum(["none", "npc", "faction"]).optional(),
   giverId: z.string().uuid().optional(),
   placeId: z.string().uuid().nullable().optional(),
   giver: z.string().trim().max(160).optional(),
   focus: z.string().trim().max(600).optional(),
   currentDraft: missionCurrentDraftSchema,
 }).superRefine((input, context) => {
-  if (input.giverType && !input.giverId) {
+  if (input.giverType === "none" && (input.giverId || input.giver)) {
+    context.addIssue({ code: "custom", path: ["giverType"], message: "No giver cannot be combined with a giver ID or name." });
+  }
+
+  if (input.giverType && input.giverType !== "none" && !input.giverId) {
     context.addIssue({ code: "custom", path: ["giverId"], message: "A giver ID is required when a giver type is selected." });
   }
 
@@ -309,12 +315,16 @@ export const missionDraftSchema = z.object({
   playerNotes: z.string().trim().max(2400),
   gmNotes: z.string().trim().max(2400),
   hook: z.string().trim().max(800),
-  suggestedGiverType: z.enum(["npc", "faction"]),
+  suggestedGiverType: z.enum(["none", "npc", "faction"]),
   suggestedGiverName: z.string().trim().max(160),
   thumbnailDescription: z.string().trim().min(1).max(1600),
+}).superRefine((draft, context) => {
+  if (draft.suggestedGiverType === "none" && draft.suggestedGiverName !== "") {
+    context.addIssue({ code: "custom", path: ["suggestedGiverName"], message: "An unassigned mission cannot have a suggested giver name." });
+  }
 });
 
-export const missionReviewDraftSchema = missionDraftSchema.extend({
+export const missionReviewDraftSchema = missionDraftSchema.safeExtend({
   summary: z.string().trim().max(4000),
   playerNotes: z.string().max(20000),
   gmNotes: z.string().max(20000),

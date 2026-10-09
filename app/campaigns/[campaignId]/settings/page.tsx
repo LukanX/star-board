@@ -15,5 +15,10 @@ export default async function SettingsPage({
 
   if (!result) notFound();
 
-  return <SettingsRouteView campaignId={campaignId} initialCampaign={result.campaign} initialOpenRouterOutcome={normalizeOpenRouterCallbackOutcome(query)} />;
+  return <SettingsRouteView
+    campaignId={campaignId}
+    initialCampaign={result.campaign}
+    initialNarrativeSettings={result.narrativeSettings}
+    initialOpenRouterOutcome={normalizeOpenRouterCallbackOutcome(query)}
+  />;
 }

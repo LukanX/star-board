@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getServerEnv: vi.fn(),
   requireCampaignGM: vi.fn(),
   loadCampaignAiContext: vi.fn(),
+  loadCampaignNarrativeAiContext: vi.fn(),
   recordAiGeneration: vi.fn(),
   buildMissionPrompt: vi.fn(() => "mission-prompt"),
   buildNpcPrompt: vi.fn(() => "npc-prompt"),
@@ -20,6 +21,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
 vi.mock("@/lib/ai/assistance", () => ({
   loadCampaignAiContext: mocks.loadCampaignAiContext,
+  loadCampaignNarrativeAiContext: mocks.loadCampaignNarrativeAiContext,
   loadMissionAiReferences: mocks.loadMissionAiReferences,
   recordAiGeneration: mocks.recordAiGeneration,
 }));
@@ -60,6 +62,7 @@ describe("structured AI assistance routes", () => {
     mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: {}, user: { id: userId }, role: "gm" });
     mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A tense frontier campaign", visualStyle: "Cinematic sci-fi realism" } });
+    mocks.loadCampaignNarrativeAiContext.mockImplementation((_supabase, _campaignId, campaign) => ({ campaign: { ...campaign, setting: "", styleTags: [] } }));
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini", "google/gemini-2.5-flash", "openai/gpt-4o", "openai/gpt-image-1", "google/gemini-2.5-flash-image", "bytedance-seed/seedream-4.5"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [
       { id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true },
@@ -143,13 +146,42 @@ describe("structured AI assistance routes", () => {
     const draft = { title: "The Relay", summary: "A damaged relay is broadcasting a distress signal.", playerNotes: "Find the relay and decide who gets rescued first.", gmNotes: "The signal is being replayed by a hidden saboteur.", hook: "The distress call uses a crew member's voice.", suggestedGiverType: "npc", suggestedGiverName: "Relay Keeper Venn", thumbnailDescription: "A damaged orbital relay sparking above a blue gas giant." };
     mocks.generateJson.mockResolvedValue({ data: draft, model: "openrouter/fallback", generationId: "text-run-2", usage: { inputTokens: 12, outputTokens: 34, cost: 0.001 } });
 
-    const response = await generateMission(request({ ...baseInput, title: "The Relay" }));
+    const response = await generateMission(request({ ...baseInput, title: "The Relay", giver: "Relay Keeper Venn" }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
     expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "mission-prompt", expect.anything(), "openai/gpt-4o-mini");
+    expect(mocks.loadCampaignNarrativeAiContext).toHaveBeenCalledWith(expect.anything(), campaignId, expect.objectContaining({ system: "Starfinder 2e" }));
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "mission", status: "complete", model: "openai/gpt-4o-mini", provider: "openrouter", effectiveModel: "openrouter/fallback", generationId: "text-run-2", inputTokens: 12, outputTokens: 34, costUsd: 0.001 }));
+  });
+
+  it("passes canonical custom mission tags through to the prompt builder", async () => {
+    const draft = { title: "The Relay", summary: "A damaged relay is broadcasting a distress signal.", playerNotes: "Find the relay and decide who gets rescued first.", gmNotes: "The signal is being replayed by a hidden saboteur.", hook: "The distress call uses a crew member's voice.", suggestedGiverType: "npc", suggestedGiverName: "Relay Keeper Venn", thumbnailDescription: "A damaged orbital relay sparking above a blue gas giant." };
+    mocks.generateJson.mockResolvedValue({ data: draft, model: "openrouter/fallback", generationId: "text-run-tags" });
+
+    const response = await generateMission(request({
+      ...baseInput,
+      styleTags: [" space opera ", "one-off mystery"],
+      giver: "Relay Keeper Venn",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.buildMissionPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ styleTags: ["Space Opera", "one-off mystery"] }),
+      expect.anything(),
+      {},
+      "",
+    );
+  });
+
+  it("does not call the provider when private narrative context cannot be loaded", async () => {
+    mocks.loadCampaignNarrativeAiContext.mockResolvedValue({ error: "Campaign narrative context could not be loaded." });
+
+    const response = await generateMission(request({ ...baseInput, title: "The Relay" }));
+
+    expect(response.status).toBe(503);
+    expect(mocks.generateJson).not.toHaveBeenCalled();
   });
 
   it("passes selected giver and location context into the mission prompt", async () => {
@@ -188,7 +220,7 @@ describe("structured AI assistance routes", () => {
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: [liveModel] } });
     mocks.generateJson.mockResolvedValue({ data: draft, model: liveModel, generationId: "text-run-live" });
 
-    const response = await generateMission(request({ ...baseInput, title: "The Relay", model: liveModel }));
+    const response = await generateMission(request({ ...baseInput, title: "The Relay", model: liveModel, giver: "Relay Keeper Venn" }));
 
     expect(response.status).toBe(200);
     expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "mission-prompt", expect.anything(), liveModel);
@@ -200,6 +232,22 @@ describe("structured AI assistance routes", () => {
     expect(response.status).toBe(400);
     expect(mocks.generateJson).not.toHaveBeenCalled();
     expect(mocks.recordAiGeneration).not.toHaveBeenCalled();
+  });
+
+  it.each(["create", "refine"] as const)("keeps no giver in %s drafts", async (mode) => {
+    const draft = { title: "The Relay", summary: "Explore a damaged relay.", playerNotes: "", gmNotes: "", hook: "", suggestedGiverType: "none", suggestedGiverName: "", thumbnailDescription: "A damaged orbital relay." };
+    mocks.generateJson.mockResolvedValue({ data: draft, model: "openai/gpt-4o-mini" });
+    const response = await generateMission(request({ ...baseInput, mode, giverType: "none", ...(mode === "refine" ? { currentDraft: { title: draft.title }, feedback: "Make the mission riskier." } : {}) }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).draft).toEqual(draft);
+    expect(mocks.loadMissionAiReferences).toHaveBeenCalledWith(expect.anything(), campaignId, expect.objectContaining({ giverType: "none" }));
+  });
+
+  it.each([undefined, "none"])("rejects an invented giver when no giver is selected (%s)", async (giverType) => {
+    mocks.generateJson.mockResolvedValue({ data: { title: "The Relay", summary: "Explore a relay.", playerNotes: "", gmNotes: "", hook: "", suggestedGiverType: "npc", suggestedGiverName: "Invented contact", thumbnailDescription: "A damaged orbital relay." } });
+    const response = await generateMission(request({ ...baseInput, giverType }));
+    expect(response.status).toBe(502);
+    expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: "failed" }));
   });
 
   it("surfaces provider rate limits instead of masking them as an application failure", async () => {

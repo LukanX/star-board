@@ -87,12 +87,14 @@ export default function JobPublicRecord({
           <MarkdownPreviewToolbar>
             {job.giverType === "NPC" ? (
               <UserRound size={14} />
-            ) : (
+            ) : job.giverType === "FACTION" ? (
               <Network size={14} />
+            ) : (
+              <BriefcaseBusiness size={14} />
             )}{" "}
-            {job.giverType === "NPC" ? "MISSION GIVER" : "FACTION"}
+            {job.giverType === "FACTION" ? "FACTION" : "MISSION GIVER"}
           </MarkdownPreviewToolbar>
-          <p>{job.giver || "Unknown contact"}</p>
+          <p>{job.giverType ? job.giver || "Unknown contact" : "No designated giver"}</p>
         </MarkdownPreview>
         <MarkdownPreview>
           <MarkdownPreviewToolbar>

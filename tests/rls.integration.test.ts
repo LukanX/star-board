@@ -103,6 +103,64 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(unchanged.data?.description).toContain("local RLS integration suite");
   });
 
+  it("keeps narrative settings GM-only and enforces tag bounds in PostgreSQL", async () => {
+    const saved = await gmClient
+      .from("campaign_narrative_settings")
+      .insert({
+        campaign_id: campaignId,
+        setting: "A remote research station.",
+        style_tags: ["Space Opera", "First Contact"],
+      })
+      .select("setting, style_tags")
+      .single();
+    expect(saved.error).toBeNull();
+    expect(saved.data).toEqual({ setting: "A remote research station.", style_tags: ["Space Opera", "First Contact"] });
+
+    const hidden = await playerClient
+      .from("campaign_narrative_settings")
+      .select("setting, style_tags")
+      .eq("campaign_id", campaignId);
+    expect(hidden.error).toBeNull();
+    expect(hidden.data).toEqual([]);
+
+    const blockedUpdate = await playerClient
+      .from("campaign_narrative_settings")
+      .update({ setting: "player write should be blocked" })
+      .eq("campaign_id", campaignId)
+      .select("campaign_id");
+    expect(blockedUpdate.error).toBeNull();
+    expect(blockedUpdate.data).toEqual([]);
+
+    const blockedInsert = await playerClient
+      .from("campaign_narrative_settings")
+      .insert({ campaign_id: campaignId, setting: "", style_tags: [] })
+      .select("campaign_id");
+    expect(blockedInsert.error).not.toBeNull();
+
+    const oversizedTags = await gmClient
+      .from("campaign_narrative_settings")
+      .update({ style_tags: Array.from({ length: 9 }, (_, index) => `tag-${index}`) })
+      .eq("campaign_id", campaignId)
+      .select("campaign_id");
+    expect(oversizedTags.error).not.toBeNull();
+
+    const duplicateTags = await gmClient
+      .from("campaign_narrative_settings")
+      .update({ style_tags: ["Mystery", "mystery"] })
+      .eq("campaign_id", campaignId)
+      .select("campaign_id");
+    expect(duplicateTags.error).not.toBeNull();
+
+    const cleared = await gmClient
+      .from("campaign_narrative_settings")
+      .update({ setting: "", style_tags: [] })
+      .eq("campaign_id", campaignId)
+      .select("setting, style_tags")
+      .single();
+    expect(cleared.error).toBeNull();
+    expect(cleared.data).toEqual({ setting: "", style_tags: [] });
+  });
+
   it("keeps join links GM-only and redeems one into player membership", async () => {
     const tokenHash = createHash("sha256").update(joinToken).digest("hex");
     const blockedInsert = await playerClient.from("campaign_join_links").insert({
@@ -679,6 +737,65 @@ describeLocal("local Supabase RLS boundaries", () => {
 
     const deleted = await gmClient.from("enemies").delete().eq("id", created.data).select("id").single();
     expect(deleted.error).toBeNull();
+  });
+
+  it("supports optional campaign-scoped mission givers and deletion cleanup", async () => {
+    const gmUser = (await gmClient.auth.getUser()).data.user;
+    const job = await gmClient.from("jobs").insert({
+      campaign_id: campaignId, author_id: gmUser?.id, title: "Unassigned giver test", status: "open",
+    }).select("id, giver_npc_id, giver_faction_id").single();
+    expect(job.error).toBeNull();
+    expect(job.data).toMatchObject({ giver_npc_id: null, giver_faction_id: null });
+    const npc = await gmClient.from("npcs").insert({
+      campaign_id: campaignId, author_id: gmUser?.id, name: "Optional giver NPC",
+    }).select("id").single();
+    const faction = await gmClient.from("factions").insert({
+      campaign_id: campaignId, author_id: gmUser?.id, name: "Optional giver faction",
+    }).select("id").single();
+    expect(npc.error).toBeNull();
+    expect(faction.error).toBeNull();
+
+    const both = await gmClient.from("jobs").update({ giver_npc_id: npc.data?.id, giver_faction_id: faction.data?.id }).eq("id", job.data?.id);
+    expect(both.error).not.toBeNull();
+    const assigned = await gmClient.from("jobs").update({ giver_npc_id: npc.data?.id }).eq("id", job.data?.id).select("giver_npc_id").single();
+    expect(assigned.error).toBeNull();
+    expect(assigned.data?.giver_npc_id).toBe(npc.data?.id);
+    const cleared = await gmClient.from("jobs").update({ giver_npc_id: null, giver_faction_id: null }).eq("id", job.data?.id);
+    expect(cleared.error).toBeNull();
+    const reassigned = await gmClient.from("jobs").update({ giver_faction_id: faction.data?.id }).eq("id", job.data?.id);
+    expect(reassigned.error).toBeNull();
+    expect((await gmClient.from("factions").delete().eq("id", faction.data?.id)).error).toBeNull();
+    const afterFactionDelete = await gmClient.from("jobs").select("giver_faction_id").eq("id", job.data?.id).single();
+    expect(afterFactionDelete.error).toBeNull();
+    expect(afterFactionDelete.data?.giver_faction_id).toBeNull();
+    expect((await gmClient.from("jobs").update({ giver_npc_id: npc.data?.id }).eq("id", job.data?.id)).error).toBeNull();
+    expect((await gmClient.from("npcs").delete().eq("id", npc.data?.id)).error).toBeNull();
+    const afterNpcDelete = await gmClient.from("jobs").select("giver_npc_id").eq("id", job.data?.id).single();
+    expect(afterNpcDelete.error).toBeNull();
+    expect(afterNpcDelete.data?.giver_npc_id).toBeNull();
+
+    const playerRead = await playerClient.from("jobs").select("id, giver_npc_id, giver_faction_id").eq("id", job.data?.id).single();
+    expect(playerRead.error).toBeNull();
+    expect(playerRead.data).toMatchObject({ giver_npc_id: null, giver_faction_id: null });
+    const playerInsert = await playerClient.from("jobs").insert({ campaign_id: campaignId, author_id: playerId, title: "Unauthorized unassigned" });
+    expect(playerInsert.error).not.toBeNull();
+    const playerUpdate = await playerClient.from("jobs").update({ title: "Unauthorized change" }).eq("id", job.data?.id).select("id");
+    expect(playerUpdate.data ?? []).toEqual([]);
+
+    const otherCampaign = await gmClient.rpc("create_campaign", { campaign_name: "Optional giver boundary test" });
+    expect(otherCampaign.error).toBeNull();
+    try {
+      const foreignNpc = await gmClient.from("npcs").insert({ campaign_id: otherCampaign.data, author_id: gmUser?.id, name: "Foreign giver NPC" }).select("id").single();
+      const foreignFaction = await gmClient.from("factions").insert({ campaign_id: otherCampaign.data, author_id: gmUser?.id, name: "Foreign giver faction" }).select("id").single();
+      expect(foreignNpc.error).toBeNull();
+      expect(foreignFaction.error).toBeNull();
+      for (const giver of [{ giver_npc_id: foreignNpc.data?.id }, { giver_faction_id: foreignFaction.data?.id }]) {
+        const invalid = await gmClient.from("jobs").update(giver).eq("id", job.data?.id);
+        expect(invalid.error).not.toBeNull();
+      }
+    } finally {
+      if (otherCampaign.data) expect((await gmClient.from("campaigns").delete().eq("id", otherCampaign.data)).error).toBeNull();
+    }
   });
 
   it("allows both GMs and players to vote on open jobs", async () => {

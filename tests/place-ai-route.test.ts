@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getServerEnv: vi.fn(),
   requireCampaignGM: vi.fn(),
   loadCampaignAiContext: vi.fn(),
+  loadCampaignNarrativeAiContext: vi.fn(),
   loadPlaceAiContext: vi.fn(),
   recordAiGeneration: vi.fn(),
   buildPlacePrompt: vi.fn(() => "place-prompt"),
@@ -18,6 +19,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
 vi.mock("@/lib/ai/assistance", () => ({
   loadCampaignAiContext: mocks.loadCampaignAiContext,
+  loadCampaignNarrativeAiContext: mocks.loadCampaignNarrativeAiContext,
   loadPlaceAiContext: mocks.loadPlaceAiContext,
   recordAiGeneration: mocks.recordAiGeneration,
 }));
@@ -68,6 +70,7 @@ describe("AI place assistance route", () => {
     mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key" });
     mocks.requireCampaignGM.mockResolvedValue({ supabase: { from: vi.fn().mockReturnValue(createPlacesQuery()) }, user: { id: userId }, role: "gm" });
     mocks.loadCampaignAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A frontier campaign", visualStyle: "Cinematic sci-fi realism" } });
+    mocks.loadCampaignNarrativeAiContext.mockImplementation((_supabase, _campaignId, campaign) => ({ campaign: { ...campaign, setting: "", styleTags: [] } }));
     mocks.loadPlaceAiContext.mockResolvedValue({ context: undefined });
     mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-4o-mini"] } });
     mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-4o-mini", capability: "structured-text", compatible: true }] });
@@ -107,6 +110,7 @@ describe("AI place assistance route", () => {
       },
     };
     mocks.loadPlaceAiContext.mockResolvedValue({ context: placeContext });
+    mocks.loadCampaignNarrativeAiContext.mockResolvedValue({ campaign: { system: "Starfinder 2e", description: "A frontier campaign", visualStyle: "Cinematic sci-fi realism", setting: "SAVED_PLACE_SETTING", styleTags: ["Exploration"] } });
     mocks.generateJson.mockResolvedValue({ data: draft, model: "openai/gpt-4o-mini", generationId: "place-run-1", usage: { inputTokens: 14, outputTokens: 42, cost: 0.002 } });
 
     const response = await generatePlace(request({ campaignId, mode: "create", parentPlaceId: parentId, name: "The Blue Door", kind: "room" }));

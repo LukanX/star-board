@@ -5,6 +5,7 @@ import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { validateCampaignPlace } from "@/lib/places";
 import { createJobSchema } from "@/lib/validation/job";
+import { resolveJobGiver } from "@/lib/campaign/job-giver";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 
@@ -65,9 +66,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const notesByJob = new Map((jobNotes ?? []).map((note) => [note.job_id, note.body_markdown]));
     const jobs = jobsWithArt.map((job) => {
       const votes = votesByJob.get(job.id) ?? { count: 0, voted: false };
-      const giver = job.giver_npc_id
-        ? { type: "NPC", id: job.giver_npc_id, name: npcs.get(job.giver_npc_id) ?? "Unknown contact" }
-        : { type: "FACTION", id: job.giver_faction_id, name: factions.get(job.giver_faction_id ?? "") ?? "Unknown faction" };
+      const giver = resolveJobGiver(job, npcs, factions);
 
       const { hook, ...publicJob } = job;
       return { ...publicJob, giver, votes: votes.count, voted: votes.voted, ...(membership.role === "gm" ? { hook, gm_notes_markdown: notesByJob.get(job.id) ?? "" } : {}) };

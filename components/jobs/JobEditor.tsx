@@ -15,6 +15,7 @@ import {
 } from "@/components/archive/CampaignArtField";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
+import NarrativeStyleTagPicker from "@/components/ui/NarrativeStyleTagPicker";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type {
   ApiFaction,
@@ -24,6 +25,19 @@ import type {
   Mission,
 } from "@/lib/campaign/types";
 import { flattenPlaceTree } from "@/lib/places";
+import { narrativeStyleTagsSchema } from "@/lib/validation/campaign-narrative-settings";
+
+type MissionTagSource = "campaign" | "custom";
+
+const generationTagsDirtySource = "job-generation-tags";
+
+function missionTagRequestContextKey(source: MissionTagSource, styleTags: string[], customTag: string) {
+  if (source === "campaign") return "{}";
+
+  const pendingTags = customTag.trim() ? [...styleTags, customTag] : styleTags;
+  const parsed = narrativeStyleTagsSchema.safeParse(pendingTags);
+  return JSON.stringify({ styleTags: parsed.success ? parsed.data : pendingTags });
+}
 
 export type JobDraft = {
   title: string;
@@ -31,7 +45,7 @@ export type JobDraft = {
   playerNotesMarkdown: string;
   gmNotesMarkdown: string;
   hook: string;
-  giverType: "npc" | "faction";
+  giverType: "none" | "npc" | "faction";
   giverId: string;
   placeId: string | null;
   status: "draft" | "open" | "archived";
@@ -48,7 +62,7 @@ const emptyJobDraft: JobDraft = {
   playerNotesMarkdown: "",
   gmNotesMarkdown: "",
   hook: "",
-  giverType: "npc",
+  giverType: "none",
   giverId: "",
   placeId: null,
   status: "draft",
@@ -68,8 +82,8 @@ function toDraft(job?: Mission): JobDraft {
     playerNotesMarkdown: job.playerNotesMarkdown,
     gmNotesMarkdown: job.gmNotesMarkdown ?? "",
     hook: job.hook ?? "",
-    giverType: job.giverType.toLowerCase() as JobDraft["giverType"],
-    giverId: job.giverId,
+    giverType: job.giverType === "NPC" ? "npc" : job.giverType === "FACTION" ? "faction" : "none",
+    giverId: job.giverId ?? "",
     placeId: job.placeId,
     status: job.status === "promoted" ? "open" : job.status,
     artSubject: job.artSubject ?? "",
@@ -101,6 +115,10 @@ export default function JobEditor({
 }) {
   const [draft, setDraftState] = useState<JobDraft>(() => toDraft(job));
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [tagSource, setTagSource] = useState<MissionTagSource>("campaign");
+  const [customStyleTags, setCustomStyleTags] = useState<string[]>([]);
+  const [customTag, setCustomTag] = useState("");
+  const [tagValidationMessage, setTagValidationMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { setDirty, clearDirty, confirmNavigation } = useDirtyForm();
@@ -108,7 +126,7 @@ export default function JobEditor({
     setDirty();
     setDraftState(updater);
   };
-  const giverOptions = (draft.giverType === "npc" ? npcs : factions).map(
+  const giverOptions = (draft.giverType === "npc" ? npcs : draft.giverType === "faction" ? factions : []).map(
     (giver) => ({ value: giver.id, label: giver.name }),
   );
   const placeOptions = flattenPlaceTree(places).map(({ place, depth }) => ({
@@ -122,6 +140,39 @@ export default function JobEditor({
   ) => {
     setDraft((current) => ({ ...current, [field]: value }));
   };
+
+  const updateTagSource = (source: MissionTagSource) => {
+    setTagSource(source);
+    setTagValidationMessage(null);
+    if (source === "custom") setDirty(generationTagsDirtySource);
+    else clearDirty(generationTagsDirtySource);
+  };
+
+  const updateCustomTags = (styleTags: string[], nextCustomTag: string) => {
+    setCustomStyleTags(styleTags);
+    setCustomTag(nextCustomTag);
+    setTagValidationMessage(null);
+    if (tagSource === "custom") setDirty(generationTagsDirtySource);
+  };
+
+  const prepareMissionRequestFields = () => {
+    if (tagSource === "campaign") return {};
+
+    const tagsToValidate = customTag.trim()
+      ? [...customStyleTags, customTag]
+      : customStyleTags;
+    const result = narrativeStyleTagsSchema.safeParse(tagsToValidate);
+    if (!result.success) {
+      throw new Error(result.error.issues[0]?.message ?? "Mission narrative tags are invalid.");
+    }
+
+    setCustomStyleTags(result.data);
+    setCustomTag("");
+    setTagValidationMessage(null);
+    return { styleTags: result.data };
+  };
+
+  const requestContextKey = missionTagRequestContextKey(tagSource, customStyleTags, customTag);
 
   const onCancel = () => {
     if (!confirmNavigation()) return;
@@ -153,6 +204,7 @@ export default function JobEditor({
       label: "GIVER TYPE",
       value: draft.giverType,
       options: [
+        { value: "none", label: "NO GIVER" },
         { value: "npc", label: "NPC" },
         { value: "faction", label: "FACTION" },
       ],
@@ -161,14 +213,14 @@ export default function JobEditor({
         update("giverId", "");
       },
     },
-    {
+    ...(draft.giverType === "none" ? [] : [{
       key: "giver",
       label: draft.giverType === "npc" ? "NPC" : "FACTION",
       value: draft.giverId,
       placeholder: draft.giverType === "npc" ? "SELECT NPC" : "SELECT FACTION",
       options: giverOptions,
-      onChange: (value) => update("giverId", value),
-    },
+      onChange: (value: string) => update("giverId", value),
+    }]),
     {
       key: "location",
       label: "LOCATION",
@@ -189,10 +241,49 @@ export default function JobEditor({
       entityLabel="job"
       mode={job ? "refine" : "create"}
       contextFields={contextFields}
+      requestContextKey={requestContextKey}
+      prepareRequestFields={prepareMissionRequestFields}
+      renderContextControls={({ isGenerating }) => (
+        <section className="grid gap-[9px] border border-[rgba(98,232,255,.18)] bg-[rgba(98,232,255,.035)] p-[10px]" data-mission-tag-controls>
+          <fieldset className="grid min-w-0 gap-[7px]" disabled={isGenerating || isSaving}>
+            <legend className="text-[var(--cyan)] font-mono text-[8px] tracking-[.12em]">MISSION NARRATIVE TAG SOURCE</legend>
+            <div aria-label="Mission narrative tag source" className="grid grid-cols-2 gap-[7px]" role="radiogroup">
+              {(["campaign", "custom"] as const).map((source) => (
+                <label className={`flex min-h-[34px] min-w-0 items-center gap-2 border px-[9px] py-[6px] font-mono text-[9px] cursor-pointer focus-within:border-[var(--cyan)] ${tagSource === source ? "border-[rgba(98,232,255,.55)] bg-[rgba(98,232,255,.08)] text-[var(--cyan)]" : "border-[var(--line)] text-[var(--muted)] hover:border-[rgba(98,232,255,.35)]"}`} key={source}>
+                  <input
+                    checked={tagSource === source}
+                    className="h-3 w-3 shrink-0 accent-[var(--cyan)]"
+                    name={`mission-tag-source-${campaignId}`}
+                    onChange={() => updateTagSource(source)}
+                    type="radio"
+                    value={source}
+                  />
+                  <span>{source === "campaign" ? "CAMPAIGN TAGS" : "CUSTOM TAGS"}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {tagSource === "custom" ? (
+            <>
+              <p className="m-0 text-[var(--muted)] font-mono text-[8px] tracking-[.06em]">CUSTOM TAGS REPLACE CAMPAIGN TAGS FOR THIS GENERATION.</p>
+              <NarrativeStyleTagPicker
+                idPrefix="job-narrative"
+                styleTags={customStyleTags}
+                customTag={customTag}
+                disabled={isGenerating || isSaving}
+                validationMessage={tagValidationMessage}
+                onChange={updateCustomTags}
+                onValidationMessageChange={setTagValidationMessage}
+              />
+            </>
+          ) : null}
+        </section>
+      )}
       requestFields={{
         title: draft.title,
-        ...(draft.giverId
-          ? { giverType: draft.giverType, giverId: draft.giverId }
+        giverType: draft.giverType,
+        ...(draft.giverType !== "none" && draft.giverId
+          ? { giverId: draft.giverId }
           : {}),
         ...(draft.placeId ? { placeId: draft.placeId } : {}),
       }}
@@ -242,16 +333,19 @@ export default function JobEditor({
         },
       ]}
       onApply={(candidate) =>
-        setDraft((current) => ({
-          ...current,
-          title: candidate.title ?? current.title,
-          summary: candidate.summary ?? current.summary,
-          playerNotesMarkdown:
-            candidate.playerNotes ?? current.playerNotesMarkdown,
-          gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
-          hook: candidate.hook ?? current.hook,
-          artSubject: candidate.thumbnailDescription ?? current.artSubject,
-        }))
+        {
+          setDraft((current) => ({
+            ...current,
+            title: candidate.title ?? current.title,
+            summary: candidate.summary ?? current.summary,
+            playerNotesMarkdown:
+              candidate.playerNotes ?? current.playerNotesMarkdown,
+            gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
+            hook: candidate.hook ?? current.hook,
+            artSubject: candidate.thumbnailDescription ?? current.artSubject,
+          }));
+          clearDirty(generationTagsDirtySource);
+        }
       }
     />
   );
@@ -268,7 +362,12 @@ export default function JobEditor({
         {
           method: job ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(job ? { ...draft, jobId: job.id } : draft),
+          body: JSON.stringify({
+            ...draft,
+            giverType: draft.giverType === "none" ? null : draft.giverType,
+            giverId: draft.giverType === "none" ? null : draft.giverId,
+            ...(job ? { jobId: job.id } : {}),
+          }),
         },
       );
       const result = (await response.json()) as {
@@ -402,11 +501,12 @@ export default function JobEditor({
                   update("giverId", "");
                 }}
               >
+                <option value="none">NO GIVER</option>
                 <option value="npc">NPC</option>
                 <option value="faction">FACTION</option>
               </select>
             </label>
-            <label>
+            {draft.giverType !== "none" ? <label>
               Giver
               <select
                 className={editorSelectClassName}
@@ -421,7 +521,7 @@ export default function JobEditor({
                   </option>
                 ))}
               </select>
-            </label>
+            </label> : null}
           </div>
           <RichMarkdownField campaignId={campaignId} label="Summary" value={draft.summary} isMarkdown maxLength={4000} audience="player" onChange={(value) => update("summary", value)} />
           <RichMarkdownField campaignId={campaignId} label="Player notes" value={draft.playerNotesMarkdown} isMarkdown maxLength={20000} audience="player" onChange={(value) => update("playerNotesMarkdown", value)} />

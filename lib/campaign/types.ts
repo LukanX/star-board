@@ -6,16 +6,16 @@ export type CampaignRecord = { id: string; name: string; system: string; descrip
 export type CampaignMembership = { role: "gm" | "player"; display_name: string; campaign: CampaignRecord | CampaignRecord[] | null };
 
 export type Mission = {
-  id: string; title: string; category: string; summary: string; giver: string; giverType: "NPC" | "FACTION"; votes: number;
+  id: string; title: string; category: string; summary: string; giver: string | null; giverType: "NPC" | "FACTION" | null; votes: number;
   accent: "cyan" | "pink" | "amber"; image: string | null; voted: boolean; status: "draft" | "open" | "promoted" | "archived";
-  playerNotesMarkdown: string; giverId: string; placeId: string | null; artPath?: string | null; artUrl?: string | null;
+  playerNotesMarkdown: string; giverId: string | null; placeId: string | null; artPath?: string | null; artUrl?: string | null;
   artPrompt?: string | null; artProvider?: string | null; artSubject?: string | null; hook?: string; gmNotesMarkdown?: string;
 };
 export type ApiJob = {
   id: string; title: string; summary: string; status: "draft" | "open" | "promoted" | "archived"; player_notes_markdown: string;
   hook?: string; gm_notes_markdown?: string; giver_npc_id: string | null; giver_faction_id: string | null; place_id: string | null;
   art_path: string | null; art_subject: string | null; art_url?: string | null; art_prompt: string | null; art_provider: string | null;
-  giver: { type: "NPC" | "FACTION"; name: string }; votes: number; voted: boolean;
+  giver: { type: "NPC" | "FACTION"; name: string } | null; votes: number; voted: boolean;
 };
 export type ApiCharacter = { id: string; owner_id: string | null; is_active?: boolean; name: string; species: string; class_name: string; level: number; backstory_markdown: string; physical_description: string; physical_description_is_markdown?: boolean; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; can_edit?: boolean; can_generate_portrait?: boolean; portrait_ai_role?: "gm" | "player" | null };
 export type Character = { id: string; ownerId: string | null; isActive: boolean; name: string; species: string; className: string; level: number; subtitle: string; detail: string; color: "pink" | "cyan" | "purple" | "amber"; image: string | null; status: "ACTIVE" | "RESTING"; backstoryMarkdown: string; physicalDescription: string; physicalDescriptionIsMarkdown?: boolean; artPath?: string | null; artUrl?: string | null; artSubject?: string | null; artPrompt?: string | null; artProvider?: string | null; canEdit: boolean };

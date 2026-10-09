@@ -42,6 +42,31 @@ function render(node: React.ReactNode) {
 }
 
 describe("character portrait UI boundaries", () => {
+  it("supports optional generation-context controls without changing the draft fields", () => {
+    const markup = render(
+      <AiDraftAssistant
+        campaignId={campaignId}
+        endpoint="/api/ai/mission"
+        entityLabel="JOB"
+        mode="create"
+        fields={[{ key: "summary", label: "Summary", maxLength: 4000, multiline: true }]}
+        renderContextControls={({ isGenerating }) => (
+          <fieldset disabled={isGenerating}>
+            <legend>MISSION NARRATIVE TAG SOURCE</legend>
+            <label><input type="radio" name="tag-source" value="custom" />Custom tags</label>
+          </fieldset>
+        )}
+        requestContextKey="{}"
+        showModelPicker={false}
+        onApply={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain("MISSION NARRATIVE TAG SOURCE");
+    expect(markup).toContain('name="tag-source"');
+    expect(markup).toContain("GM direction");
+  });
+
   it("keeps generic character AI out of the manual editor", () => {
     const markup = render(<CharacterEditor campaignId={campaignId} />);
 

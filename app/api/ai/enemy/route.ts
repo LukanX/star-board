@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
-import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, loadCampaignNarrativeAiContext, recordAiGeneration } from "@/lib/ai/assistance";
 import { buildEnemyPrompt } from "@/lib/ai/prompts";
 import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
 import { requireCampaignGM } from "@/lib/auth/permissions";
@@ -65,13 +65,16 @@ export async function POST(request: Request) {
     const aiContext = await loadCampaignAiContext(context.supabase, input.data.campaignId);
     if (aiContext.error) return NextResponse.json({ error: aiContext.error }, { status: aiContext.notFound ? 404 : 503 });
 
+    const narrativeContext = await loadCampaignNarrativeAiContext(context.supabase, input.data.campaignId, aiContext.campaign);
+    if ("error" in narrativeContext) return NextResponse.json({ error: narrativeContext.error }, { status: 503 });
+
     const linkedContext = await loadLinkedEntityContext(context.supabase, input.data.campaignId, input.data, "gm");
     if ("error" in linkedContext) {
       const failure = linkedEntityContextFailure(linkedContext.error);
       return NextResponse.json({ error: failure.message }, { status: failure.status });
     }
 
-    const prompt = buildEnemyPrompt(input.data, aiContext.campaign, linkedContext.context);
+    const prompt = buildEnemyPrompt(input.data, narrativeContext.campaign, linkedContext.context);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundEnemyGeneration(request)) {
