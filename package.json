@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:rls": "vitest run tests/rls.integration.test.ts"
+    "test:rls": "vitest run tests/rls.integration.test.ts tests/system-library.rls.integration.test.ts tests/library-access.rls.integration.test.ts",
+    "references:refresh": "node scripts/refresh-reference-catalog.mjs",
+    "references:wiki-audit": "node scripts/audit-wiki-appearances.mjs",
+    "references:traits-refresh": "node scripts/refresh-creature-traits.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

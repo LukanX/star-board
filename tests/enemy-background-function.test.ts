@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createEnemyBackgroundSignature } from "@/lib/ai/enemy-jobs";
 import { enemyJobPendingTimeoutMs, enemyJobProviderTimeoutMs } from "@/lib/ai/enemy-job-lifecycle";
 import { enemyStatBlockSchema } from "@/lib/validation/enemy";
+import { librarySource } from "./support/library-reference";
+import type { EnemyBackgroundJob } from "@/lib/validation/enemy";
 
 const mocks = vi.hoisted(() => ({
   generateJson: vi.fn(),
@@ -80,14 +82,14 @@ function createSupabaseMock(options: {
   return { supabase, claimQuery, completionQuery, failureQuery };
 }
 
-function createRequest() {
+function createRequest(payload: EnemyBackgroundJob = job) {
   return new Request("https://star-board.test/.netlify/functions/generate-enemy-background", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "X-Star-Board-Enemy-Signature": createEnemyBackgroundSignature(job, secret),
+      "X-Star-Board-Enemy-Signature": createEnemyBackgroundSignature(payload, secret),
     },
-    body: JSON.stringify(job),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -149,6 +151,18 @@ describe("generate-enemy-background", () => {
     expect(response.status).toBe(202);
     expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "failed", status_updated_at: expect.any(String), error_message: "OpenRouter timed out", draft: null }));
     expect(mocks.logAiProviderFailure).toHaveBeenCalled();
+  });
+
+  it("retains signed reference revisions when completing a reviewed draft", async () => {
+    const { supabase, completionQuery } = createSupabaseMock();
+    mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
+    const payload = { ...job, references: [librarySource] };
+    const response = await handler(createRequest(payload));
+    expect(response.status).toBe(202);
+    expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ reference_sources: [librarySource], draft }));
+    const modified = createRequest({ ...payload, references: [{ ...librarySource, revision: 8 }] });
+    modified.headers.set("X-Star-Board-Enemy-Signature", createEnemyBackgroundSignature(payload, secret));
+    expect((await handler(modified)).status).toBe(401);
   });
 
   it("does not start a job that was already claimed or missed its pending deadline", async () => {

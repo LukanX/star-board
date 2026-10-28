@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import AiArtStudio from "@/components/archive/AiArtStudio";
 import { ImagePlus, LoaderCircle, Sparkles, X } from "lucide-react";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
+import type { NpcReferenceContext, EnemyReferenceContext } from "@/lib/references/types";
 import {
   discardNewArtStudioSession,
   finalizeArtStudioSession,
@@ -21,6 +22,8 @@ export type CampaignArtEditorTarget = {
   visible?: boolean;
   showGenerator?: boolean;
   parentPlaceId?: string | null;
+  npcReferenceContext?: NpcReferenceContext;
+  enemyReferenceContext?: EnemyReferenceContext;
   value: string | null;
   trackUnsavedUploads?: boolean;
   url?: string | null;
@@ -120,6 +123,8 @@ export default function CampaignArtField({
   entityId,
   characterId,
   portraitAiRole,
+  npcReferenceContext,
+  enemyReferenceContext,
   showGenerator = true,
   parentPlaceId,
   value,
@@ -345,6 +350,8 @@ export default function CampaignArtField({
             kind={kind}
             entityId={entityId}
             characterId={characterId}
+            npcReferenceContext={npcReferenceContext}
+            enemyReferenceContext={enemyReferenceContext}
             portraitAiRole={portraitAiRole}
             parentPlaceId={parentPlaceId}
             subject={subject}

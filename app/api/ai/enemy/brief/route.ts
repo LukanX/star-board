@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
-import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, recordAiGeneration as recordGeneration } from "@/lib/ai/assistance";
 import { buildEnemyBriefPrompt } from "@/lib/ai/prompts";
+import { buildSystemReferenceContext, enemyLibrarySelections } from "@/lib/references/system-library";
+import { ReferenceError } from "@/lib/references/catalog";
 import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
@@ -63,7 +65,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: failure.message }, { status: failure.status });
     }
 
-    const prompt = buildEnemyBriefPrompt(input.data, aiContext.campaign, linkedContext.context);
+    const referenceContext = await buildSystemReferenceContext(context.supabase, input.data.campaignId, enemyLibrarySelections(input.data.systemReferences, input.data.traits));
+    const recordAiGeneration: typeof recordGeneration = (supabase, details) => recordGeneration(supabase, { ...details, referenceSources: referenceContext.sources });
+    const prompt = buildEnemyBriefPrompt(input.data, aiContext.campaign, linkedContext.context, referenceContext);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
 
@@ -99,8 +103,9 @@ export async function POST(request: Request) {
     const { error: auditError } = await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "enemy", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult.model ?? selectedModel.id, generationId: providerResult.generationId, inputTokens: providerResult.usage?.inputTokens, outputTokens: providerResult.usage?.outputTokens, costUsd: providerResult.usage?.cost, status: "complete" });
     if (auditError) return NextResponse.json({ error: "Enemy brief metadata could not be saved." }, { status: 503 });
 
-    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult.model ?? selectedModel.id });
-  } catch {
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult.model ?? selectedModel.id, references: referenceContext.sources });
+  } catch (error) {
+    if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "Enemy brief assistance is temporarily unavailable." }, { status: 503 });
   }
 }

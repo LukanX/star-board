@@ -173,6 +173,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         artPath: verifiedInput.artPath ?? null,
       },
       p_details: {
+        ...(verifiedInput.systemReferences ? { systemReferences: verifiedInput.systemReferences } : {}),
         level: verifiedInput.level,
         size: verifiedInput.size,
         rarity: verifiedInput.rarity,

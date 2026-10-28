@@ -1,6 +1,6 @@
 # Browser acceptance tests
 
-Playwright tests run only against the local Next.js server at `http://127.0.0.1:3100`. The test server overrides the public Supabase URL to the local Supabase API at `http://127.0.0.1:54321`; tests must never use hosted Supabase or Netlify.
+Playwright tests run only against the local Next.js server at `http://127.0.0.1:3100`. The test server overrides the public Supabase URL to the local Supabase API at `http://127.0.0.1:55421`; tests must never use hosted Supabase or Netlify.
 
 ## Local auth boundary
 
@@ -17,6 +17,30 @@ npm run test:e2e
 ```
 
 The setup project provisions or reuses the local GM account `star-board-playwright-gm@local.test`, creates the campaign named `Star Board Playwright verification`, signs in through the real login form, and writes `playwright/.auth/gm.json` plus `playwright/.auth/gm-campaign.json`. Both files are ignored. Override `PLAYWRIGHT_GM_EMAIL`, `PLAYWRIGHT_GM_PASSWORD`, or `PLAYWRIGHT_CAMPAIGN_NAME` when running against a disposable local dataset. The helper rejects non-loopback Supabase URLs.
+
+### Campaign library fixtures
+
+The System library journeys additionally require the guarded fixture environment
+shown in the [root README's RLS instructions](../../README.md): the local Auth
+service key, explicit database container and confirmed database port. Set those
+values in the same PowerShell process as `npm run test:e2e`. They are used only
+for temporary local campaign owners, members, editor grants and imported
+metadata fixtures. Tests never change a real account's membership or editor
+access. No production table grants or existing permissions are changed.
+Do not persist/print the service key or use a hosted URL.
+
+Run the focused journeys with:
+
+```powershell
+npx playwright test library-access.spec.ts system-library.spec.ts reference-selections.spec.ts --project=chromium --workers=1
+```
+
+Coverage includes campaign-scoped reference revisions, owner and member-editor
+permissions, isolation between campaigns, member-only grant/revoke controls,
+browser history, legacy-link redirects, one persistent campaign shell,
+name-only browse lists, sidebar dirty navigation, desktop/mobile overflow,
+independently persisted opt-ins under Library > Generation context, and private enemy ancestry/trait bindings. Tests
+remove their temporary records and restore campaign settings.
 
 ## First required journeys
 

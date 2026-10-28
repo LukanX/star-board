@@ -1,0 +1,10 @@
+{
+  "repository": "foundryvtt/pf2e",
+  "release": "sf2e-1.6.1",
+  "commit": "28d9d156f252d084371d994dc359509b49eadf18",
+  "schemaVersion": 1,
+  "contentRevision": 1,
+  "packs": ["ancestries", "classes"],
+  "includedFields": ["_id", "name", "type", "system.publication"],
+  "excludedContent": ["source prose", "naming lists", "artwork", "rule elements", "premium modules"]
+}

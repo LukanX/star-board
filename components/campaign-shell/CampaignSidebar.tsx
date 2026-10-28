@@ -92,6 +92,7 @@ export function CampaignSidebar({
               const isActive = activeView === item.id;
               return (
                 <CampaignRouteLink
+                  aria-current={isActive ? "page" : undefined}
                   className={`${navItemClassName} ${isActive ? "bg-[rgba(98,232,255,.095)] text-[var(--cyan)] shadow-[inset_2px_0_0_var(--cyan)] hover:bg-[rgba(98,232,255,.12)] hover:text-[var(--cyan)]" : ""}`}
                   href={item.href}
                   key={item.id}

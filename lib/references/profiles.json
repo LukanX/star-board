@@ -1,0 +1,62 @@
+{
+  "ancestries/android.json": {
+    "name": "Android",
+    "pageId": "dyusFHHyaQOaQhZ0",
+    "facts": ["Humanoid biomechanical body.", "Visible circuitry can glow; do not assume exposed robot machinery."],
+    "summary": ""
+  },
+  "ancestries/vesk.json": {
+    "name": "Vesk",
+    "pageId": "JxPJE2NPYNZ54EUO",
+    "facts": ["Muscular, scaled humanoid with a strong tail, claws, and teeth.", "Bony head and jaw projections; scale colors can vary."],
+    "summary": ""
+  },
+  "ancestries/kasatha.json": {
+    "name": "Kasatha",
+    "pageId": "PKGmC9bntc0F90mY",
+    "facts": ["Four arms on a tall humanoid body.", "Gray skin, black eyes, and a skull elongated toward the back."],
+    "summary": ""
+  },
+  "ancestries/barathu.json": {
+    "name": "Barathu",
+    "pageId": "CFvzqUAC03CP6sJI",
+    "facts": ["Floating, inflated body with hanging tentacles or limbs, rather than a standard humanoid silhouette.", "Body form and coloration are variable."],
+    "summary": ""
+  },
+  "ancestries/human.json": {
+    "name": "Human",
+    "pageId": "7pU8yM7yPMw92SY3",
+    "facts": ["Human anatomy with individually varied skin, hair, facial features, and build."],
+    "summary": ""
+  },
+  "classes/envoy.json": {
+    "name": "Envoy",
+    "facts": [],
+    "summary": "A coordination and social expertise role; no required uniform or equipment."
+  },
+  "classes/mystic.json": {
+    "name": "Mystic",
+    "facts": [],
+    "summary": "A magical role associated with connections; appearance and equipment remain individual."
+  },
+  "classes/operative.json": {
+    "name": "Operative",
+    "facts": [],
+    "summary": "A precision and specialist expertise role; do not prescribe a specific weapon or outfit."
+  },
+  "classes/solarian.json": {
+    "name": "Solarian",
+    "facts": [],
+    "summary": "A cosmic-energy martial role; show manifestations only when the subject calls for them."
+  },
+  "classes/soldier.json": {
+    "name": "Soldier",
+    "facts": [],
+    "summary": "An area-fire and defensive combat role; do not invent mandatory armor or a weapon loadout."
+  },
+  "classes/witchwarper.json": {
+    "name": "Witchwarper",
+    "facts": [],
+    "summary": "A reality-altering magical role; do not invent required physical mutations."
+  }
+}

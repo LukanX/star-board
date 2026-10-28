@@ -2,6 +2,14 @@ import type { CharacterGenerationInput, EnemyBriefGenerationInput, EnemyGenerati
 import type { CampaignAiContext, CampaignNarrativeAiContext, MissionAiReferences, PlaceAiContext } from "@/lib/ai/assistance";
 import type { ImageGenerationInput } from "@/lib/validation/image";
 import { imagePromptMaxLength } from "@/lib/validation/image";
+import type { ReferenceContext } from "@/lib/references/types";
+
+export class ImagePromptBudgetError extends Error {
+  constructor() {
+    super("The reference-grounded image prompt cannot fit the required appearance and style. Shorten the visual style or refinement and try again.");
+    this.name = "ImagePromptBudgetError";
+  }
+}
 
 export const ART_SAFETY_INSTRUCTION =
   "Create original artwork without imitating a living artist or copyrighted franchise style. Do not include written text, brand logos, signatures, or watermarks.";
@@ -20,6 +28,7 @@ type ArtPromptOptions = {
   targetKind?: ImageGenerationInput["targetKind"];
   placeContext?: PlaceAiContext;
   characterContext?: CharacterArtContext;
+  referenceContext?: ReferenceContext;
 };
 
 function campaignLines(context?: CampaignAiContext) {
@@ -149,7 +158,7 @@ export function buildMissionPrompt(input: MissionGenerationInput, context?: Camp
   ].filter(Boolean).join("\n");
 }
 
-export function buildNpcPrompt(input: NpcGenerationInput, context?: CampaignNarrativeAiContext, linkedContext?: string) {
+export function buildNpcPrompt(input: NpcGenerationInput, context?: CampaignNarrativeAiContext, linkedContext?: string, referenceContext?: ReferenceContext) {
   return [
     "You are a campaign writer for a Starfinder 2e campaign manager.",
     "Return only valid JSON matching the requested NPC draft fields.",
@@ -160,6 +169,7 @@ export function buildNpcPrompt(input: NpcGenerationInput, context?: CampaignNarr
     input.name ? `Existing name: ${input.name}` : "",
     input.species ? `Species: ${input.species}` : "",
     input.role ? `Role: ${input.role}` : "",
+    referenceContext?.text ?? "",
     input.focus ? `GM focus: ${input.focus}` : "",
     input.feedback ? `Revision feedback: ${input.feedback}` : "",
     input.protectedFields?.length ? `Keep these fields unchanged: ${input.protectedFields.join(", ")}` : "",
@@ -171,7 +181,7 @@ export function buildNpcPrompt(input: NpcGenerationInput, context?: CampaignNarr
   ].filter(Boolean).join("\n");
 }
 
-export function buildCharacterPrompt(input: Omit<CharacterGenerationInput, "characterId">, context?: CampaignAiContext, linkedContext?: string) {
+export function buildCharacterPrompt(input: Omit<CharacterGenerationInput, "characterId">, context?: CampaignAiContext, linkedContext?: string, referenceContext?: ReferenceContext) {
   return [
     "You are a character portrait prompt writer for a Starfinder 2e campaign manager.",
     "Return only valid JSON matching the requested character visual prompt fields.",
@@ -184,6 +194,7 @@ export function buildCharacterPrompt(input: Omit<CharacterGenerationInput, "char
     input.level !== undefined ? `Level: ${input.level}` : "",
     `Backstory: ${input.backstoryMarkdown || "No backstory recorded."}`,
     `Physical appearance: ${input.physicalDescription || "No physical appearance recorded."}`,
+    referenceContext?.text ?? "",
     input.focus ? `Portrait direction: ${input.focus}` : "",
     input.feedback ? `Revision feedback: ${input.feedback}` : "",
     input.protectedFields?.length ? `Keep these fields unchanged: ${input.protectedFields.join(", ")}` : "",
@@ -241,9 +252,10 @@ export function buildPlacePrompt(input: PlaceGenerationInput, context?: Campaign
   ].filter(Boolean).join("\n");
 }
 
-export function buildEnemyPrompt(input: EnemyGenerationInput, context?: CampaignNarrativeAiContext, linkedContext?: string) {
+export function buildEnemyPrompt(input: EnemyGenerationInput, context?: CampaignNarrativeAiContext, linkedContext?: string, referenceContext?: ReferenceContext) {
   return [
     "You are a Starfinder 2e creature stat-block writer for a GM campaign manager.",
+    referenceContext?.text ?? "",
     "Return only valid JSON matching every requested enemy draft field. Do not return markdown, commentary, or a group of creatures.",
     ...campaignLines(context),
     ...linkedEntityLines(linkedContext),
@@ -267,9 +279,10 @@ export function buildEnemyPrompt(input: EnemyGenerationInput, context?: Campaign
   ].filter(Boolean).join("\n");
 }
 
-export function buildEnemyBriefPrompt(input: EnemyBriefGenerationInput, context?: CampaignAiContext, linkedContext?: string) {
+export function buildEnemyBriefPrompt(input: EnemyBriefGenerationInput, context?: CampaignAiContext, linkedContext?: string, referenceContext?: ReferenceContext) {
   return [
     "You are a spoiler-safe copy editor for a GM campaign manager.",
+    referenceContext?.text ?? "",
     "Return only valid JSON with exactly playerDescription and artSubject.",
     ...campaignLines(context),
     ...linkedEntityLines(linkedContext),
@@ -305,6 +318,7 @@ export function buildArtPrompt(subject: string, visualStyle?: string, refinement
     ? truncatePromptPart(characterContext.physicalDescription, 240)
     : "";
   const savedAppearance = physicalDescription ? `Saved physical appearance: ${physicalDescription}` : "";
+  const referenceText = options.referenceContext?.text ?? "";
   const boundedStyle = visualStyle?.trim()
     ? `Campaign visual style: ${truncatePromptPart(visualStyle.trim(), 1200)}`
     : "";
@@ -320,6 +334,7 @@ export function buildArtPrompt(subject: string, visualStyle?: string, refinement
     characterAuthorityInstruction,
     savedCharacter,
     savedAppearance,
+    referenceText,
     styleAuthorityInstruction,
     boundedStyle,
     boundedRefinement,
@@ -329,6 +344,7 @@ export function buildArtPrompt(subject: string, visualStyle?: string, refinement
     Math.min(1200, imagePromptMaxLength - reservedSections.join(" ").length - 1 - "Subject: ".length),
   );
   const boundedSubject = truncatePromptPart(subject, subjectBudget);
+  if (referenceText && subjectBudget < Math.min(subject.length, 160)) throw new ImagePromptBudgetError();
   const promptParts = [
     ART_SAFETY_INSTRUCTION,
     targetInstruction,
@@ -336,6 +352,7 @@ export function buildArtPrompt(subject: string, visualStyle?: string, refinement
     `Subject: ${boundedSubject}`,
     savedCharacter,
     savedAppearance,
+    referenceText,
     styleAuthorityInstruction,
     boundedStyle,
     boundedRefinement,
@@ -346,5 +363,7 @@ export function buildArtPrompt(subject: string, visualStyle?: string, refinement
     : 0;
   const boundedPlaceContext = boundedPlaceArtContext(placeContext, placeContextBudget);
 
-  return [...promptParts, boundedPlaceContext].filter(Boolean).join(" ");
+  const prompt = [...promptParts, boundedPlaceContext].filter(Boolean).join(" ");
+  if (referenceText && prompt.length > imagePromptMaxLength) throw new ImagePromptBudgetError();
+  return prompt;
 }

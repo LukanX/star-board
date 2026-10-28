@@ -22,6 +22,7 @@ vi.mock("@/lib/campaign/characters-server", () => ({ getCampaignCharacter: mocks
 
 import { POST as createCharacter, GET as listCharacters } from "@/app/api/campaigns/[campaignId]/characters/route";
 import { DELETE as deleteCharacter, PATCH as updateCharacter } from "@/app/api/campaigns/[campaignId]/characters/[characterId]/route";
+import { searchReferences } from "@/lib/references/catalog";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -162,6 +163,41 @@ describe("character routes", () => {
     expect(query.update).toHaveBeenCalledWith({ name: "Nova Prime", updated_by: userId });
     expect(query.eq).toHaveBeenNthCalledWith(1, "id", characterId);
     expect(query.eq).toHaveBeenNthCalledWith(2, "campaign_id", campaignId);
+  });
+
+  it("persists explicit ancestry/class identities beside the existing text", async () => {
+    const ancestry = searchReferences("ancestry", "Android")[0].binding;
+    const classReference = searchReferences("class", "Soldier")[0].binding;
+    const query = createQuery({ id: characterId, owner_id: userId, species: "Android", class_name: "Soldier", ancestry_reference_id: ancestry.id, ancestry_catalog_version: ancestry.catalogVersion });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase: { from: vi.fn().mockReturnValue(query) }, user: { id: userId } });
+    mocks.getCampaignRole.mockResolvedValue("player");
+    const response = await createCharacter(request({ name: "Reference test", species: "Android", className: "Soldier", ancestryReference: ancestry, classReference }), campaignParams());
+    expect(response.status).toBe(201);
+    expect(query.insert).toHaveBeenCalledWith(expect.objectContaining({
+      ancestry_reference_id: ancestry.id, ancestry_catalog_version: ancestry.catalogVersion,
+      class_reference_id: classReference.id, class_catalog_version: classReference.catalogVersion,
+    }));
+    expect((await response.json()).character.ancestry_reference_id).toBe(ancestry.id);
+  });
+
+  it("rejects binding/text conflicts before writing", async () => {
+    const query = createQuery({});
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase: { from: vi.fn().mockReturnValue(query) }, user: { id: userId } });
+    mocks.getCampaignRole.mockResolvedValue("player");
+    const response = await createCharacter(request({ name: "Reference test", species: "Human", ancestryReference: searchReferences("ancestry", "Android")[0].binding }), campaignParams());
+    expect(response.status).toBe(400);
+    expect(query.insert).not.toHaveBeenCalled();
+  });
+
+  it("clears a stale binding atomically when species changes and detects concurrent edits", async () => {
+    const binding = searchReferences("ancestry", "Android")[0].binding;
+    const query = createQuery(null, { code: "PGRST116" });
+    query.maybeSingle.mockResolvedValue({ data: { species: "Android", class_name: "", ancestry_reference_id: binding.id, ancestry_catalog_version: binding.catalogVersion, updated_at: "2026-10-21T10:00:00Z", art_path: null }, error: null });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase: { from: vi.fn().mockReturnValue(query) }, user: { id: userId } });
+    const response = await updateCharacter(request({ species: "Custom" }, "PATCH"), characterParams());
+    expect(response.status).toBe(409);
+    expect(query.update).toHaveBeenCalledWith(expect.objectContaining({ species: "Custom", ancestry_reference_id: null, ancestry_catalog_version: null }));
+    expect(query.eq).toHaveBeenCalledWith("updated_at", "2026-10-21T10:00:00Z");
   });
 
   it("supports artwork-only portrait updates without changing character identity", async () => {

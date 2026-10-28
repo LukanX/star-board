@@ -40,12 +40,12 @@ supabase db push --local
 Set these values in `.env.local` using the values printed by `supabase status`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:55421
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-local-publishable-key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refresh the terminal after installing the CLI. If PowerShell still cannot resolve `supabase`, run the Scoop shim directly with `& "$env:USERPROFILE\\scoop\\shims\\supabase.exe"`.
+The local dashboard is available at `http://127.0.0.1:55423`. On Windows, refresh the terminal after installing the CLI. If PowerShell still cannot resolve `supabase`, run the Scoop shim directly with `& "$env:USERPROFILE\\scoop\\shims\\supabase.exe"`.
 
 `supabase db reset --local` is destructive: it recreates the local database from the migrations and `supabase/seed.sql`. Use `supabase db push --local` for a non-destructive migration update.
 
@@ -53,7 +53,7 @@ The local dashboard is available at `http://127.0.0.1:54323`. On Windows, refres
 
 1. Create a Supabase project.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001_initial.sql` through `0038_optional_job_giver.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
+3. Apply `supabase/migrations/0001_initial.sql` through `0046_campaign_library_owner.sql` in order through the Supabase SQL editor or the linked Supabase CLI.
 4. In Supabase Auth URL Configuration, set the Site URL to the deployed origin and add the deployed `/auth/callback` URL to the allowed redirect URLs. Keep localhost URLs only as additional development redirects.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed origin when deploying. This public variable is embedded during the Next.js build, so changing it in Netlify requires a new deploy.
 6. In the hosted Reset Password email template, use `{{ .ConfirmationURL }}` for the action link. Do not hardcode `localhost` or construct the action link from `{{ .SiteURL }}` when the app supplies a redirect URL.
@@ -78,6 +78,56 @@ Deployed Netlify requests always use the background path even if a stale `NETLIF
 ### Netlify enemy generation
 
 The GM enemy route keeps local generation synchronous, but queues full structured stat-block generation on Netlify so large responses are not lost to the synchronous request limit. The `generate-enemy-background` function validates the result, stores the private draft in `ai_generation_runs`, and the enemy editor polls `/api/ai/enemy/[generationRunId]` until the review candidate is ready. Apply `0023_async_enemy_generation.sql` and make `SUPABASE_SECRET_KEY` available to the Netlify Functions scope before using this deployed path. Generation never saves or overwrites an enemy until the GM applies the reviewed draft.
+
+### System library and Starfinder references
+
+NPC Species and character Species/Class fields offer optional official reference selections alongside unrestricted custom text. A selection saves a stable Foundry identity and catalog version; changing the text clears its binding. An unchanged older selection can still be saved, but reference-grounded generation requires reselecting from the current catalog or choosing **Use custom text**.
+
+Open **Library** in a campaign's Archive sidebar to browse the Foundry catalog at `/campaigns/[campaignId]/library/ancestries` or `/campaigns/[campaignId]/library/creature-traits`. The library stays inside the campaign's persistent sidebar and topbar, including on direct loads and refreshes. Browse lists show searchable names only; open an entry for authored content, editing and imported source details. The 60 ancestry and 292 creature-trait identities remain installation-wide, while authored appearance, lore and trait guidance belong to that campaign. Creature traits are rules-relevant tags, not encounter labels such as boss or ambusher. The catalog does not create custom reference records. Old `/system/...` links with a valid campaign query redirect to the corresponding campaign library; links without a campaign return to campaign selection.
+
+The bundled metadata and Supabase library work in deployment without a running Foundry instance, runtime GitHub/wiki connection, MCP server, new provider credentials or another AI call. Migrations through `0046_campaign_library_owner.sql` provide campaign-scoped storage and immutable owner identity, not AI-written appearance or lore. New campaigns start with empty authored fields. Migration 0045 copies prior shared revisions into each existing campaign and maps previous editor/admin grants only to campaigns where those accounts are current members. The five older AI-written anatomy profiles are retained only in the legacy artifact and never used as a fallback. Six existing AI-authored class-role summaries remain active and are not independently human-reviewed or official excerpts.
+
+Campaign members and the owner can browse that campaign's authored reference content. The campaign creator (`campaigns.created_by`) is its **System library owner**: the owner can edit automatically and manage editing access. The creator identity is database-protected and ownership transfer is not currently supported. Other campaign GMs do not inherit the owner permission. The owner can grant or revoke access only for existing members of that campaign; a new member can be assigned after joining. These grants and edits do not affect any other campaign. Removing a member also removes their editor grant.
+
+Open **Library > Library access** from the relevant campaign to manage its members. The list is limited to that campaign; the application does not expose a global Auth-user directory, invitations, or account administration. Direct API and database operations enforce the same campaign-owner and membership checks.
+
+Each successful save appends an immutable revision within its campaign; concurrent edits return a conflict and preserve the unsaved form. Auth account deletion preserves revision content with null authorship, while campaign deletion removes that campaign's revisions. Text is labeled **User-entered System library content**, not official, verified, canonical or necessarily human-authored. Enter only material you have permission to use, and never campaign secrets: current members can read their campaign's entries.
+
+GMs opt in under **Library > Generation context**, not Campaign settings. Appearance, lore and creature-trait context are three independent switches, all initially off. Only explicitly bound references contribute context; matching free text never binds automatically. NPC/character text can use ancestry appearance/lore; enemy text and briefs can also use selected creature traits. Artwork uses ancestry appearance only. Source notes never enter prompts. Enabling a section sends its applicable text to the campaign's configured AI provider.
+
+Enemy editors provide an optional ancestry reference and creature-trait autocomplete alongside unrestricted custom traits. Bindings are private GM data, survive saving/reloading, and clear when their matching trait is removed or changed. Existing imported/manual traits stay unbound until explicitly selected. Individual appearance, protected draft fields and campaign art style take precedence over general reference defaults; character assistance uses saved identity rather than unsaved editor changes.
+
+Enabled campaigns use only their own latest saved reference text on the next generation. Drafts retain the exact campaign revision, included sections and hash used; changing a campaign library never rewrites an existing draft or approved artwork. Draft source panels check for changed context on focus and distinguish unbound, disabled, empty and available selections. Provenance survives enemy/image background processing and image gallery restoration without storing raw library prose in usage logs. All generation remains review-before-save.
+
+Appearance and trait guidance allow 4,000 characters each, lore 8,000, and source notes 2,000. Combined reference prompt context is limited to 4,000 characters; oversized context fails explicitly rather than being clipped or summarized. Artwork retains its separate 3,000-character total prompt limit. Empty or disabled content contributes nothing, without AI-written defaults or silent storage-error fallbacks.
+
+Maintainers can explicitly refresh the catalog from its immutable source pin:
+
+```bash
+npm run references:refresh -- --download
+npm run references:traits-refresh -- --download
+```
+
+Alternatively, pass `--source` with a clean checkout at the pinned commit. Trait extraction statically resolves the configured creature-trait namespace and imports only slugs, labels and source identity, not rule descriptions. Distinct slugs may legitimately share a display name. Review [the reference notice](lib/references/NOTICE.md) before changing the pin. Refreshes are never performed during installation, build, or runtime.
+
+After reviewing a metadata refresh, generate a **new** forward migration (choose the next unused migration number), then validate and apply it locally:
+
+```powershell
+node scripts\seed-system-references.mjs --output supabase\migrations\0047_refresh_system_references.sql
+supabase db push --local
+```
+
+The seed tool refuses to overwrite an existing file. Its upsert updates imported metadata only and preserves authored revisions. Deploy the matching artifact and migration together; stale or mismatched bindings require reselection before generation. Do not rewrite already-applied migrations or push to hosted Supabase without authorization.
+
+The StarfinderWiki follow-up currently supports metadata discovery only:
+
+```bash
+npm run references:wiki-audit
+```
+
+This explicitly checks current crawler rules and audits every catalog ancestry using paced article requests. It records candidate/canonical URLs, revision identifiers, section hashes, and coverage metrics in [the generated wiki audit](lib/references/wiki-coverage.generated.json), without saving article prose. Multiword title spelling and wiki redirects are handled, but a found article is **not** approval of subject/edition compatibility or excerpt reuse.
+
+This remains a standalone metadata audit, not a wiki-content integration; wiki integration was stopped. Source permission remains unresolved. The command never changes the runtime catalog, sends wiki prose to a provider or enables wiki anatomy grounding. It is separate from the user-entered library. Failed HTTP/parser checks abort the audit and preserve the last successful report rather than inventing missing-source results.
 
 The migrations create campaign membership, role-aware RLS, GM-only notes in private tables, one active player vote per campaign, join-link redemption, episode promotion, a private `campaign-art` storage bucket, the genre-neutral Places archive, the campaign-scoped Enemies archive, faction player/GM notes, and optional campaign-scoped NPC faction membership. Places form an arbitrary-depth tree through `parent_place_id`; sibling names are unique within a campaign, cycles are rejected in PostgreSQL, deleting a parent promotes children to roots, and deleting a Place clears primary-place links on NPCs, factions, jobs, and episodes. Enemy mechanics, source provenance, and GM notes remain in GM-only detail rows; unrevealed enemy artwork is blocked from player Storage reads by an exact `enemies.art_path` reference and reveal check rather than a filename convention. Unattached background-generated image objects remain private to their requesting GM and are removed during retention when they are no longer referenced. Campaign creation and membership redemption use security-definer functions so a client cannot grant itself access by inserting rows directly.
 
@@ -162,11 +212,20 @@ npm run build
 The database-backed RLS suite is opt-in and targets only the local Supabase instance. Start local Supabase first, then run this in PowerShell:
 
 ```powershell
+$raw = npx supabase status -o json 2>$null
+if ($LASTEXITCODE -ne 0) { throw "Local Supabase is unavailable." }
+$local = ($raw -join "`n") | ConvertFrom-Json
+if (([uri]$local.API_URL).Host -ne "127.0.0.1" -or -not $local.SERVICE_ROLE_KEY) { throw "Local-only fixture guard failed." }
+$env:NEXT_PUBLIC_SUPABASE_URL = $local.API_URL
+$env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = $local.ANON_KEY
+$env:TEST_LOCAL_SUPABASE_SERVICE_KEY = $local.SERVICE_ROLE_KEY
+$env:TEST_LOCAL_SUPABASE_DB_CONTAINER = "supabase_db_star-board"
+$env:TEST_LOCAL_SUPABASE_DB_PORT = ([uri]$local.DB_URL).Port.ToString()
 $env:RUN_LOCAL_SUPABASE_TESTS = "1"
 npm run test:rls
 ```
 
-The suite creates or signs into two local test accounts, creates a temporary campaign, and removes that campaign through the GM policy when it finishes. It is guarded against non-loopback Supabase URLs.
+Confirm the container name using `docker ps` if your local Supabase project ID differs. Privileged fixture SQL verifies that the explicit database container exposes the confirmed local DB port. The service key is used only for temporary local Auth accounts, not to bypass production table grants. Do not print these credentials, commit them or substitute hosted values. The suites create temporary campaigns/users/reference entries and remove their fixtures; shared revisions, editor revocation, concurrency, enemy bindings, and exact provenance count/byte bounds are tested alongside campaign RLS.
 
 ## Product direction
 

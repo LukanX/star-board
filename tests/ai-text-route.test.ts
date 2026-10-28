@@ -41,6 +41,7 @@ import { POST as generateFaction } from "@/app/api/ai/faction/route";
 import { POST as generateMission } from "@/app/api/ai/mission/route";
 import { POST as generateNpc } from "@/app/api/ai/npc/route";
 import { AiProviderError } from "@/lib/ai/errors";
+import { searchReferences } from "@/lib/references/catalog";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -126,7 +127,14 @@ describe("structured AI assistance routes", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toMatchObject({ name: "Kept Name", species: "Android", role: "Smuggler" });
-    expect(mocks.buildNpcPrompt).toHaveBeenCalledWith(expect.objectContaining({ feedback: "Make the character warmer without changing their identity.", protectedFields: ["name", "species"] }), expect.anything(), "");
+    expect(mocks.buildNpcPrompt).toHaveBeenCalledWith(expect.objectContaining({ feedback: "Make the character warmer without changing their identity.", protectedFields: ["name", "species"] }), expect.anything(), "", { text: "", sources: [] });
+  });
+
+  it("rejects mismatched NPC ancestry before spending provider usage", async () => {
+    const response = await generateNpc(request({ ...baseInput, species: "Human", ancestryReference: searchReferences("ancestry", "Vesk")[0].binding }));
+    expect(response.status).toBe(400);
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(mocks.resolveCampaignCredential).not.toHaveBeenCalled();
   });
 
   it("returns a validated faction draft and records metadata", async () => {

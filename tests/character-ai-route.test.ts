@@ -24,6 +24,7 @@ vi.mock("@/lib/ai/model-discovery", () => ({ getAiModelCatalog: mocks.getAiModel
 vi.mock("@/lib/ai/route-support", () => ({ campaignCredentialErrorResponse: vi.fn(), resolveCampaignCredential: mocks.resolveCampaignCredential }));
 
 import { POST as generateCharacterPrompt } from "@/app/api/ai/character/route";
+import { searchReferences } from "@/lib/references/catalog";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -82,7 +83,7 @@ describe("character portrait prompt route", () => {
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
     expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "character-prompt", expect.anything(), "openai/gpt-4o-mini");
-    expect(mocks.buildCharacterPrompt).toHaveBeenCalledWith(expect.objectContaining({ backstoryMarkdown: "A survivor of a derelict ship.", physicalDescription: "Tall with silver eyes." }), expect.objectContaining({ system: "Starfinder 2e" }), "");
+    expect(mocks.buildCharacterPrompt).toHaveBeenCalledWith(expect.objectContaining({ backstoryMarkdown: "A survivor of a derelict ship.", physicalDescription: "Tall with silver eyes." }), expect.objectContaining({ system: "Starfinder 2e" }), "", { text: "", sources: [] });
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ campaignId, userId, kind: "character", status: "complete", model: "openai/gpt-4o-mini", provider: "openrouter", effectiveModel: "openrouter/fallback", generationId: "character-run-1" }));
   });
 
@@ -95,5 +96,26 @@ describe("character portrait prompt route", () => {
     expect(response.status).toBe(403);
     expect(payload.error).toBe("Campaign membership is required for AI character assistance.");
     expect(mocks.generateJson).not.toHaveBeenCalled();
+  });
+
+  it("grounds from saved bindings rather than forged client ancestry", async () => {
+    const binding = searchReferences("ancestry", "Kasatha")[0].binding;
+    const saved = await mocks.loadCharacterPortraitAccess();
+    saved.access.character = { ...saved.access.character, species: "Kasatha", ancestry_reference_id: binding.id, ancestry_catalog_version: binding.catalogVersion };
+    mocks.loadCharacterPortraitAccess.mockResolvedValue(saved);
+    const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: { appearance: true, lore: false, creature_traits: false }, error: null }) };
+    mocks.getAuthenticatedUser.mockResolvedValue({ user: { id: userId }, supabase: {
+      from: vi.fn(() => query),
+      rpc: vi.fn(async () => ({ error: null, data: [{
+        reference_id: binding.id, kind: "ancestry", name: "Kasatha", catalog_version: binding.catalogVersion,
+        source_url: searchReferences("ancestry", "Kasatha")[0].sourceUrl, publication: "", revision: 1,
+        appearance: "Four arms (user-entered fixture).", lore: "", trait_context: "", source_notes: "", updated_at: null,
+      }] })),
+    } });
+    mocks.generateJson.mockResolvedValue({ data: { visualPrompt: "An individual portrait." }, model: "openai/gpt-4o-mini" });
+    const response = await generateCharacterPrompt(request({ campaignId, characterId: saved.access.character.id, mode: "create", species: "Vesk", ancestryReference: searchReferences("ancestry", "Vesk")[0].binding }));
+    expect(response.status).toBe(200);
+    expect(mocks.buildCharacterPrompt).toHaveBeenCalledWith(expect.anything(), expect.anything(), "", expect.objectContaining({ text: expect.stringContaining("Four arms") }));
+    expect((await response.json()).references[0].id).toBe(binding.id);
   });
 });

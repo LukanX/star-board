@@ -3,7 +3,10 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { generateImage } from "@/lib/ai/client";
 import { loadPlaceAiContext } from "@/lib/ai/assistance";
-import { buildArtPrompt } from "@/lib/ai/prompts";
+import { buildArtPrompt, ImagePromptBudgetError } from "@/lib/ai/prompts";
+import { ReferenceError } from "@/lib/references/catalog";
+import { buildSystemReferenceContext } from "@/lib/references/system-library";
+import { readReferenceBinding } from "@/lib/references/types";
 import { canUseCharacterPortraitAi, loadCharacterPortraitAccess, type CharacterPortraitAccess } from "@/lib/ai/character-portrait-access";
 import { getAuthenticatedUser, requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
@@ -255,6 +258,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: placeContextResult.error }, { status: placeContextResult.invalid ? 400 : 503 });
     }
 
+    diagnosticStage = "reference-context";
+    const referenceContext = await buildSystemReferenceContext(supabase, input.data.campaignId, characterAccess
+      ? [{ kind: "ancestry", text: characterAccess.character.species, binding: readReferenceBinding(characterAccess.character, "ancestry") }]
+      : input.data.npcReferenceContext
+        ? [{ kind: "ancestry", text: input.data.npcReferenceContext.species, binding: input.data.npcReferenceContext.ancestryReference }]
+        : input.data.enemyReferenceContext
+          ? [{ kind: "ancestry", binding: input.data.enemyReferenceContext.ancestryReference }]
+          : [], "image");
+    const referenceMetadata = referenceContext.sources.length ? { references: referenceContext.sources } : {};
+    const referenceColumns = referenceContext.sources.length ? { reference_sources: referenceContext.sources } : {};
     const visualStyleHash = createHash("sha256").update(visualStyle).digest("hex");
     const prompt = buildArtPrompt(
       input.data.subject,
@@ -262,6 +275,7 @@ export async function POST(request: Request) {
       input.data.refinement,
       {
         targetKind: input.data.targetKind,
+        referenceContext,
         placeContext: placeContextResult.context,
         characterContext: characterAccess
           ? {
@@ -298,6 +312,7 @@ export async function POST(request: Request) {
           aspect_ratio: input.data.aspectRatio,
           size: requestedSize ?? null,
           status: "pending",
+          ...referenceColumns,
           ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
         })
         .select("id, created_at, status_updated_at")
@@ -316,6 +331,7 @@ export async function POST(request: Request) {
         ...(requestedSize ? { size: requestedSize } : {}),
         ...(imageResolution ? { resolution: imageResolution } : {}),
         supportedParameters,
+        ...referenceMetadata,
       };
 
       try {
@@ -344,6 +360,7 @@ export async function POST(request: Request) {
           createdAt: new Date(generationRun.created_at).toISOString(),
           statusUpdatedAt: new Date(generationRun.status_updated_at ?? generationRun.created_at).toISOString(),
           model: selectedModel.id,
+          ...referenceMetadata,
           ...(characterAccess ? { characterId: characterAccess.character.id } : {}),
         },
         prompt,
@@ -432,6 +449,7 @@ export async function POST(request: Request) {
         output_tokens: response.usage?.outputTokens,
         cost_usd: response.usage?.cost,
         status: "complete",
+        ...referenceColumns,
       })
       .select("id, created_at")
       .single();
@@ -498,6 +516,7 @@ export async function POST(request: Request) {
       model: response.model,
       createdAt,
       temporaryPath,
+      ...referenceMetadata,
     });
 
     if (!draft.success) {
@@ -506,6 +525,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ draft: draft.data, model: response.model });
   } catch (error: unknown) {
+    if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof ImagePromptBudgetError) return NextResponse.json({ error: error.message }, { status: 400 });
     logUnexpectedImageFailure(diagnosticStage, diagnosticModel, error);
     return NextResponse.json({ error: "Art generation is temporarily unavailable.", diagnosticStage }, { status: 503 });
   }

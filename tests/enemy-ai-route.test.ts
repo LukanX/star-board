@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AiProviderError } from "@/lib/ai/errors";
 import { enemyStatBlockSchema } from "@/lib/validation/enemy";
+import { libraryEntry, librarySource } from "./support/library-reference";
 
 const mocks = vi.hoisted(() => ({
   generateJson: vi.fn(),
@@ -82,8 +83,11 @@ function createSupabaseMock() {
   };
   generationUpdate.update.mockReturnValue(generationUpdate);
 
+  let generationQueries = 0;
+  const settings = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: { appearance: true, lore: false, creature_traits: false }, error: null }) };
   return {
-    from: vi.fn().mockReturnValueOnce(generationInsert).mockReturnValue(generationUpdate),
+    from: vi.fn((table: string) => table === "campaign_system_reference_settings" ? settings : ++generationQueries === 1 ? generationInsert : generationUpdate),
+    rpc: vi.fn().mockResolvedValue({ data: [libraryEntry], error: null }),
     generationInsert,
     generationUpdate,
   };
@@ -151,7 +155,7 @@ describe("POST /api/ai/enemy", () => {
     });
     expect(mocks.generateJson).not.toHaveBeenCalled();
     expect(mocks.recordAiGeneration).not.toHaveBeenCalled();
-    expect(mocks.buildEnemyPrompt).toHaveBeenCalledWith(expect.objectContaining({ campaignId }), expect.objectContaining({ setting: "SAVED_ENEMY_SETTING", styleTags: ["Survival"] }), "");
+    expect(mocks.buildEnemyPrompt).toHaveBeenCalledWith(expect.objectContaining({ campaignId }), expect.objectContaining({ setting: "SAVED_ENEMY_SETTING", styleTags: ["Survival"] }), "", { text: "", sources: [] });
     expect(mocks.dispatchEnemyBackgroundJob).toHaveBeenCalledWith(previewUrl, {
       generationRunId,
       prompt: "enemy-prompt",
@@ -174,6 +178,29 @@ describe("POST /api/ai/enemy", () => {
       status_updated_at: expect.any(String),
       error_message: "The enemy background worker could not be reached.",
     });
+
+  });
+
+  it("preserves exact manual provenance in synchronous audits, queued runs and signed dispatch", async () => {
+    const input = { ...baseInput, systemReferences: { ancestry: { id: librarySource.id, catalogVersion: librarySource.catalogVersion }, creatureTraits: [] } };
+    const synchronous = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase: synchronous, user: { id: userId }, role: "gm" });
+    mocks.generateJson.mockResolvedValue({ data: draft, model: "openai/gpt-4o-mini" });
+    const sync = await POST(request(input));
+    expect(sync.status).toBe(200);
+    expect((await sync.json()).references).toEqual([librarySource]);
+    expect(mocks.recordAiGeneration).toHaveBeenCalledWith(synchronous, expect.objectContaining({ referenceSources: [librarySource] }));
+    const queued = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase: queued, user: { id: userId }, role: "gm" });
+    const response = await POST(request(input, previewUrl));
+    expect(response.status).toBe(202);
+    expect((await response.json()).job.references).toEqual([librarySource]);
+    expect(queued.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({ reference_sources: [librarySource] }));
+    expect(mocks.dispatchEnemyBackgroundJob).toHaveBeenCalledWith(previewUrl, expect.objectContaining({ references: [librarySource] }), "worker-secret");
+    expect(mocks.buildEnemyPrompt).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), "", {
+      text: expect.stringContaining(libraryEntry.appearance), sources: [librarySource],
+    });
+    expect(JSON.stringify(queued.generationInsert.insert.mock.calls)).not.toContain(libraryEntry.appearance);
   });
 
   it("keeps local generation synchronous and records a completed draft", async () => {

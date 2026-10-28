@@ -4,6 +4,8 @@ import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { ApiEnemy, EnemyFilters } from "@/lib/campaign/types";
 import { enemyStatBlockSchema, type EnemyStatBlockV1 } from "@/lib/validation/enemy";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { referenceBindingSchema, creatureTraitBindingSchema } from "@/lib/validation/reference";
 
 export type CampaignEnemiesResult = {
   role: "gm" | "player";
@@ -186,7 +188,24 @@ export async function readCampaignEnemyForRole(
   const detail = role === "gm" ? (await readEnemyDetails(supabase, campaignId, [enemyId])).get(enemyId) ?? null : null;
   const [withArt] = await addCampaignArtUrls(supabase, [data as EnemyPublicRow], true);
   const enemy = toEnemy(withArt, detail, withArt.art_url ?? null);
-  if (role === "gm") return enemy;
+  if (role === "gm") {
+    const { data: references, error: referenceError } = await supabase.from("enemy_reference_selections")
+      .select("reference_id, kind, catalog_version, system_reference_entries(name)").eq("enemy_id", enemyId);
+    if (referenceError) throw new Error("Unable to read enemy System references.");
+    const rows = z.array(z.object({
+      reference_id: z.string(), kind: z.enum(["ancestry", "creature_trait"]), catalog_version: z.string(),
+      system_reference_entries: z.object({ name: z.string() }),
+    })).parse(references);
+    enemy.system_references = { ancestry: null, creatureTraits: [] };
+    enemy.system_reference_names = {};
+    for (const row of rows) {
+      const binding = { id: row.reference_id, catalogVersion: row.catalog_version };
+      if (row.kind === "ancestry") enemy.system_references.ancestry = referenceBindingSchema.parse(binding);
+      else enemy.system_references.creatureTraits.push(creatureTraitBindingSchema.parse(binding));
+      enemy.system_reference_names[row.reference_id] = row.system_reference_entries.name;
+    }
+    return enemy;
+  }
   const [visibleEnemy] = await maskPlayerFacingEntityMarkdownBatch(supabase, campaignId, [enemy], (record) => [
     { key: "player_description", markdown: record.player_description },
   ]);

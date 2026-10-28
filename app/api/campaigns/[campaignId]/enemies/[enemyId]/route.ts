@@ -28,6 +28,7 @@ function toRpcPayload(input: EnemyInput) {
       artPath: input.artPath ?? null,
     },
     details: {
+      ...(input.systemReferences ? { systemReferences: input.systemReferences } : {}),
       level: input.level,
       size: input.size,
       rarity: input.rarity,
@@ -92,6 +93,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
 
     const mergedResult = createEnemySchema.safeParse({
+      systemReferences: input.data.systemReferences,
       name: input.data.name ?? current.name,
       playerDescription: input.data.playerDescription ?? current.player_description,
       playerDescriptionIsMarkdown: input.data.playerDescriptionIsMarkdown ?? current.player_description_is_markdown ?? false,
@@ -165,7 +167,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       p_expected_updated_at: current.updated_at,
       p_expected_source_hash: current.source_content_hash ?? null,
     });
-    if (error) return NextResponse.json({ error: error.code === "40001" ? "The enemy changed while this edit was being saved." : "Unable to update enemy." }, { status: error.code === "23505" || error.code === "40001" ? 409 : 400 });
+    if (error) return NextResponse.json({ error: error.code === "40001" || error.code === "PT409" ? "The enemy changed while this edit was being saved." : "Unable to update enemy." }, { status: error.code === "23505" || error.code === "40001" || error.code === "PT409" ? 409 : 400 });
     if (typeof updatedId !== "string") return NextResponse.json({ error: "Enemy was updated without an identifier." }, { status: 503 });
 
     if (current.art_path !== mergedResult.data.artPath) await removeCampaignArtIfUnreferenced(context.supabase, campaignId, current.art_path);

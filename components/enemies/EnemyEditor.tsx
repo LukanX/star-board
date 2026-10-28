@@ -4,6 +4,11 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Download, FileSearch, Pin, PinOff, RefreshCw, Sparkles, Undo2, X } from "lucide-react";
 import { discardNewCampaignArtStudioSession, finalizeCampaignArtStudioSession, markCampaignArtPersisted, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
+import EnemySystemReferences from "@/components/enemies/EnemySystemReferences";
+import ReferenceSources from "@/components/ui/ReferenceSources";
+import { reconcileEnemyReferences } from "@/lib/references/enemy";
+import { referenceStatusesSchema, type EnemyReferenceSelections } from "@/lib/validation/reference";
+import type { ReferenceStatus } from "@/lib/references/types";
 import RichMarkdownField from "@/components/markdown/RichMarkdownField";
 import { editorPanelClassName, editorSelectClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
@@ -17,6 +22,7 @@ function defaultStatBlock(): EnemyStatBlockV1 {
 }
 
 type EnemyDraft = {
+  systemReferences: EnemyReferenceSelections;
   name: string;
   playerDescription: string;
   playerDescriptionIsMarkdown: boolean;
@@ -43,6 +49,8 @@ type ApprovedImport = {
 };
 
 type EnemyAiCheckpoint = {
+  systemReferences: EnemyReferenceSelections;
+  sources: ReferenceStatus[];
   candidate: EnemyAiDraft;
   protectedFields: string[];
 };
@@ -73,6 +81,7 @@ function toSourceSnapshot(enemy: ApiEnemy): EnemySourceSnapshot | null {
 
 function toDraft(enemy?: ApiEnemy): EnemyDraft {
   return enemy ? {
+    systemReferences: enemy.system_references ?? { ancestry: null, creatureTraits: [] },
     name: enemy.name,
     playerDescription: enemy.player_description,
     playerDescriptionIsMarkdown: enemy.player_description_is_markdown ?? false,
@@ -92,6 +101,7 @@ function toDraft(enemy?: ApiEnemy): EnemyDraft {
     sourceSnapshot: toSourceSnapshot(enemy),
     statBlock: enemy.stat_block ?? defaultStatBlock(),
   } : {
+    systemReferences: { ancestry: null, creatureTraits: [] },
     name: "",
     playerDescription: "",
     playerDescriptionIsMarkdown: false,
@@ -120,6 +130,10 @@ function traitsFromText(value: string): string[] {
 export default function EnemyEditor({ campaignId, enemy, initialImportPreview, onSaved, onCancel: parentOnCancel }: { campaignId: string; enemy?: ApiEnemy; initialImportPreview?: EnemyImportPreview | null; onSaved?: (enemy: ApiEnemy) => void; onCancel?: () => void }) {
   const [draft, setDraftState] = useState<EnemyDraft>(() => toDraft(enemy));
   const [aiCandidate, setAiCandidate] = useState<EnemyAiDraft | null>(null);
+  const [aiReferences, setAiReferences] = useState<EnemyReferenceSelections>({ ancestry: null, creatureTraits: [] });
+  const [referenceNames, setReferenceNames] = useState<Record<string, string>>(enemy?.system_reference_names ?? {});
+  const [aiSources, setAiSources] = useState<ReferenceStatus[]>([]);
+  const [briefSources, setBriefSources] = useState<ReferenceStatus[]>([]);
   const [aiCheckpoint, setAiCheckpoint] = useState<EnemyAiCheckpoint | null>(null);
   const [aiProtectedFields, setAiProtectedFields] = useState<string[]>([]);
   const [aiBrief, setAiBrief] = useState<EnemyAiBrief>({ name: "", level: "", traits: "", focus: "" });
@@ -149,7 +163,10 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const setDraft = (updater: (current: EnemyDraft) => EnemyDraft) => {
     setDirty();
-    setDraftState(updater);
+    setDraftState((current) => {
+      const next = updater(current);
+      return { ...next, systemReferences: reconcileEnemyReferences(next.systemReferences, traitsFromText(next.traitsText), referenceNames) };
+    });
   };
   const update = <K extends keyof EnemyDraft>(field: K, value: EnemyDraft[K]) => {
     if (field === "name" || field === "level" || field === "traitsText") manuallyTouchedFieldsRef.current.add(field === "traitsText" ? "traits" : field);
@@ -168,6 +185,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const startAiSession = () => {
     if (aiSessionStarted) return;
+    setAiReferences(draft.systemReferences);
     setAiBrief({
       name: draft.name,
       level: enemy || manuallyTouchedFieldsRef.current.has("level") ? String(draft.level) : "",
@@ -195,6 +213,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
     setDirty("ai");
     setAiSessionStarted(true);
     setAiBrief((current) => ({ ...current, [field]: value }));
+    if (field === "traits") setAiReferences((current) => reconcileEnemyReferences(current, traitsFromText(value), referenceNames));
     if (!enemyAiBriefFields.has(field)) return;
     if (!value.trim()) {
       setAiProtectedFields((current) => current.filter((candidate) => candidate !== field));
@@ -215,6 +234,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
     trackUnsavedUploads: true,
     url: draft.artUrl,
     subject: draft.artSubject,
+    enemyReferenceContext: { ancestryReference: draft.systemReferences.ancestry },
     currentPrompt: draft.artPrompt,
     onSubjectChange: (value) => update("artSubject", value),
     onChange: (value) => update("artPath", value),
@@ -240,6 +260,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
         };
 
     return {
+      systemReferences: reconcileEnemyReferences(aiReferences, source.traits ?? [], referenceNames),
       campaignId,
       mode: revision || enemy ? "refine" : "create",
       name: source.name,
@@ -273,18 +294,22 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
     setIsGenerating(true); setError(null);
     try {
       const response = await fetch("/api/ai/enemy", { method: "POST", headers: { "Content-Type": "application/json" }, signal: generationController.signal, body: JSON.stringify(generationBody(revision, briefLevel ?? undefined)) });
-      const result = (await response.json()) as { error?: string; draft?: unknown; job?: EnemyBackgroundJob };
+      const result = (await response.json()) as { error?: string; draft?: unknown; job?: EnemyBackgroundJob; references?: unknown };
       let candidate: EnemyAiDraft;
+      let sources: ReferenceStatus[] = [];
       if (response.status === 202 && result.job) {
-        candidate = await waitForEnemyBackgroundJob(result.job, { signal: generationController.signal });
+        candidate = await waitForEnemyBackgroundJob(result.job, { signal: generationController.signal, onReferences: (value) => { sources = value; } });
       } else {
         if (!response.ok || !result.draft) throw new Error(result.error ?? "Enemy generation failed.");
         candidate = enemyAiDraftSchema.parse(result.draft);
+        sources = referenceStatusesSchema.parse(result.references ?? []);
       }
       if (aiCandidate) {
-        setAiCheckpoint({ candidate: aiCandidate, protectedFields: [...aiProtectedFields] });
+        setAiCheckpoint({ candidate: aiCandidate, protectedFields: [...aiProtectedFields], systemReferences: aiReferences, sources: aiSources });
       }
       setAiCandidate(candidate);
+      setAiSources(sources);
+      setAiReferences((current) => reconcileEnemyReferences(current, candidate.traits, referenceNames));
       setAiFeedback("");
       setDirty("ai");
     } catch (generationError) {
@@ -305,6 +330,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
   ) => {
     setDirty("ai");
     setAiCandidate((current) => (current ? { ...current, [field]: value } : current));
+    if (field === "traits" && Array.isArray(value) && value.every((trait) => typeof trait === "string")) setAiReferences((current) => reconcileEnemyReferences(current, value, referenceNames));
   };
 
   const toggleAiProtected = (field: string) => {
@@ -322,6 +348,8 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
   const undoAiRevision = () => {
     if (!aiCheckpoint || isGenerating) return;
     setAiCandidate(aiCheckpoint.candidate);
+    setAiReferences(aiCheckpoint.systemReferences);
+    setAiSources(aiCheckpoint.sources);
     setAiProtectedFields(aiCheckpoint.protectedFields);
     setAiCheckpoint(null);
     setAiFeedback("");
@@ -331,7 +359,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const applyEnemyCandidate = () => {
     if (!aiCandidate) return;
-    setDraft((current) => ({ ...current, name: aiCandidate.name, playerDescription: aiCandidate.playerDescription, playerDescriptionIsMarkdown: true, level: aiCandidate.level, size: aiCandidate.size, rarity: aiCandidate.rarity, traitsText: aiCandidate.traits.join(", "), family: aiCandidate.family ?? "", gmNotesMarkdown: aiCandidate.gmNotesMarkdown, artSubject: aiCandidate.artSubject, statBlock: aiCandidate.statBlock, origin: "ai", sourceSnapshot: null }));
+    setDraft((current) => ({ ...current, systemReferences: aiReferences, name: aiCandidate.name, playerDescription: aiCandidate.playerDescription, playerDescriptionIsMarkdown: true, level: aiCandidate.level, size: aiCandidate.size, rarity: aiCandidate.rarity, traitsText: aiCandidate.traits.join(", "), family: aiCandidate.family ?? "", gmNotesMarkdown: aiCandidate.gmNotesMarkdown, artSubject: aiCandidate.artSubject, statBlock: aiCandidate.statBlock, origin: "ai", sourceSnapshot: null }));
     setApprovedImport(null);
     setStatBlockIssues([]);
     setAiCandidate(null);
@@ -356,9 +384,10 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
     setIsBriefGenerating(true); setError(null);
     try {
       const response = await fetch("/api/ai/enemy/brief", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(generationBody(false, briefLevel ?? undefined)) });
-      const result = (await response.json()) as { error?: string; draft?: unknown };
+      const result = (await response.json()) as { error?: string; draft?: unknown; references?: unknown };
       if (!response.ok || !result.draft) throw new Error(result.error ?? "Enemy brief generation failed.");
       setBriefCandidate(enemyBriefDraftSchema.parse(result.draft));
+      setBriefSources(referenceStatusesSchema.parse(result.references ?? []));
       setDirty("ai");
     } catch (generationError) {
       if (!aiCandidate && !briefCandidate && !aiFeedback.trim()) clearDirty("ai");
@@ -368,7 +397,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const applyBriefCandidate = () => {
     if (!briefCandidate) return;
-    setDraft((current) => ({ ...current, playerDescription: briefCandidate.playerDescription, playerDescriptionIsMarkdown: true, artSubject: briefCandidate.artSubject }));
+    setDraft((current) => ({ ...current, systemReferences: reconcileEnemyReferences(aiReferences, traitsFromText(current.traitsText), referenceNames), playerDescription: briefCandidate.playerDescription, playerDescriptionIsMarkdown: true, artSubject: briefCandidate.artSubject }));
     setBriefCandidate(null);
     if (!aiCandidate) {
       setAiSessionStarted(false);
@@ -422,7 +451,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
       }
       setStatBlockIssues([]);
       const statBlock: EnemyStatBlockV1 = statBlockResult.data;
-      const payload = { name: draft.name, playerDescription: draft.playerDescription, playerDescriptionIsMarkdown: draft.playerDescriptionIsMarkdown, isRevealed: draft.isRevealed, artPath: draft.artPath, artUrl: draft.artUrl, level: draft.level, size: draft.size, rarity: draft.rarity, traits: traitsFromText(draft.traitsText), family: draft.family || null, statBlock, gmNotesMarkdown: draft.gmNotesMarkdown, origin: draft.origin, artSubject: draft.artSubject || null, artPrompt: draft.artPrompt, artProvider: draft.artProvider, sourceSnapshot: draft.sourceSnapshot, ...(enemy ? { expectedUpdatedAt: enemy.updated_at } : {}) };
+      const payload = { systemReferences: draft.systemReferences, name: draft.name, playerDescription: draft.playerDescription, playerDescriptionIsMarkdown: draft.playerDescriptionIsMarkdown, isRevealed: draft.isRevealed, artPath: draft.artPath, artUrl: draft.artUrl, level: draft.level, size: draft.size, rarity: draft.rarity, traits: traitsFromText(draft.traitsText), family: draft.family || null, statBlock, gmNotesMarkdown: draft.gmNotesMarkdown, origin: draft.origin, artSubject: draft.artSubject || null, artPrompt: draft.artPrompt, artProvider: draft.artProvider, sourceSnapshot: draft.sourceSnapshot, ...(enemy ? { expectedUpdatedAt: enemy.updated_at } : {}) };
       const validated = createEnemySchema.safeParse(payload);
       if (!validated.success) {
         const mechanicsIssues = validated.error.issues.filter((issue) => issue.path[0] === "statBlock").map(({ path, message }) => ({ path: path.slice(1), message }));
@@ -448,6 +477,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
           sourceSnapshot: reviewedSource.sourceSnapshot,
         },
         preserved: {
+          systemReferences: draft.systemReferences,
           playerDescription: draft.playerDescription,
           playerDescriptionIsMarkdown: draft.playerDescriptionIsMarkdown,
           isRevealed: draft.isRevealed,
@@ -478,6 +508,31 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
   );
 
   return <section className={`${editorPanelClassName} mb-5`} data-enemy-editor="true"><div className="editor-heading flex items-start justify-between gap-4 mb-[18px]"><div><p className={eyebrowClassName}>GM ENEMY RECORD</p><h2 className="mt-[6px] text-[19px]">{enemy ? `Edit ${enemy.name}` : "Add an enemy"}</h2></div><div className="editor-heading-actions flex items-center gap-2"><button className="h-[37px] inline-flex items-center justify-center gap-2 border border-[var(--line)] bg-[rgba(255,255,255,.035)] px-[12px] text-[var(--muted)] font-mono text-[9px] tracking-[.1em] cursor-pointer hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]" disabled={isSaving} onClick={toggleAiWorkspace} type="button"><Sparkles size={14} /> {aiWorkspaceOpen ? "BACK TO EDITOR" : "OPEN AI WORKSPACE"}</button><button aria-label="Close enemy editor" className="w-8 h-8 inline-grid place-items-center border border-transparent bg-transparent text-[var(--muted)] cursor-pointer p-0 hover:text-[var(--ink)] hover:border-[var(--line)] hover:bg-[rgba(255,255,255,.035)]" onClick={onCancel} title="Close enemy editor" type="button"><X size={17} /></button></div></div>
+    <EnemySystemReferences campaignId={campaignId} value={aiWorkspaceOpen ? aiReferences : draft.systemReferences} names={referenceNames} disabled={isGenerating || isBriefGenerating || isSaving} traitsLocked={isSourceLocked}
+      onAncestry={(binding) => {
+        if (aiWorkspaceOpen) { setAiReferences((current) => ({ ...current, ancestry: binding })); setDirty("ai"); }
+        else setDraft((current) => ({ ...current, systemReferences: { ...current.systemReferences, ancestry: binding } }));
+      }}
+      onTrait={(name, binding) => {
+        const names = { ...referenceNames, [binding.id]: name };
+        setReferenceNames(names);
+        if (aiWorkspaceOpen) {
+          setAiReferences((current) => ({ ...current, creatureTraits: [...current.creatureTraits.filter((entry) => entry.id !== binding.id), binding] }));
+          const traits = [...traitsFromText(aiCandidate ? aiCandidate.traits.join(", ") : aiBrief.traits), name];
+          if (aiCandidate) setAiCandidate({ ...aiCandidate, traits: [...new Set(traits)] });
+          else setAiBrief((current) => ({ ...current, traits: [...new Set(traits)].join(", ") }));
+          setDirty("ai");
+        } else {
+          setDraftState((current) => ({ ...current, traitsText: [...new Set([...traitsFromText(current.traitsText), name])].join(", "), systemReferences: { ...current.systemReferences, creatureTraits: [...current.systemReferences.creatureTraits.filter((entry) => entry.id !== binding.id), binding] } }));
+          setDirty();
+        }
+      }}
+      onUnbind={(id) => {
+        if (aiWorkspaceOpen) { setAiReferences((current) => ({ ...current, creatureTraits: current.creatureTraits.filter((entry) => entry.id !== id) })); setDirty("ai"); }
+        else setDraft((current) => ({ ...current, systemReferences: { ...current.systemReferences, creatureTraits: current.systemReferences.creatureTraits.filter((entry) => entry.id !== id) } }));
+      }} />
+    <ReferenceSources sources={aiWorkspaceOpen && aiCandidate ? aiSources : aiWorkspaceOpen && briefCandidate ? briefSources : []} campaignId={campaignId} compareWithDraft={Boolean(aiWorkspaceOpen && (aiCandidate || briefCandidate))}
+      currentSelections={[{ kind: "ancestry", binding: (aiWorkspaceOpen ? aiReferences : draft.systemReferences).ancestry }, ...(aiWorkspaceOpen ? aiReferences : draft.systemReferences).creatureTraits.map((binding) => ({ kind: "creature_trait" as const, binding }))]} />
     <div hidden={!aiWorkspaceOpen} aria-hidden={!aiWorkspaceOpen} className="grid gap-[12px] mb-4">
       <section className="grid gap-[10px] p-[12px] border border-[rgba(185,146,255,.3)] bg-[rgba(185,146,255,.055)]"><div className="flex items-center gap-2"><Sparkles size={15} className="text-[var(--purple)]" /><p className={`${eyebrowClassName} !m-0 text-[var(--purple)]`}>ENEMY STARTING BRIEF</p></div><p className="m-0 text-[var(--muted)] text-[10px] leading-[1.5]">Give the generator only the essentials you already know. Leave Level blank when you want it to choose.</p><div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-1"><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">Name<input className="h-[37px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" maxLength={160} value={aiBrief.name} onChange={(event) => updateAiBrief("name", event.target.value)} disabled={isGenerating || isBriefGenerating} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">Level<input className="h-[37px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" type="number" min={-1} max={25} step={1} placeholder="AI chooses" value={aiBrief.level} onChange={(event) => updateAiBrief("level", event.target.value)} disabled={isGenerating || isBriefGenerating} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">Type / classification<input className="h-[37px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" maxLength={400} placeholder="Aberration, construct, aquatic" value={aiBrief.traits} onChange={(event) => updateAiBrief("traits", event.target.value)} disabled={isGenerating || isBriefGenerating} /></label></div><RichMarkdownField campaignId={campaignId} label="Concept / direction" value={aiBrief.focus} isMarkdown maxLength={600} audience="gm" onChange={(value) => updateAiBrief("focus", value)} /></section>
       <section className="grid gap-[10px] p-[12px] border border-[rgba(185,146,255,.3)] bg-[rgba(185,146,255,.055)]"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Sparkles size={15} className="text-[var(--purple)]" /><p className={`${eyebrowClassName} !m-0 text-[var(--purple)]`}>AI COMPLETE CREATURE DRAFT</p></div><button className="h-[32px] inline-flex items-center gap-2 border border-[rgba(255,92,154,.4)] bg-[rgba(255,92,154,.08)] px-[10px] text-[var(--pink)] font-mono text-[8px] tracking-[.08em] cursor-pointer" disabled={isGenerating || isSourceLocked} onClick={() => void generateEnemy(Boolean(aiCandidate))} type="button">{isGenerating ? <RefreshCw className="animate-spin" size={13} /> : <Sparkles size={13} />} {isGenerating ? "GENERATING..." : aiCandidate ? "REVISE DRAFT" : "GENERATE DRAFT"}</button></div><p className="m-0 text-[var(--muted)] text-[10px] leading-[1.5]">Review and edit the candidate here. Nothing is saved until you apply it to the manual editor and submit the record.</p>{aiCandidate ? <div className="grid gap-2 border-t border-[rgba(185,146,255,.18)] pt-2"><div className="grid grid-cols-2 gap-2 max-[600px]:grid-cols-1"><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]"><span className="flex items-center justify-between gap-2">NAME {protectedToggle("name", "name")}</span><input className="h-[35px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" maxLength={160} value={aiCandidate.name} onChange={(event) => updateAiCandidate("name", event.target.value)} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]"><span className="flex items-center justify-between gap-2">LEVEL {protectedToggle("level", "level")}</span><input className="h-[35px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" type="number" min={-1} max={25} value={aiCandidate.level} onChange={(event) => updateAiCandidate("level", Number(event.target.value))} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]"><span className="flex items-center justify-between gap-2">SIZE {protectedToggle("size", "size")}</span><select className={editorSelectClassName} value={aiCandidate.size} onChange={(event) => updateAiCandidate("size", enemySizeSchema.parse(event.target.value))}>{enemySizeSchema.options.map((size) => <option key={size} value={size}>{size.toUpperCase()}</option>)}</select></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]"><span className="flex items-center justify-between gap-2">RARITY {protectedToggle("rarity", "rarity")}</span><select className={editorSelectClassName} value={aiCandidate.rarity} onChange={(event) => updateAiCandidate("rarity", enemyRaritySchema.parse(event.target.value))}>{enemyRaritySchema.options.map((rarity) => <option key={rarity} value={rarity}>{rarity.toUpperCase()}</option>)}</select></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]"><span className="flex items-center justify-between gap-2">TRAITS {protectedToggle("traits", "traits")}</span><input className="h-[35px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" maxLength={400} value={aiCandidate.traits.join(", ")} onChange={(event) => updateAiCandidate("traits", traitsFromText(event.target.value))} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]"><span className="flex items-center justify-between gap-2">FAMILY {protectedToggle("family", "family")}</span><input className="h-[35px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" maxLength={160} value={aiCandidate.family ?? ""} onChange={(event) => updateAiCandidate("family", event.target.value || null)} /></label></div><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">PLAYER-SAFE DESCRIPTION {protectedToggle("playerDescription", "player description")}<textarea className="min-h-[75px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] p-2 text-[var(--ink)] font-mono text-[10px] leading-[1.45]" maxLength={4000} value={aiCandidate.playerDescription} onChange={(event) => updateAiCandidate("playerDescription", event.target.value)} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">GM NOTES {protectedToggle("gmNotesMarkdown", "GM notes")}<textarea className="min-h-[75px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] p-2 text-[var(--ink)] font-mono text-[10px] leading-[1.45]" maxLength={20000} value={aiCandidate.gmNotesMarkdown} onChange={(event) => updateAiCandidate("gmNotesMarkdown", event.target.value)} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">ARTWORK SUBJECT {protectedToggle("artSubject", "artwork subject")}<textarea className="min-h-[65px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] p-2 text-[var(--ink)] font-mono text-[10px] leading-[1.45]" maxLength={1600} value={aiCandidate.artSubject} onChange={(event) => updateAiCandidate("artSubject", event.target.value)} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">STRUCTURED STAT BLOCK {protectedToggle("statBlock", "stat block")}<EnemyStatBlockEditor value={aiCandidate.statBlock} onChange={(statBlock) => updateAiCandidate("statBlock", statBlock)} disabled={isSourceLocked} issues={[]} /></label><label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">WHAT SHOULD CHANGE?<RichMarkdownField

@@ -4,7 +4,7 @@ import { enemyBackgroundJobSchema, type EnemyBackgroundJob } from "@/lib/validat
 export const enemyBackgroundFunctionName = "generate-enemy-background";
 
 export function createEnemyBackgroundSignature(job: EnemyBackgroundJob, secret: string) {
-  return createHmac("sha256", secret).update(JSON.stringify(job)).digest("hex");
+  return createHmac("sha256", secret).update(JSON.stringify(enemyBackgroundJobSchema.parse(job))).digest("hex");
 }
 
 export function verifyEnemyBackgroundSignature(job: EnemyBackgroundJob, signature: string | null, secret: string) {

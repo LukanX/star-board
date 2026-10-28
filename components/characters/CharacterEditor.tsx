@@ -10,6 +10,8 @@ import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { ApiCampaignMember, ApiCharacter, CharacterDraft } from "@/lib/campaign/types";
+import ReferenceCombobox from "@/components/ui/ReferenceCombobox";
+import { readReferenceBinding } from "@/lib/references/types";
 
 const emptyDraft: CharacterDraft = {
   name: "",
@@ -49,6 +51,8 @@ export default function CharacterEditor({
       ? {
           name: character.name,
           species: character.species,
+          ancestryReference: readReferenceBinding(character, "ancestry"),
+          classReference: readReferenceBinding(character, "class"),
           className: character.class_name,
           level: character.level,
           isActive: character.is_active !== false,
@@ -148,6 +152,7 @@ export default function CharacterEditor({
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          {canGeneratePortrait ? <p className="text-[10px] text-[var(--muted)]">Portrait AI uses saved identity and appearance. Save Character before generating with changed Species, Class, or appearance.</p> : null}
           {canGeneratePortrait ? (
             <button
               className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px bg-[rgba(255,255,255,.035)] text-[var(--muted)] hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]"
@@ -202,20 +207,8 @@ export default function CharacterEditor({
               onChange={(event) => update("name", event.target.value)}
             />
           </label>
-          <label>
-            Species
-            <input
-              value={draft.species}
-              onChange={(event) => update("species", event.target.value)}
-            />
-          </label>
-          <label>
-            Class
-            <input
-              value={draft.className}
-              onChange={(event) => update("className", event.target.value)}
-            />
-          </label>
+          <ReferenceCombobox campaignId={campaignId} kind="ancestry" label="Species" value={draft.species} binding={draft.ancestryReference} onChange={(species, ancestryReference) => { setDirty(); setDraft((current) => ({ ...current, species, ancestryReference })); }} />
+          <ReferenceCombobox campaignId={campaignId} kind="class" label="Class" value={draft.className} binding={draft.classReference} onChange={(className, classReference) => { setDirty(); setDraft((current) => ({ ...current, className, classReference })); }} />
           <label>
             Level
             <input

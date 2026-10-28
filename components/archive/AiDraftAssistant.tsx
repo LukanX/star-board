@@ -6,6 +6,9 @@ import AiModelPicker from "@/components/archive/AiModelPicker";
 import RichMarkdownField from "@/components/markdown/RichMarkdownField";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { NoteVisibility } from "@/lib/campaign/types";
+import ReferenceSources from "@/components/ui/ReferenceSources";
+import { referenceStatusesSchema } from "@/lib/validation/reference";
+import type { ReferenceStatus } from "@/lib/references/types";
 
 export type AiDraftField = {
   key: string;
@@ -25,6 +28,7 @@ export type AiDraftSelectField = {
 };
 
 type DraftCheckpoint = {
+  references?: ReferenceStatus[];
   candidate: Record<string, string>;
   protectedFields: string[];
   contextValues: Record<string, string>;
@@ -42,7 +46,8 @@ type AiDraftAssistantProps = {
   stageContextFields?: boolean;
   requestFields?: Record<string, string | number | null | undefined>;
   renderContextControls?: (state: { isGenerating: boolean }) => ReactNode;
-  prepareRequestFields?: () => Record<string, unknown>;
+  prepareRequestFields?: (values: Record<string, string>) => Record<string, unknown>;
+  renderBriefField?: (state: { field: AiDraftField; value: string; onChange: (value: string) => void; disabled: boolean }) => ReactNode;
   requestContextKey?: string;
   identityKey?: string;
   currentDraft?: Record<string, string>;
@@ -112,6 +117,7 @@ function AiDraftAssistantContent({
   requestFields,
   renderContextControls,
   prepareRequestFields,
+  renderBriefField,
   requestContextKey,
   currentDraft,
   protectedFieldKeys = [],
@@ -144,6 +150,7 @@ function AiDraftAssistantContent({
   ]);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [lastModel, setLastModel] = useState<string | null>(null);
+  const [references, setReferences] = useState<ReferenceStatus[] | undefined>(undefined);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
@@ -224,7 +231,8 @@ function AiDraftAssistantContent({
     setError(null);
 
     try {
-      const additionalFields = prepareRequestFields?.() ?? {};
+      const seedValues = revision && candidate ? valuesForFields(briefFields, candidate) : visibleBriefValues;
+      const additionalFields = prepareRequestFields?.(seedValues) ?? {};
       const generatedContextKey = requestContextKey === undefined
         ? null
         : JSON.stringify(additionalFields);
@@ -238,6 +246,7 @@ function AiDraftAssistantContent({
         error?: string;
         model?: string;
         draft?: Record<string, unknown>;
+        references?: unknown;
       };
 
       if (!response.ok || !result.draft) {
@@ -251,8 +260,11 @@ function AiDraftAssistantContent({
 
       if (requestId !== requestIdRef.current) return;
 
+      const parsedReferences = result.references === undefined ? undefined : referenceStatusesSchema.parse(result.references);
+
       if (candidate) {
         setCheckpoint({
+          references,
           candidate,
           protectedFields: [...protectedFields],
           contextValues: { ...candidateContextValues },
@@ -262,6 +274,7 @@ function AiDraftAssistantContent({
       const nextCandidate = candidateFromResult(result.draft);
       setLastModel(result.model ?? selectedModel);
       setCandidate(nextCandidate);
+      setReferences(parsedReferences);
       setCandidateRequestContextKey(generatedContextKey);
       setCandidateContextValues({ ...visibleContextValues });
       setFeedback("");
@@ -302,6 +315,7 @@ function AiDraftAssistantContent({
   const undo = () => {
     if (!checkpoint || isGenerating) return;
     setCandidate(checkpoint.candidate);
+    setReferences(checkpoint.references);
     setCandidateRequestContextKey(checkpoint.requestContextKey);
     setCandidateContextValues(checkpoint.contextValues);
     setStagedContextValues(checkpoint.contextValues);
@@ -323,6 +337,7 @@ function AiDraftAssistantContent({
     if (stageContextFields) onApplyContext?.(visibleContextValues);
     setBriefValues(valuesForFields(briefFields, candidate));
     setCandidate(null);
+    setReferences(undefined);
     setCandidateRequestContextKey(null);
     setCandidateContextValues({});
     setStagedContextValues({ ...visibleContextValues });
@@ -423,32 +438,28 @@ function AiDraftAssistantContent({
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-1">
-            {briefFields.map((field) => (
-              <label
+            {briefFields.map((field) => {
+              const change = (value: string) => {
+                markDirty();
+                setHasStarted(true);
+                setBriefValues({ ...visibleBriefValues, [field.key]: value });
+              };
+              return <div key={field.key} className="min-w-0">{renderBriefField?.({ field, value: visibleBriefValues[field.key] ?? "", onChange: (value) => { change(value); updateCandidate(field.key, value); }, disabled: isGenerating }) ?? <label
                 className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]"
-                key={field.key}
               >
                 {field.label}
                 <input
                   className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--purple)] focus:shadow-[0_0_0_2px_rgba(185,146,255,.1)] placeholder:text-[#4d5a6b]"
                   maxLength={field.maxLength}
                   value={visibleBriefValues[field.key] ?? ""}
-                  onChange={(event) =>
-                    (() => {
-                      markDirty();
-                      setHasStarted(true);
-                      setBriefValues((current) => ({
-                        ...current,
-                        [field.key]: event.target.value,
-                      }));
-                    })()
-                  }
+                  onChange={(event) => change(event.target.value)}
                 />
-              </label>
-            ))}
+              </label>}</div>;
+            })}
           </div>
         </div>
       ) : null}
+      {references ? <ReferenceSources sources={references} campaignId={campaignId} characterId={typeof requestFields?.characterId === "string" ? requestFields.characterId : undefined} /> : null}
       {showModelPicker ? (
         <AiModelPicker
           campaignId={campaignId}

@@ -13,8 +13,19 @@ const isLoopbackSupabase = (() => {
     return false;
   }
 })();
-const localSupabaseUrl = isLoopbackSupabase ? configuredSupabaseUrl : "http://127.0.0.1:54321";
+const configuredSupabasePort = (() => {
+  try {
+    return new URL(configuredSupabaseUrl ?? "").port;
+  } catch {
+    return null;
+  }
+})();
+const localSupabaseUrl = isLoopbackSupabase && configuredSupabasePort !== "54321"
+  ? configuredSupabaseUrl!
+  : "http://127.0.0.1:55421";
 const localPublishableKey = isLoopbackSupabase ? configuredPublishableKey ?? "local-e2e-placeholder" : "local-e2e-placeholder";
+process.env.NEXT_PUBLIC_SUPABASE_URL = localSupabaseUrl;
+process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = localPublishableKey;
 const authFile = path.resolve("playwright/.auth/gm.json");
 
 export default defineConfig({

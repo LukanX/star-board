@@ -4,6 +4,7 @@ import { getImageJobStaleMessage } from "@/lib/ai/image-job-lifecycle";
 import { loadCharacterPortraitAccess } from "@/lib/ai/character-portrait-access";
 import { getAuthenticatedUser, getCampaignRole } from "@/lib/auth/permissions";
 import { createCampaignArtSignedUrl } from "@/lib/storage/campaign-art";
+import { referenceStatusesSchema } from "@/lib/validation/reference";
 
 type RouteContext = { params: Promise<{ generationRunId: string }> };
 
@@ -27,7 +28,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const { data: run, error } = await context.supabase
       .from("ai_generation_runs")
-      .select("id, campaign_id, requested_by, kind, mode, purpose, target_kind, target_character_id, aspect_ratio, size, model, effective_model, image_path, image_media_type, created_at, status, status_updated_at, error_message")
+      .select("id, campaign_id, requested_by, kind, mode, purpose, target_kind, target_character_id, aspect_ratio, size, model, effective_model, image_path, image_media_type, created_at, status, status_updated_at, error_message, reference_sources")
       .eq("id", generationRunId)
       .eq("kind", "image")
       .maybeSingle();
@@ -96,6 +97,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
         model: run.effective_model ?? run.model,
         createdAt: new Date(run.created_at).toISOString(),
         temporaryPath: run.image_path,
+        ...(run.reference_sources == null ? {} : { references: referenceStatusesSchema.parse(run.reference_sources) }),
         ...(run.target_kind === "character" && run.target_character_id ? { characterId: run.target_character_id } : {}),
         image: { base64: null, url: signedUrl, mediaType: run.image_media_type },
       },

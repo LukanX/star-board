@@ -209,7 +209,7 @@ export default function CampaignsPage() {
       <section className={campaignsFrameClassName}>
         <header className={campaignsHeaderClassName}>
           <div className={campaignsHeaderBrandClassName}><span className={authBrandSymbolClassName}><Orbit size={23} /></span><span><strong className={authBrandNameClassName}>STAR BOARD</strong><small className={authBrandSubtitleClassName}>CAMPAIGN MANAGER</small></span></div>
-          <div className={campaignsHeaderActionsClassName}><span className={campaignsClearanceClassName}><ShieldCheck size={14} /> SIGNED IN</span><SignOutButton className={campaignsSignOutClassName} /></div>
+          <div className={`${campaignsHeaderActionsClassName} flex-wrap`}><span className={campaignsClearanceClassName}><ShieldCheck size={14} /> SIGNED IN</span><SignOutButton className={campaignsSignOutClassName} /></div>
         </header>
         <div className={campaignsIntroClassName}><p className={eyebrowBrightClassName}><span className={liveDotBrightClassName} /> CAMPAIGNS</p><h1>Choose or create a campaign.</h1><p>Anyone with an account can open a new campaign. A GM invite is only needed to join an existing one.</p></div>
         <div className={campaignsLayoutClassName}>

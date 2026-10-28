@@ -48,6 +48,7 @@ type MarkdownContentProps = {
   className?: string;
   preserveSoftBreaks?: boolean;
   suppressAutolinkLiterals?: boolean;
+  allowEntityLinks?: boolean;
 };
 
 export function MarkdownContent({
@@ -55,13 +56,14 @@ export function MarkdownContent({
   className = "",
   preserveSoftBreaks = false,
   suppressAutolinkLiterals = false,
+  allowEntityLinks = true,
 }: MarkdownContentProps) {
   return (
     <div
       className={`markdown-content ${markdownContentClassName} ${preserveSoftBreaks ? "whitespace-pre-wrap" : ""} ${className}`.trim()}
     >
       <ReactMarkdown
-        components={{ a: MarkdownEntityLink }}
+        components={allowEntityLinks ? { a: MarkdownEntityLink } : {}}
         remarkPlugins={suppressAutolinkLiterals ? legacyRichMarkdownPlugins : markdownPlugins}
       >
         {source}

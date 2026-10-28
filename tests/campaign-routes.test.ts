@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   campaignEntityPath,
+  campaignLibraryPath,
   campaignPath,
   campaignSectionPath,
   campaignsPath,
@@ -31,6 +32,7 @@ describe("campaign route contracts", () => {
     expect(campaignSectionPath("campaign-42", "notes")).toBe("/campaigns/campaign-42/notes");
     expect(campaignEntityPath("campaign-42", "notes", "note-7")).toBe("/campaigns/campaign-42/notes/note-7");
     expect(campaignSectionPath("campaign-42", "members")).toBe("/campaigns/campaign-42/members");
+    expect(campaignSectionPath("campaign-42", "library")).toBe("/campaigns/campaign-42/library");
     expect(campaignSectionPath("campaign-42", "settings")).toBe("/campaigns/campaign-42/settings");
   });
 
@@ -46,6 +48,9 @@ describe("campaign route contracts", () => {
     expect(getCampaignSectionFromPath("/campaigns/campaign-42/npcs", "campaign-42")).toBe("npcs");
     expect(getCampaignSectionFromPath("/campaigns/campaign-42/npcs/npc-7", "campaign-42")).toBe("npcs");
     expect(getCampaignSectionFromPath("/campaigns/campaign-42/enemies/enemy-7", "campaign-42")).toBe("enemies");
+    expect(getCampaignSectionFromPath("/campaigns/campaign-42/library/ancestries", "campaign-42")).toBe("library");
+    expect(getCampaignSectionFromPath("/campaigns/campaign-42/library/ancestries/sf2e.ancestry", "campaign-42")).toBe("library");
+    expect(getCampaignSectionFromPath("/campaigns/campaign-42/library/access", "campaign-42")).toBe("library");
     expect(getCampaignSectionFromPath("/campaigns/another-campaign/npcs", "campaign-42")).toBe("overview");
   });
 
@@ -56,9 +61,18 @@ describe("campaign route contracts", () => {
     );
   });
 
+  it("builds campaign-scoped library list, detail, generation and access paths", () => {
+    expect(campaignLibraryPath("crew alpha")).toBe("/campaigns/crew%20alpha/library/ancestries");
+    expect(campaignLibraryPath("campaign-42", "creature-traits", "trait/one")).toBe("/campaigns/campaign-42/library/creature-traits/trait%2Fone");
+    expect(campaignLibraryPath("campaign-42", "generation")).toBe("/campaigns/campaign-42/library/generation");
+    expect(campaignLibraryPath("campaign-42", "access")).toBe("/campaigns/campaign-42/library/access");
+  });
 });
 
 describe("campaign navigation metadata", () => {
+  it("includes Library in the campaign Archive", () => {
+    expect(getCampaignNavigationItem("library")).toEqual({ id: "library", label: "Library", group: "Archive" });
+  });
   it("includes Enemies in the Archive", () => {
     expect(campaignNavigation).toContainEqual({ id: "enemies", label: "Enemies", group: "Archive" });
     expect(getCampaignNavigationItem("enemies")).toEqual({ id: "enemies", label: "Enemies", group: "Archive" });

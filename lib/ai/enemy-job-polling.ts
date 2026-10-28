@@ -7,8 +7,11 @@ import {
   getEnemyJobStaleMessage,
 } from "@/lib/ai/enemy-job-lifecycle";
 import { enemyAiDraftSchema, type EnemyAiDraft } from "@/lib/validation/enemy";
+import { referenceStatusesSchema } from "@/lib/validation/reference";
+import type { ReferenceStatus } from "@/lib/references/types";
 
 export type EnemyBackgroundJob = {
+  references?: ReferenceStatus[];
   generationRunId: string;
   status: "pending" | "running";
   mode: "create" | "refine";
@@ -32,10 +35,12 @@ type EnemyJobStatusResponse = {
     model?: string | null;
     createdAt?: string;
     draft?: unknown;
+    references?: unknown;
   };
 };
 
 type PollOptions = {
+  onReferences?: (references: ReferenceStatus[]) => void;
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -133,6 +138,7 @@ export async function waitForEnemyBackgroundJob(
       if (result.job?.status === "complete") {
         const draft = enemyAiDraftSchema.safeParse(result.job.draft);
         if (!draft.success) throw new Error("The completed enemy job has no usable draft.");
+        options.onReferences?.(referenceStatusesSchema.parse(result.job.references ?? job.references ?? []));
         return draft.data;
       }
 

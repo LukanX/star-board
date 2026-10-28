@@ -22,7 +22,15 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user && /^\/campaigns\/[^/]+\/library(?:\/|$)/.test(request.nextUrl.pathname)) {
+    const login = new URL("/login", request.url);
+    login.searchParams.set("mode", "signin");
+    login.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    const redirect = NextResponse.redirect(login);
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+    return redirect;
+  }
   return response;
 }
 

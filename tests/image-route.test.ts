@@ -30,6 +30,7 @@ vi.mock("@/lib/ai/assistance", () => ({ loadPlaceAiContext: mocks.loadPlaceAiCon
 
 import { POST } from "@/app/api/ai/image/route";
 import { AiProviderError } from "@/lib/ai/errors";
+import { searchReferences } from "@/lib/references/catalog";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -121,7 +122,9 @@ function createSupabaseMock() {
   const attachImage = vi.fn().mockResolvedValue({ data: true, error: null });
 
   let generationRunQueryCount = 0;
+  const systemQuery = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: { appearance: true, lore: false, creature_traits: false }, error: null }) };
   const from = vi.fn((table: string) => {
+    if (table === "campaign_system_reference_settings") return systemQuery;
     if (table === "campaigns") return campaignQuery;
     if (table === "campaign_visual_styles") return styleQuery;
     if (table === "ai_generation_runs") {
@@ -134,7 +137,12 @@ function createSupabaseMock() {
   return {
     from,
     storage: { from: storageFrom },
-    rpc: attachImage,
+    rpc: vi.fn((name: string, args: unknown) => name === "read_system_references" ? Promise.resolve({ error: null, data: [{
+      reference_id: searchReferences("ancestry", "Kasatha")[0].binding.id, kind: "ancestry", name: "Kasatha",
+      catalog_version: searchReferences("ancestry", "Kasatha")[0].binding.catalogVersion,
+      source_url: searchReferences("ancestry", "Kasatha")[0].sourceUrl, publication: "", revision: 1,
+      appearance: "Four arms (user-entered fixture).", lore: "", trait_context: "", source_notes: "", updated_at: null,
+    }] }) : attachImage(name, args)),
     generationInsert,
     generationUpdate,
     styleQuery,
@@ -199,6 +207,35 @@ describe("POST /api/ai/image", () => {
 
     expect(response.status).toBe(403);
     expect(payload.error).toBe("GM access is required for AI art assistance.");
+  });
+
+  it.each(["npc", "enemy"] as const)("grounds direct %s artwork identically in synchronous and signed background paths", async (targetKind) => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.generateImage.mockResolvedValue({ image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" }, model: "openai/gpt-image-1" });
+    const binding = searchReferences("ancestry", "Kasatha")[0].binding;
+    const body = { campaignId, mode: "create", targetKind, subject: "A pilot with a missing arm.",
+      ...(targetKind === "npc" ? { npcReferenceContext: { species: "Kasatha", ancestryReference: binding } } : { enemyReferenceContext: { ancestryReference: binding } }) };
+    const sync = await POST(createRequest(body));
+    expect(sync.status).toBe(200);
+    const syncDraft = (await sync.json()).draft;
+    expect(syncDraft.prompt).toContain("Four arms");
+    expect(syncDraft.prompt).toContain("missing arm");
+    expect(syncDraft.references[0].id).toBe(binding.id);
+    const queuedSupabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase: queuedSupabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", NETLIFY_IMAGE_GENERATION: "background", SUPABASE_SECRET_KEY: "worker-secret" });
+    mocks.dispatchImageBackgroundJob.mockResolvedValue(undefined);
+    const queued = await POST(createRequest(body));
+    expect(queued.status).toBe(202);
+    const job = (await queued.json()).job;
+    expect(job.prompt).toBe(syncDraft.prompt);
+    expect(job.references).toEqual(syncDraft.references);
+    expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prompt: syncDraft.prompt, references: syncDraft.references }), "worker-secret");
+    expect(queuedSupabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({ reference_sources: syncDraft.references }));
   });
 
   it("allows an owner to generate a portrait with saved character context", async () => {

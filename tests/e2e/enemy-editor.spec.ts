@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "./fixtures";
 
 test("creates and hydrates a readable enemy stat block", async ({ page, campaign }) => {
@@ -79,6 +80,27 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
     await expect(editor).toHaveCount(0);
     await page.getByRole("link", { name: "OPEN FULL RECORD", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/campaigns/${campaign.campaignId}/enemies/${enemyId}$`));
+    const exportResponsePromise = page.waitForResponse((response) => response.url().includes(`/enemies/${enemyId}/export/foundry`), { timeout: 15000 });
+    await page.getByRole("button", { name: "Export enemy to Foundry VTT", exact: true }).click();
+    const exportResponse = await exportResponsePromise;
+    const exportResponseBody = await exportResponse.text();
+    expect(exportResponse.ok(), exportResponseBody).toBeTruthy();
+    const exportReview = page.getByRole("region", { name: "Foundry export warnings" });
+    await expect(exportReview).toBeVisible({ timeout: 10000 });
+    await expect(exportReview).toContainText("Some entries are text-only or need manual setup in Foundry.");
+    const downloadPromise = page.waitForEvent("download");
+    await exportReview.getByRole("button", { name: "DOWNLOAD WITH WARNINGS", exact: true }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/-foundry-actor\.json$/);
+    const downloadPath = await download.path();
+    const exportedActor = JSON.parse(await readFile(downloadPath, "utf8")) as Record<string, unknown>;
+    expect(exportedActor.name).toBe(enemyName);
+    expect(exportedActor.type).toBe("npc");
+    expect(exportedActor).not.toHaveProperty("campaign_id");
+    expect(exportedActor).not.toHaveProperty("gm_notes_markdown");
+    expect(exportedActor).not.toHaveProperty("source_snapshot");
+    expect(JSON.stringify(exportedActor)).not.toContain(campaign.campaignId);
+
     const statBlock = page.locator('[data-enemy-stat-block="true"]');
     await expect(statBlock).toContainText("120");
     await expect(statBlock).toContainText("30 feet");
