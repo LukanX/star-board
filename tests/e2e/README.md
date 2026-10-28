@@ -39,7 +39,11 @@ Coverage includes campaign-scoped reference revisions, owner and member-editor
 permissions, isolation between campaigns, member-only grant/revoke controls,
 browser history, legacy-link redirects, one persistent campaign shell,
 name-only browse lists, sidebar dirty navigation, desktop/mobile overflow,
-independently persisted opt-ins under Library > Generation context, and private enemy ancestry/trait bindings. Tests
+aligned NPC/character inputs with wrapped reference guidance, selected references
+and lookup errors, consistent NPC AI workspace input spacing,
+independently persisted opt-ins under Library > Generation context, and inline enemy
+trait search in manual and AI workflows, including generation requests and private
+ancestry/trait bindings. Tests
 remove their temporary records and restore campaign settings.
 
 ## First required journeys

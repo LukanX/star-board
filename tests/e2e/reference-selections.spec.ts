@@ -1,5 +1,51 @@
+import type { Locator } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { searchReferences } from "../../lib/references/catalog";
+
+async function expectAlignedInputs(inputs: Locator[]) {
+  const boxes = await Promise.all(inputs.map((input) => input.boundingBox()));
+  const first = boxes[0];
+  if (!first) throw new Error("Expected the first aligned input to be visible.");
+  for (const box of boxes) {
+    if (!box) throw new Error("Expected all aligned inputs to be visible.");
+    expect(Math.abs(box.y - first.y)).toBeLessThanOrEqual(1);
+    expect(box.height).toBe(42);
+  }
+}
+
+for (const entity of ["npcs", "characters"] as const) {
+  test(`keeps ${entity} inputs aligned when reference guidance wraps`, async ({ page, campaign }) => {
+    await page.goto(`/campaigns/${campaign.campaignId}/${entity}`);
+    await page.getByRole("button", { name: entity === "npcs" ? "ADD NPC" : "ADD CHARACTER", exact: true }).click();
+    const form = page.locator("form.character-form");
+    const species = form.getByRole("combobox", { name: "Species", exact: true });
+    const name = form.getByLabel("Name", { exact: true });
+    const peer = entity === "npcs"
+      ? form.getByLabel("Role", { exact: true })
+      : form.getByRole("combobox", { name: "Class", exact: true });
+
+    for (const selected of [false, true]) {
+      if (selected) {
+        await species.fill("Kasatha");
+        await page.getByRole("option", { name: /Kasatha/ }).click();
+        await expect(species.locator("..")).toContainText("Kasatha selected");
+      }
+      for (const width of [1440, 900, 600, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        if (width > 760) {
+          await expectAlignedInputs([name, species, peer, ...(entity === "characters" ? [form.getByLabel("Level", { exact: true })] : [])]);
+        } else if (width > 420) {
+          await expectAlignedInputs([species, peer]);
+        }
+        const inputBox = await species.boundingBox();
+        const statusBox = await species.locator("..").locator("[aria-live]").boundingBox();
+        if (!inputBox || !statusBox) throw new Error("Expected the reference input and guidance to be visible.");
+        expect(statusBox.y).toBeGreaterThanOrEqual(inputBox.y + inputBox.height + 6);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+      }
+    }
+  });
+}
 
 test("saves and reloads official ancestry/class selections while keeping custom text", async ({ page, campaign }) => {
   test.setTimeout(60000);
@@ -74,6 +120,11 @@ test("handles lookup failures, retry, and obsolete responses without blocking cu
     await page.getByRole("button", { name: "ADD NPC", exact: true }).click();
     const species = page.getByRole("combobox", { name: "Species", exact: true });
     await expect(page.getByRole("alert").filter({ hasText: "Reference lookup unavailable for testing." })).toBeVisible();
+    await expectAlignedInputs([
+      page.locator("form.character-form").getByLabel("Name", { exact: true }),
+      species,
+      page.locator("form.character-form").getByLabel("Role", { exact: true }),
+    ]);
     fail = false;
     await page.getByRole("button", { name: "Retry", exact: true }).click();
     await species.focus();
@@ -110,6 +161,11 @@ test("keeps NPC workspace bindings aligned during revisions and applies only on 
   await page.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
   const workspace = page.locator("[data-ai-draft-assistant]");
   const species = workspace.getByRole("combobox", { name: "Species", exact: true });
+  await expectAlignedInputs([
+    workspace.getByLabel("Name", { exact: true }),
+    species,
+    workspace.getByLabel("Role", { exact: true }),
+  ]);
   await species.fill("Vesk");
   await workspace.getByRole("option", { name: /Vesk/ }).click();
   await page.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();

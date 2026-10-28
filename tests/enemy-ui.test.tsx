@@ -4,6 +4,7 @@ import DirtyFormProvider from "@/components/campaign-shell/DirtyFormProvider";
 import EnemiesRouteView from "@/components/enemies/EnemiesRouteView";
 import EnemyPreview from "@/components/enemies/EnemyPreview";
 import EnemyPublicRecord from "@/components/enemies/EnemyPublicRecord";
+import { EnemyTraitReferences } from "@/components/enemies/EnemySystemReferences";
 import type { ApiEnemy } from "@/lib/campaign/types";
 import { enemyStatBlockSchema } from "@/lib/validation/enemy";
 
@@ -48,6 +49,28 @@ const enemy: ApiEnemy = {
 function render(node: React.ReactNode) {
   return renderToStaticMarkup(<DirtyFormProvider>{node}</DirtyFormProvider>);
 }
+
+describe("enemy system references", () => {
+  it("uses clear trait actions and explains that removing a reference keeps the trait text", () => {
+    const markup = renderToStaticMarkup(<EnemyTraitReferences
+      campaignId={enemy.campaign_id}
+      bindings={[{ id: "sf2e.creature-traits.undead", catalogVersion: "v1" }]}
+      names={{ "sf2e.creature-traits.undead": "Undead" }}
+      disabled={false}
+      traitsLocked={false}
+      onTrait={() => undefined}
+      onUnbind={() => undefined}
+    />);
+
+    expect(markup).toContain(">Add trait</label>");
+    expect(markup).toContain('aria-label="Remove Undead reference"');
+    expect(markup).toContain(">Undead</span>");
+    expect(markup).not.toContain("Undead · undead");
+    expect(markup).toContain("lucide-x");
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain("Removing a trait reference leaves its trait text unchanged.");
+  });
+});
 
 describe("enemy archive UI secrecy", () => {
   it("keeps mechanics, GM notes, and provenance out of player records", () => {

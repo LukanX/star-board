@@ -4,6 +4,7 @@ import { expect, test } from "./fixtures";
 import { getLocalE2eSupabaseConfig } from "./support/local-auth";
 import { localLibrarySql, sqlLiteral } from "../support/local-library-sql";
 import { referenceCatalogVersion, searchReferences } from "../../lib/references/catalog";
+import { enemyStatBlockSchema } from "../../lib/validation/enemy";
 
 test("campaign owner and assigned editor share campaign-specific revisions", async ({ browser, page, campaign }) => {
   test.setTimeout(90000);
@@ -215,13 +216,24 @@ test("saves explicit enemy ancestry/traits and clears a binding when its trait i
     await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
     const editor = page.locator("[data-enemy-editor]");
     const form = editor.locator("form.character-form");
+    await expect(editor.getByText("SYSTEM REFERENCES", { exact: true })).toHaveCount(0);
     await form.getByLabel("Name", { exact: true }).fill(`Reference enemy ${Date.now()}`);
     await editor.getByRole("combobox", { name: "Ancestry reference", exact: true }).fill("Kasatha");
     await editor.getByRole("option", { name: /^Kasatha/ }).click();
-    await editor.getByRole("combobox", { name: "Bind a creature trait", exact: true }).fill("Undead");
+    const addTrait = editor.getByRole("combobox", { name: "Add trait", exact: true });
+    await expect(addTrait.locator("../../..").getByLabel("Traits / type", { exact: true })).toBeVisible();
+    await addTrait.fill("Undead");
     await editor.getByRole("option", { name: /^Undead/ }).click();
     await expect(form.getByLabel("Traits / type", { exact: true })).toHaveValue("Undead");
-    await expect(editor.getByRole("button", { name: "Unbind Undead", exact: true })).toBeVisible();
+    const removeTrait = editor.getByRole("button", { name: "Remove Undead reference", exact: true });
+    await expect(removeTrait.locator("..")).toHaveText("Undead");
+    await expect(removeTrait.locator("svg")).toBeVisible();
+    await removeTrait.click();
+    await expect(removeTrait).toHaveCount(0);
+    await expect(form.getByLabel("Traits / type", { exact: true })).toHaveValue("Undead");
+    await addTrait.fill("Undead");
+    await editor.getByRole("option", { name: /^Undead/ }).click();
+    await expect(removeTrait).toBeVisible();
     const saving = page.waitForResponse((response) => response.url().endsWith(endpoint) && response.request().method() === "POST");
     await form.getByRole("button", { name: "SAVE ENEMY", exact: true }).click();
     const saved = await saving;
@@ -238,5 +250,92 @@ test("saves explicit enemy ancestry/traits and clears a binding when its trait i
     expect((await reread.json()).enemy.system_references).toEqual({ ancestry: enemy.system_references.ancestry, creatureTraits: [] });
   } finally {
     if (enemyId) expect((await page.request.delete(`${endpoint}/${enemyId}`)).ok()).toBeTruthy();
+  }
+});
+
+test("adds searched traits to the AI classification and generation requests", async ({ page, campaign }) => {
+  test.setTimeout(60000);
+  const requests: Array<{ traits?: string[]; systemReferences: { ancestry: unknown; creatureTraits: Array<{ id: string }> } }> = [];
+  await page.route("**/api/ai/enemy", async (route) => {
+    const body = route.request().postDataJSON() as (typeof requests)[number];
+    requests.push(body);
+    const statBlock = enemyStatBlockSchema.parse({ schemaVersion: 1 });
+    statBlock.defenses.armorClass = 18;
+    statBlock.defenses.hitPoints = [{ label: "HP", value: 30, notes: "" }];
+    await route.fulfill({ status: 200, json: { references: [], draft: {
+      name: "Trait test", playerDescription: "A test creature.", level: 1, size: "medium", rarity: "common",
+      traits: body.traits ?? [], family: null, statBlock,
+      gmNotesMarkdown: "", artSubject: "",
+    } } });
+  });
+  await page.goto(`/campaigns/${campaign.campaignId}/enemies`);
+  await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
+  const editor = page.locator("[data-enemy-editor]");
+  await editor.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
+  const classification = editor.getByLabel("Type / classification", { exact: true });
+  const traitSearch = editor.getByRole("combobox", { name: "Add trait", exact: true });
+  await expect(traitSearch.locator("../../..").getByLabel("Type / classification", { exact: true })).toBeVisible();
+  await expect(editor.getByText("SYSTEM REFERENCES", { exact: true })).toHaveCount(0);
+  await editor.getByRole("combobox", { name: "Ancestry reference", exact: true }).fill("Kasatha");
+  await editor.getByRole("option", { name: /^Kasatha/ }).click();
+  await classification.fill("undead");
+  await traitSearch.fill("Undead");
+  await editor.getByRole("option", { name: /^Undead/ }).click();
+  await expect(classification).toHaveValue("undead");
+  await editor.getByRole("button", { name: "BACK TO EDITOR", exact: true }).click();
+  await expect(editor.locator("form.character-form").getByLabel("Traits / type", { exact: true })).toHaveValue("");
+  await editor.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
+  await expect(classification).toHaveValue("undead");
+  await expect(editor.getByRole("button", { name: "Remove Undead reference", exact: true })).toBeVisible();
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await traitSearch.focus();
+    await traitSearch.press("ArrowDown");
+    await expect(editor.getByRole("option").first()).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    await traitSearch.press("Escape");
+  }
+  await editor.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
+  await expect(editor.getByRole("button", { name: "USE DRAFT", exact: true })).toBeVisible();
+  expect(requests[0]).toMatchObject({
+    traits: ["undead"],
+    systemReferences: { ancestry: searchReferences("ancestry", "Kasatha")[0].binding, creatureTraits: [{ id: "sf2e.creature-traits.undead" }] },
+  });
+  await traitSearch.fill("Acid");
+  await editor.getByRole("option", { name: /^Acid/ }).click();
+  await expect(classification).toHaveValue("undead, Acid");
+  await expect(editor.getByRole("button", { name: /^(Keep|Unpin) traits unchanged$/ }).locator("../..").locator("input")).toHaveValue("undead, Acid");
+  await editor.getByRole("textbox", { name: "WHAT SHOULD CHANGE?", exact: true }).fill("Make it more resilient.");
+  await editor.getByRole("button", { name: "REVISE DRAFT", exact: true }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1].traits).toEqual(["undead", "Acid"]);
+  expect(requests[1].systemReferences.creatureTraits.map((binding) => binding.id)).toEqual([
+    "sf2e.creature-traits.undead", "sf2e.creature-traits.acid",
+  ]);
+  await editor.getByRole("button", { name: "USE DRAFT", exact: true }).click();
+  await expect(editor.locator("form.character-form").getByLabel("Traits / type", { exact: true })).toHaveValue("undead, Acid");
+  await expect(editor.getByRole("button", { name: "Remove Acid reference", exact: true })).toBeVisible();
+  await expect(editor.getByRole("combobox", { name: "Ancestry reference", exact: true })).toHaveValue("Kasatha");
+  const endpoint = `/api/campaigns/${campaign.campaignId}/enemies`;
+  const saving = page.waitForResponse((response) => response.url().endsWith(endpoint) && response.request().method() === "POST");
+  await editor.getByRole("button", { name: "SAVE ENEMY", exact: true }).click();
+  const saved = await saving;
+  expect(saved.ok(), await saved.text()).toBeTruthy();
+  const enemy = (await saved.json()).enemy;
+  try {
+    const reread = await page.request.get(`${endpoint}/${enemy.id}`);
+    expect(reread.ok()).toBeTruthy();
+    expect((await reread.json()).enemy).toMatchObject({
+      traits: ["undead", "Acid"],
+      system_references: {
+        ancestry: searchReferences("ancestry", "Kasatha")[0].binding,
+        creatureTraits: expect.arrayContaining([
+          expect.objectContaining({ id: "sf2e.creature-traits.undead" }),
+          expect.objectContaining({ id: "sf2e.creature-traits.acid" }),
+        ]),
+      },
+    });
+  } finally {
+    expect((await page.request.delete(`${endpoint}/${enemy.id}`)).ok()).toBeTruthy();
   }
 });

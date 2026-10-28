@@ -437,7 +437,7 @@ function AiDraftAssistantContent({
               Keep these short. Leave any blank and explain the vibe below.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 max-[760px]:grid-cols-1">
+          <div className="grid grid-cols-3 items-start gap-2 max-[760px]:grid-cols-1">
             {briefFields.map((field) => {
               const change = (value: string) => {
                 markDirty();
@@ -445,11 +445,11 @@ function AiDraftAssistantContent({
                 setBriefValues({ ...visibleBriefValues, [field.key]: value });
               };
               return <div key={field.key} className="min-w-0">{renderBriefField?.({ field, value: visibleBriefValues[field.key] ?? "", onChange: (value) => { change(value); updateCandidate(field.key, value); }, disabled: isGenerating }) ?? <label
-                className="grid gap-[6px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]"
+                className="grid gap-[7px] text-[var(--dim)] font-mono text-[8px] tracking-[.1em]"
               >
                 {field.label}
                 <input
-                  className="w-full h-[37px] border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--purple)] focus:shadow-[0_0_0_2px_rgba(185,146,255,.1)] placeholder:text-[#4d5a6b]"
+                  className="w-full h-[42px] border border-[rgba(139,151,169,.28)] outline-none p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px] focus:border-[var(--purple)] focus:shadow-[0_0_0_2px_rgba(185,146,255,.1)] placeholder:text-[#4d5a6b]"
                   maxLength={field.maxLength}
                   value={visibleBriefValues[field.key] ?? ""}
                   onChange={(event) => change(event.target.value)}

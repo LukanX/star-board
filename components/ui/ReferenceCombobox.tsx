@@ -60,7 +60,7 @@ export default function ReferenceCombobox({ campaignId, kind, label, value, bind
   }
 
   return (
-    <div className="relative grid min-w-0 gap-[7px]" onBlur={(event) => {
+    <div className="relative grid min-w-0 content-start gap-[7px]" onBlur={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
     }}>
       <label htmlFor={id} className="text-[var(--dim)] font-mono text-[8px] tracking-[.12em]">{label}</label>
@@ -111,7 +111,7 @@ export default function ReferenceCombobox({ campaignId, kind, label, value, bind
               <span className="block text-[9px] text-[var(--muted)]">{candidate.publication}</span>
             </button>
           ))}
-          {!options.length ? <p className="m-0 p-3 text-[10px] text-[var(--muted)]">{pending ? "Looking up references..." : error ? "Lookup unavailable; custom text is still available." : "No matches. Keep your custom text."}</p> : null}
+          {!options.length ? <p className="m-0 p-3 text-[10px] text-[var(--muted)]">{pending ? "Looking up references..." : error ? kind === "creature_trait" ? "Lookup unavailable; enter custom traits in the traits field." : "Lookup unavailable; custom text is still available." : kind === "creature_trait" ? "No matches. Enter a custom trait in the traits field." : "No matches. Keep your custom text."}</p> : null}
         </div>
       ) : null}
       <div id={`${id}-status`} className="text-[9px] leading-relaxed text-[var(--muted)] [overflow-wrap:anywhere]" aria-live="polite">
@@ -120,7 +120,7 @@ export default function ReferenceCombobox({ campaignId, kind, label, value, bind
             <span>{selected ? `${selected.name} selected · ${selected.coverage === "available" ? kind === "class" ? "AI-authored class context" : "User-entered context available" : "No library text entered"}` : pending ? "Checking selected reference..." : "Selected reference unavailable."}</span>
             <button className="ml-2 cursor-pointer border-0 bg-transparent p-0 text-[var(--cyan)] underline focus-visible:outline focus-visible:outline-[var(--cyan)]" type="button" disabled={disabled} onClick={() => onChange(value, null)}>Use custom text</button>
           </>
-        ) : <span>Custom text; select a result to bind a reference. Campaign settings control library context.</span>}
+        ) : <span>{kind === "creature_trait" ? "Select a result to add a trait." : "Enter custom text or select a reference."}</span>}
         {selected ? <a className="ml-2 text-[var(--cyan)] underline" href={selected.sourceUrl} target="_blank" rel="noreferrer">Source</a> : null}
         {error ? <div role="alert">{error} <button className="cursor-pointer border-0 bg-transparent p-0 text-[var(--cyan)] underline" type="button" disabled={disabled} onClick={() => setRetry((current) => current + 1)}>Retry</button></div> : null}
       </div>
