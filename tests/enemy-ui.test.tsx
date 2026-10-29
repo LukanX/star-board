@@ -4,7 +4,7 @@ import DirtyFormProvider from "@/components/campaign-shell/DirtyFormProvider";
 import EnemiesRouteView from "@/components/enemies/EnemiesRouteView";
 import EnemyPreview from "@/components/enemies/EnemyPreview";
 import EnemyPublicRecord from "@/components/enemies/EnemyPublicRecord";
-import { EnemyTraitReferences } from "@/components/enemies/EnemySystemReferences";
+import EnemyTraitsField from "@/components/enemies/EnemyTraitsField";
 import type { ApiEnemy } from "@/lib/campaign/types";
 import { enemyStatBlockSchema } from "@/lib/validation/enemy";
 
@@ -51,24 +51,27 @@ function render(node: React.ReactNode) {
 }
 
 describe("enemy system references", () => {
-  it("uses clear trait actions and explains that removing a reference keeps the trait text", () => {
-    const markup = renderToStaticMarkup(<EnemyTraitReferences
+  it("renders removable trait tags within the input", () => {
+    const markup = renderToStaticMarkup(<EnemyTraitsField
       campaignId={enemy.campaign_id}
-      bindings={[{ id: "sf2e.creature-traits.undead", catalogVersion: "v1" }]}
-      names={{ "sf2e.creature-traits.undead": "Undead" }}
+      label="Traits / type"
+      value="Undead"
+      query=""
       disabled={false}
       traitsLocked={false}
-      onTrait={() => undefined}
-      onUnbind={() => undefined}
+      onChange={() => undefined}
+      onQueryChange={() => undefined}
+      onSelect={() => undefined}
     />);
 
-    expect(markup).toContain(">Add trait</label>");
-    expect(markup).toContain('aria-label="Remove Undead reference"');
+    expect(markup).toContain(">Traits / type</label>");
+    expect(markup).toContain('role="combobox"');
+    expect(markup).toContain('aria-label="Remove Undead trait"');
     expect(markup).toContain(">Undead</span>");
     expect(markup).not.toContain("Undead · undead");
     expect(markup).toContain("lucide-x");
     expect(markup).toContain('aria-hidden="true"');
-    expect(markup).toContain("Removing a trait reference leaves its trait text unchanged.");
+    expect(markup).toContain("Type a trait and press Enter or comma");
   });
 });
 

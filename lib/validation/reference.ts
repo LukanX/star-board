@@ -52,6 +52,7 @@ export const referenceSearchResponseSchema = z.object({
     preview: z.string().max(1000),
     coverage: z.enum(["available", "not-reviewed"]),
   })).max(20),
+  nextOffset: z.number().int().nonnegative().nullable().optional(),
 });
 
 export const referenceContextPreviewSchema = z.object({

@@ -12,9 +12,13 @@ const querySchema = z.object({
   kind: z.enum(["ancestry", "class", "creature_trait"]),
   q: z.string().trim().max(160).default(""),
   limit: z.coerce.number().int().min(1).max(20).default(20),
+  offset: z.coerce.number().int().min(0).max(10000).optional(),
+  exclude: z.string().max(4096).optional(),
   id: z.union([referenceBindingSchema.shape.id, creatureTraitBindingSchema.shape.id]).optional(),
   catalogVersion: referenceBindingSchema.shape.catalogVersion.optional(),
-}).strict().refine((value) => Boolean(value.id) === Boolean(value.catalogVersion), { message: "Exact lookup requires both ID and catalog version." });
+}).strict()
+  .refine((value) => Boolean(value.id) === Boolean(value.catalogVersion), { message: "Exact lookup requires both ID and catalog version." })
+  .refine((value) => (value.offset === undefined && value.exclude === undefined) || (value.kind === "creature_trait" && !value.id), { message: "Paging and exclusions are only supported for creature-trait searches." });
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
@@ -31,10 +35,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ camp
     const { kind, q, limit, id, catalogVersion } = input.data;
     if (kind !== "class") {
       let results: ReferenceCandidate[];
+      let nextOffset: number | null | undefined;
       if (kind === "creature_trait") {
         if (id && catalogVersion) resolveCreatureTrait({ id, catalogVersion });
-        results = creatureTraitRecords.filter((record) => id ? record.id === id : record.name.toLowerCase().includes(q.toLowerCase()) || record.slug.includes(q.toLowerCase()))
-          .slice(0, limit).map((record) => ({ binding: { id: record.id, catalogVersion: creatureTraitVersion }, kind, name: record.name, publication: `Creature trait · ${record.slug}`, sourceUrl: record.sourceUrl, preview: "", coverage: "not-reviewed" }));
+        const excluded = new Set((input.data.exclude ?? "").split(",").map((name) => name.trim().toLowerCase()).filter(Boolean));
+        const matches = creatureTraitRecords.filter((record) => id ? record.id === id : !excluded.has(record.name.toLowerCase()) && (record.name.toLowerCase().includes(q.toLowerCase()) || record.slug.includes(q.toLowerCase())));
+        const offset = input.data.offset ?? 0;
+        results = matches.slice(offset, offset + limit).map((record) => ({ binding: { id: record.id, catalogVersion: creatureTraitVersion }, kind, name: record.name, publication: `Creature trait · ${record.slug}`, sourceUrl: record.sourceUrl, preview: "", coverage: "not-reviewed" }));
+        if (!id) nextOffset = offset + results.length < matches.length ? offset + results.length : null;
       } else {
         const record = id && catalogVersion ? resolveReference({ id, catalogVersion }, kind) : null;
         results = searchReferences(kind, record?.name ?? q, limit).filter((candidate) => !id || candidate.binding.id === id);
@@ -47,7 +55,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ camp
           return { ...candidate, coverage: (entry.appearance || entry.lore || entry.trait_context).trim() ? "available" : "not-reviewed" };
         });
       }
-      return json({ catalogVersion: kind === "ancestry" ? referenceCatalogVersion : creatureTraitVersion, results });
+      return json({ catalogVersion: kind === "ancestry" ? referenceCatalogVersion : creatureTraitVersion, results, ...(nextOffset !== undefined ? { nextOffset } : {}) });
     }
     if (id && catalogVersion) {
       const record = resolveReference({ id, catalogVersion }, kind);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { referenceSearchResponseSchema } from "@/lib/validation/reference";
+import { searchCampaignReferences } from "@/lib/references/client";
 import type { ReferenceBinding, ReferenceCandidate, ReferenceKind } from "@/lib/references/types";
 
 type Props = {
@@ -37,15 +37,8 @@ export default function ReferenceCombobox({ campaignId, kind, label, value, bind
           params.set("id", binding.id);
           params.set("catalogVersion", binding.catalogVersion);
         }
-        const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/references?${params}`, { signal: controller.signal, cache: "no-store" });
-        const body: unknown = await response.json();
-        if (!response.ok) {
-          const message = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "Reference lookup failed.";
-          throw new Error(message);
-        }
-        const parsed = referenceSearchResponseSchema.safeParse(body);
-        if (!parsed.success) throw new Error("The reference lookup response was invalid.");
-        if (!controller.signal.aborted) setResult({ key, results: parsed.data.results });
+        const data = await searchCampaignReferences(campaignId, params, controller.signal);
+        if (!controller.signal.aborted) setResult({ key, results: data.results });
       } catch (failure) {
         if (!controller.signal.aborted) setResult({ key, results: [], error: failure instanceof Error ? failure.message : "Reference lookup failed." });
       }
@@ -78,6 +71,7 @@ export default function ReferenceCombobox({ campaignId, kind, label, value, bind
         value={binding && selected && !value ? selected.name : value}
         disabled={disabled}
         onFocus={() => setOpen(true)}
+        onClick={() => { setActive(0); setOpen(true); }}
         onChange={(event) => { onChange(event.target.value, null); setActive(0); setOpen(true); }}
         onKeyDown={(event) => {
           if (event.key === "Escape") { event.preventDefault(); setOpen(false); }

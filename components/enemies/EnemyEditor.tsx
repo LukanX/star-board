@@ -4,9 +4,12 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Download, FileSearch, Pin, PinOff, RefreshCw, Sparkles, Undo2, X } from "lucide-react";
 import { discardNewCampaignArtStudioSession, finalizeCampaignArtStudioSession, markCampaignArtPersisted, useCampaignArtEditor } from "@/components/archive/CampaignArtField";
 import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
-import { EnemyAncestryReference, EnemyTraitReferences } from "@/components/enemies/EnemySystemReferences";
+import { EnemyAncestryReference } from "@/components/enemies/EnemySystemReferences";
+import EnemyTraitsField from "@/components/enemies/EnemyTraitsField";
 import ReferenceSources from "@/components/ui/ReferenceSources";
 import { reconcileEnemyReferences } from "@/lib/references/enemy";
+import ancestryCatalog from "@/lib/references/catalog.generated.json";
+import traitCatalog from "@/lib/references/creature-traits.generated.json";
 import { referenceStatusesSchema, type EnemyReferenceSelections } from "@/lib/validation/reference";
 import type { ReferenceStatus } from "@/lib/references/types";
 import RichMarkdownField from "@/components/markdown/RichMarkdownField";
@@ -124,11 +127,26 @@ function toDraft(enemy?: ApiEnemy): EnemyDraft {
 }
 
 function traitsFromText(value: string): string[] {
-  return [...new Set(value.split(",").map((trait) => trait.trim()).filter(Boolean))];
+  return value.split(",").map((trait) => trait.trim()).filter(Boolean);
 }
 
 function addTrait(traits: string[], name: string): string[] {
   return traits.some((trait) => trait.toLowerCase() === name.toLowerCase()) ? traits : [...traits, name];
+}
+
+function traitInputError(traits: string[]) {
+  if (traits.length > 32) return "Maximum of 32 traits selected.";
+  if (traits.some((trait) => trait.length > 48)) return "Each trait must be 48 characters or fewer.";
+  if (new Set(traits.map((trait) => trait.toLocaleLowerCase())).size !== traits.length) return "Enemy traits must be unique.";
+  return null;
+}
+
+function ancestryName(id: string | undefined, names: Record<string, string>) {
+  return id ? names[id] ?? ancestryCatalog.records.find((entry) => entry.kind === "ancestry" && entry.id === id)?.name : undefined;
+}
+
+function ancestryTrait(name: string | undefined) {
+  return name ? traitCatalog.records.find((entry) => entry.name.toLowerCase() === name.trim().toLowerCase()) : undefined;
 }
 
 export default function EnemyEditor({ campaignId, enemy, initialImportPreview, onSaved, onCancel: parentOnCancel }: { campaignId: string; enemy?: ApiEnemy; initialImportPreview?: EnemyImportPreview | null; onSaved?: (enemy: ApiEnemy) => void; onCancel?: () => void }) {
@@ -141,6 +159,9 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
   const [aiCheckpoint, setAiCheckpoint] = useState<EnemyAiCheckpoint | null>(null);
   const [aiProtectedFields, setAiProtectedFields] = useState<string[]>([]);
   const [aiBrief, setAiBrief] = useState<EnemyAiBrief>({ name: "", level: "", traits: "", focus: "" });
+  const [draftTraitQuery, setDraftTraitQuery] = useState("");
+  const [aiTraitQuery, setAiTraitQuery] = useState("");
+  const [ancestryError, setAncestryError] = useState<string | null>(null);
   const [aiBriefUnpinnedFields, setAiBriefUnpinnedFields] = useState<string[]>([]);
   const [aiSessionStarted, setAiSessionStarted] = useState(false);
   const [aiFeedback, setAiFeedbackState] = useState("");
@@ -196,6 +217,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
       traits: draft.traitsText,
       focus: "",
     });
+    setAiTraitQuery("");
     setAiProtectedFields(protectedFieldsForEnemyAiBrief(draft, Boolean(enemy), manuallyTouchedFieldsRef.current));
     setAiBriefUnpinnedFields([]);
     setAiSessionStarted(true);
@@ -249,14 +271,14 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const generationBody = (revision = Boolean(aiCandidate), briefLevel = parseAiBriefLevel() ?? undefined) => {
     const source = revision && aiCandidate
-      ? aiCandidate
+      ? { ...aiCandidate, traits: traitsFromText([aiCandidate.traits.join(", "), aiTraitQuery].filter(Boolean).join(", ")) }
       : {
           ...(aiBrief.name.trim() ? { name: aiBrief.name.trim() } : {}),
           playerDescription: draft.playerDescription,
           ...(briefLevel !== undefined ? { level: briefLevel } : {}),
           size: draft.size,
           rarity: draft.rarity,
-          ...(traitsFromText(aiBrief.traits).length ? { traits: traitsFromText(aiBrief.traits) } : {}),
+          ...(traitsFromText([aiBrief.traits, aiTraitQuery].filter(Boolean).join(", ")).length ? { traits: traitsFromText([aiBrief.traits, aiTraitQuery].filter(Boolean).join(", ")) } : {}),
           family: draft.family || null,
           statBlock: draft.statBlock,
           gmNotesMarkdown: draft.gmNotesMarkdown,
@@ -282,6 +304,8 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const generateEnemy = async (revision = Boolean(aiCandidate)) => {
     if (isSourceLocked) return;
+    const traitError = traitInputError(traitsFromText([(revision && aiCandidate ? aiCandidate.traits.join(", ") : aiBrief.traits), aiTraitQuery].filter(Boolean).join(", ")));
+    if (traitError) { setError(traitError); return; }
     if (revision && !aiFeedback.trim()) {
       setError("Describe what should change before revising the enemy draft.");
       return;
@@ -363,7 +387,12 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const applyEnemyCandidate = () => {
     if (!aiCandidate) return;
-    setDraft((current) => ({ ...current, systemReferences: aiReferences, name: aiCandidate.name, playerDescription: aiCandidate.playerDescription, playerDescriptionIsMarkdown: true, level: aiCandidate.level, size: aiCandidate.size, rarity: aiCandidate.rarity, traitsText: aiCandidate.traits.join(", "), family: aiCandidate.family ?? "", gmNotesMarkdown: aiCandidate.gmNotesMarkdown, artSubject: aiCandidate.artSubject, statBlock: aiCandidate.statBlock, origin: "ai", sourceSnapshot: null }));
+    const traits = traitsFromText([aiCandidate.traits.join(", "), aiTraitQuery].filter(Boolean).join(", "));
+    const traitError = traitInputError(traits);
+    if (traitError) { setError(traitError); return; }
+    setDraft((current) => ({ ...current, systemReferences: aiReferences, name: aiCandidate.name, playerDescription: aiCandidate.playerDescription, playerDescriptionIsMarkdown: true, level: aiCandidate.level, size: aiCandidate.size, rarity: aiCandidate.rarity, traitsText: traits.join(", "), family: aiCandidate.family ?? "", gmNotesMarkdown: aiCandidate.gmNotesMarkdown, artSubject: aiCandidate.artSubject, statBlock: aiCandidate.statBlock, origin: "ai", sourceSnapshot: null }));
+    setDraftTraitQuery("");
+    setAiTraitQuery("");
     setApprovedImport(null);
     setStatBlockIssues([]);
     setAiCandidate(null);
@@ -379,6 +408,8 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
   };
 
   const generateBrief = async () => {
+    const traitError = traitInputError(traitsFromText([aiBrief.traits, aiTraitQuery].filter(Boolean).join(", ")));
+    if (traitError) { setError(traitError); return; }
     const briefLevel = parseAiBriefLevel();
     if (briefLevel === null) {
       setError("Level must be a whole number from -1 to 25, or left blank for AI to choose.");
@@ -401,7 +432,26 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
 
   const applyBriefCandidate = () => {
     if (!briefCandidate) return;
-    setDraft((current) => ({ ...current, systemReferences: reconcileEnemyReferences(aiReferences, traitsFromText(current.traitsText), referenceNames), playerDescription: briefCandidate.playerDescription, playerDescriptionIsMarkdown: true, artSubject: briefCandidate.artSubject }));
+    const traitError = traitInputError(traitsFromText([aiBrief.traits, aiTraitQuery].filter(Boolean).join(", ")));
+    if (traitError) { setError(traitError); return; }
+    let traits = traitsFromText(draft.traitsText);
+    let references = { ...draft.systemReferences, ancestry: aiReferences.ancestry };
+    if (draft.systemReferences.ancestry?.id !== aiReferences.ancestry?.id) {
+      const previousName = ancestryName(draft.systemReferences.ancestry?.id, referenceNames);
+      const match = ancestryTrait(ancestryName(aiReferences.ancestry?.id, referenceNames));
+      const selectedMatch = match && traitsFromText(aiBrief.traits).some((trait) => trait.toLowerCase() === match.name.toLowerCase());
+      traits = traits.filter((trait) => !previousName || trait.toLowerCase() !== previousName.toLowerCase());
+      if (match && selectedMatch && !traits.some((trait) => trait.toLowerCase() === match.name.toLowerCase())) {
+        if (traits.length >= 32) { setError("The ancestry classification could not be added because the 32-trait limit has been reached."); return; }
+        traits.push(match.name);
+      }
+      references = reconcileEnemyReferences(references, traits, referenceNames);
+      const binding = match && selectedMatch ? aiReferences.creatureTraits.find((entry) => entry.id === match.id) : undefined;
+      if (binding && !references.creatureTraits.some((entry) => entry.id === binding.id)) references.creatureTraits.push(binding);
+      manuallyTouchedFieldsRef.current.add("traits");
+      setApprovedImport(null);
+    }
+    setDraft((current) => ({ ...current, traitsText: traits.join(", "), systemReferences: references, playerDescription: briefCandidate.playerDescription, playerDescriptionIsMarkdown: true, artSubject: briefCandidate.artSubject }));
     setBriefCandidate(null);
     if (!aiCandidate) {
       setAiSessionStarted(false);
@@ -428,6 +478,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
     if (!importPreview) return;
     const imported = importPreview.draft;
     setDraft((current) => ({ ...current, name: imported.name, level: imported.level, size: imported.size, rarity: imported.rarity, traitsText: imported.traits.join(", "), family: imported.family ?? "", statBlock: imported.statBlock, sourceSnapshot: importPreview.sourceSnapshot, origin: "aon" }));
+    setDraftTraitQuery("");
     setApprovedImport(enemy && importPreview.existingEnemyId === enemy.id ? {
       expectedSourceHash: importPreview.existingSourceHash,
       sourceHash: importPreview.sourceSnapshot.contentHash,
@@ -455,7 +506,7 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
       }
       setStatBlockIssues([]);
       const statBlock: EnemyStatBlockV1 = statBlockResult.data;
-      const payload = { systemReferences: draft.systemReferences, name: draft.name, playerDescription: draft.playerDescription, playerDescriptionIsMarkdown: draft.playerDescriptionIsMarkdown, isRevealed: draft.isRevealed, artPath: draft.artPath, artUrl: draft.artUrl, level: draft.level, size: draft.size, rarity: draft.rarity, traits: traitsFromText(draft.traitsText), family: draft.family || null, statBlock, gmNotesMarkdown: draft.gmNotesMarkdown, origin: draft.origin, artSubject: draft.artSubject || null, artPrompt: draft.artPrompt, artProvider: draft.artProvider, sourceSnapshot: draft.sourceSnapshot, ...(enemy ? { expectedUpdatedAt: enemy.updated_at } : {}) };
+        const payload = { systemReferences: draft.systemReferences, name: draft.name, playerDescription: draft.playerDescription, playerDescriptionIsMarkdown: draft.playerDescriptionIsMarkdown, isRevealed: draft.isRevealed, artPath: draft.artPath, artUrl: draft.artUrl, level: draft.level, size: draft.size, rarity: draft.rarity, traits: traitsFromText([draft.traitsText, draftTraitQuery].filter(Boolean).join(", ")), family: draft.family || null, statBlock, gmNotesMarkdown: draft.gmNotesMarkdown, origin: draft.origin, artSubject: draft.artSubject || null, artPrompt: draft.artPrompt, artProvider: draft.artProvider, sourceSnapshot: draft.sourceSnapshot, ...(enemy ? { expectedUpdatedAt: enemy.updated_at } : {}) };
       const validated = createEnemySchema.safeParse(payload);
       if (!validated.success) {
         const mechanicsIssues = validated.error.issues.filter((issue) => issue.path[0] === "statBlock").map(({ path, message }) => ({ path: path.slice(1), message }));
@@ -512,26 +563,76 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
   );
 
   const activeReferences = aiWorkspaceOpen ? aiReferences : draft.systemReferences;
-  const ancestryControl = <EnemyAncestryReference campaignId={campaignId} binding={activeReferences.ancestry} disabled={isGenerating || isBriefGenerating || isSaving}
-    onChange={(binding) => {
-      if (aiWorkspaceOpen) { setAiReferences((current) => ({ ...current, ancestry: binding })); setDirty("ai"); }
-      else setDraft((current) => ({ ...current, systemReferences: { ...current.systemReferences, ancestry: binding } }));
-    }} />;
-  const traitControls = <EnemyTraitReferences campaignId={campaignId} bindings={activeReferences.creatureTraits} names={referenceNames} disabled={isGenerating || isBriefGenerating || isSaving} traitsLocked={isSourceLocked}
-    onTrait={(name, binding) => {
-      setReferenceNames((current) => ({ ...current, [binding.id]: name }));
+  const updateTraits = (value: string) => {
+    if (!aiWorkspaceOpen) { update("traitsText", value); return; }
+    const previous = traitsFromText(aiBrief.traits);
+    const next = traitsFromText(value);
+    updateAiBrief("traits", value);
+    setAiCandidate((current) => {
+      if (!current) return current;
+      const removed = previous.filter((trait) => !next.some((entry) => entry.toLowerCase() === trait.toLowerCase()));
+      const added = next.filter((trait) => !previous.some((entry) => entry.toLowerCase() === trait.toLowerCase()));
+      return { ...current, traits: added.reduce(addTrait, current.traits.filter((trait) => !removed.some((entry) => entry.toLowerCase() === trait.toLowerCase()))) };
+    });
+  };
+  const ancestryControl = <div className="grid gap-1">
+    <EnemyAncestryReference campaignId={campaignId} binding={activeReferences.ancestry} disabled={isGenerating || isBriefGenerating || isSaving || isSourceLocked}
+      onChange={(binding, name) => {
+        const previous = activeReferences.ancestry;
+        if (previous?.id === binding?.id) { setAncestryError(null); return true; }
+        const previousName = ancestryName(previous?.id, referenceNames);
+        const match = binding ? ancestryTrait(name) : undefined;
+        const oldTraits = traitsFromText(aiWorkspaceOpen ? aiBrief.traits : draft.traitsText);
+        const nextTraits = oldTraits.filter((trait) => !previousName || trait.toLowerCase() !== previousName.toLowerCase());
+        const canAdd = !match || nextTraits.length < 32 || nextTraits.some((trait) => trait.toLowerCase() === match.name.toLowerCase());
+        if (!canAdd) { setAncestryError("Remove a trait before adding this ancestry's classification; the 32-trait limit has been reached."); return false; }
+        setAncestryError(null);
+        if (match) {
+          if (!nextTraits.some((trait) => trait.toLowerCase() === match.name.toLowerCase())) nextTraits.push(match.name);
+        }
+        const updatedNames = { ...referenceNames, ...(binding ? { [binding.id]: name } : {}), ...(match && canAdd ? { [match.id]: match.name } : {}) };
+        const nextReferences = reconcileEnemyReferences({ ...activeReferences, ancestry: binding }, nextTraits, updatedNames);
+        if (match && canAdd && !nextReferences.creatureTraits.some((entry) => entry.id === match.id)) {
+          nextReferences.creatureTraits.push({ id: match.id, catalogVersion: traitCatalog.catalogVersion });
+        }
+        setReferenceNames(updatedNames);
+        if (aiWorkspaceOpen) {
+          updateTraits(nextTraits.join(", "));
+          setAiReferences(nextReferences);
+        } else {
+          manuallyTouchedFieldsRef.current.add("traits");
+          setApprovedImport(null);
+          setDirty();
+          setDraftState((current) => ({ ...current, traitsText: nextTraits.join(", "), systemReferences: nextReferences }));
+        }
+        return true;
+      }} />
+    {isSourceLocked ? <p className="m-0 text-[9px] text-[var(--muted)]">Detach the source to change ancestry and its classification.</p> : null}
+    {ancestryError ? <p role="alert" className="m-0 text-[9px] text-[var(--pink)]">{ancestryError}</p> : null}
+  </div>;
+  const traitControls = <EnemyTraitsField campaignId={campaignId} label={aiWorkspaceOpen ? "Type / classification" : "Traits / type"} value={aiWorkspaceOpen ? aiBrief.traits : draft.traitsText} query={aiWorkspaceOpen ? aiTraitQuery : draftTraitQuery} disabled={isGenerating || isBriefGenerating || isSaving} traitsLocked={isSourceLocked}
+    onQueryChange={(value) => { if (aiWorkspaceOpen) { setAiTraitQuery(value); setDirty("ai"); } else { setDraftTraitQuery(value); setDirty(); } }}
+    onChange={updateTraits}
+    onSelect={(value, candidate) => {
+      const { name, binding } = candidate;
+      const updatedNames = { ...referenceNames, [binding.id]: name };
+      setReferenceNames(updatedNames);
       if (aiWorkspaceOpen) {
-        updateAiBrief("traits", addTrait(traitsFromText(aiBrief.traits), name).join(", "));
-        if (aiCandidate) setAiCandidate((current) => current ? { ...current, traits: addTrait(current.traits, name) } : current);
+        updateTraits(value);
         setAiReferences((current) => ({ ...current, creatureTraits: [...current.creatureTraits.filter((entry) => entry.id !== binding.id), binding] }));
       } else {
-        setDraftState((current) => ({ ...current, traitsText: addTrait(traitsFromText(current.traitsText), name).join(", "), systemReferences: { ...current.systemReferences, creatureTraits: [...current.systemReferences.creatureTraits.filter((entry) => entry.id !== binding.id), binding] } }));
+        manuallyTouchedFieldsRef.current.add("traits");
+        setApprovedImport(null);
+        setDraftState((current) => {
+          const references = reconcileEnemyReferences(current.systemReferences, traitsFromText(value), updatedNames);
+          return {
+            ...current,
+            traitsText: value,
+            systemReferences: { ...references, creatureTraits: [...references.creatureTraits.filter((entry) => entry.id !== binding.id), binding] },
+          };
+        });
         setDirty();
       }
-    }}
-    onUnbind={(id) => {
-      if (aiWorkspaceOpen) { setAiReferences((current) => ({ ...current, creatureTraits: current.creatureTraits.filter((entry) => entry.id !== id) })); setDirty("ai"); }
-      else setDraft((current) => ({ ...current, systemReferences: { ...current.systemReferences, creatureTraits: current.systemReferences.creatureTraits.filter((entry) => entry.id !== id) } }));
     }} />;
 
   return <section className={`${editorPanelClassName} mb-5`} data-enemy-editor="true"><div className="editor-heading flex items-start justify-between gap-4 mb-[18px]"><div><p className={eyebrowClassName}>GM ENEMY RECORD</p><h2 className="mt-[6px] text-[19px]">{enemy ? `Edit ${enemy.name}` : "Add an enemy"}</h2></div><div className="editor-heading-actions flex items-center gap-2"><button className="h-[37px] inline-flex items-center justify-center gap-2 border border-[var(--line)] bg-[rgba(255,255,255,.035)] px-[12px] text-[var(--muted)] font-mono text-[9px] tracking-[.1em] cursor-pointer hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]" disabled={isSaving} onClick={toggleAiWorkspace} type="button"><Sparkles size={14} /> {aiWorkspaceOpen ? "BACK TO EDITOR" : "OPEN AI WORKSPACE"}</button><button aria-label="Close enemy editor" className="w-8 h-8 inline-grid place-items-center border border-transparent bg-transparent text-[var(--muted)] cursor-pointer p-0 hover:text-[var(--ink)] hover:border-[var(--line)] hover:bg-[rgba(255,255,255,.035)]" onClick={onCancel} title="Close enemy editor" type="button"><X size={17} /></button></div></div>
@@ -541,14 +642,11 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
       <section className="grid gap-[10px] p-[12px] border border-[rgba(185,146,255,.3)] bg-[rgba(185,146,255,.055)]">
         <div className="flex items-center gap-2"><Sparkles size={15} className="text-[var(--purple)]" /><p className={`${eyebrowClassName} !m-0 text-[var(--purple)]`}>ENEMY STARTING BRIEF</p></div>
         <p className="m-0 text-[var(--muted)] text-[10px] leading-[1.5]">Give the generator only the essentials you already know. Leave Level blank when you want it to choose.</p>
-        <div className="grid grid-cols-3 items-start gap-2 max-[760px]:grid-cols-1">
+        <div className="grid grid-cols-2 items-start gap-2 max-[760px]:grid-cols-1">
           <label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">Name<input className="h-[37px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" maxLength={160} value={aiBrief.name} onChange={(event) => updateAiBrief("name", event.target.value)} disabled={isGenerating || isBriefGenerating} /></label>
           <label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">Level<input className="h-[37px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" type="number" min={-1} max={25} step={1} placeholder="AI chooses" value={aiBrief.level} onChange={(event) => updateAiBrief("level", event.target.value)} disabled={isGenerating || isBriefGenerating} /></label>
-          <div className="grid min-w-0 gap-2">
-            <label className="grid gap-1 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">Type / classification<input className="h-[37px] border border-[rgba(139,151,169,.28)] bg-[#0a1118] px-2 text-[var(--ink)] font-mono text-[10px]" maxLength={400} placeholder="Aberration, construct, aquatic" value={aiBrief.traits} onChange={(event) => updateAiBrief("traits", event.target.value)} disabled={isGenerating || isBriefGenerating} /></label>
-            {aiWorkspaceOpen ? traitControls : null}
-          </div>
         </div>
+        {aiWorkspaceOpen ? traitControls : null}
         <div className="max-w-[360px]">{aiWorkspaceOpen ? ancestryControl : null}</div>
         <RichMarkdownField campaignId={campaignId} label="Concept / direction" value={aiBrief.focus} isMarkdown maxLength={600} audience="gm" onChange={(value) => updateAiBrief("focus", value)} />
       </section>
@@ -570,15 +668,10 @@ export default function EnemyEditor({ campaignId, enemy, initialImportPreview, o
     <form hidden={aiWorkspaceOpen} className="character-form grid gap-[13px] [&_label]:grid [&_label]:gap-[7px] [&_label]:text-[var(--dim)] [&_label]:font-mono [&_label]:text-[8px] [&_label]:tracking-[.12em] [&_input]:w-full [&_input]:border [&_input]:border-[rgba(139,151,169,.28)] [&_input]:outline-0 [&_input]:p-[10px_12px] [&_input]:bg-[#0a1118] [&_input]:text-[var(--ink)] [&_input]:font-mono [&_input]:text-[11px] [&_input]:h-[42px] [&_textarea]:w-full [&_textarea]:border [&_textarea]:border-[rgba(139,151,169,.28)] [&_textarea]:outline-0 [&_textarea]:p-[10px_12px] [&_textarea]:bg-[#0a1118] [&_textarea]:text-[var(--ink)] [&_textarea]:font-mono [&_textarea]:text-[11px] [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:leading-[1.55]" onSubmit={save}>
       <section className="grid gap-[10px] p-[12px] border border-[rgba(98,232,255,.24)] bg-[rgba(98,232,255,.035)]"><div className="flex items-center gap-2"><FileSearch size={15} className="text-[var(--cyan)]" /><p className={`${eyebrowClassName} !m-0`}>ARCHIVES OF NETHYS IMPORT</p></div><p className="m-0 text-[var(--muted)] text-[10px] leading-[1.5]">Paste one creature URL to preview normalized mechanics and provenance. Nothing is saved until you review and submit this form.</p><div className="flex gap-2 max-[600px]:flex-col"><input className="min-w-0 flex-1 h-[37px] border border-[rgba(139,151,169,.28)] outline-0 p-[9px_10px] bg-[#0a1118] text-[var(--ink)] font-mono text-[10px]" placeholder="https://2e.aonsrd.com/creatures/..." value={importUrl} onChange={(event) => { setImportUrl(event.target.value); setImportPreview(null); }} /><button className="h-[37px] inline-flex items-center justify-center gap-2 px-[12px] border border-[var(--cyan)] bg-[rgba(98,232,255,.08)] text-[var(--cyan)] font-mono text-[8px] tracking-[.1em] cursor-pointer" disabled={isImporting || !importUrl.trim()} onClick={() => void previewImport()} type="button">{isImporting ? <RefreshCw className="animate-spin" size={13} /> : <FileSearch size={13} />} {isImporting ? "READING..." : "PREVIEW SOURCE"}</button></div>{importPreview ? <div className="grid gap-2 border-t border-[rgba(98,232,255,.16)] pt-3"><p className="m-0 text-[var(--cyan)] font-mono text-[8px] tracking-[.09em]">{importPreview.sourceSnapshot.sourceTitle}{" // PAGE "}{importPreview.sourceSnapshot.sourcePage}{" // "}{importPreview.sourceSnapshot.contentHash.slice(0, 12)}...</p><div className="grid gap-1">{importPreview.differences.filter((difference) => difference.status !== "unchanged").map((difference) => <p className="m-0 text-[var(--muted)] text-[9px]" key={difference.section}>{difference.section.toUpperCase()}: {difference.summary}</p>)}</div>{importPreview.warnings.length ? <p className="m-0 text-[var(--amber)] text-[9px]">Warnings: {importPreview.warnings.join(" // ")}</p> : null}<button className="h-[34px] inline-flex w-fit items-center gap-2 border border-[var(--cyan)] bg-[var(--cyan)] px-[11px] text-[#061017] font-mono text-[8px] tracking-[.1em] cursor-pointer" onClick={applyImport} type="button"><Download size={13} /> APPLY IMPORT TO EDITOR</button></div> : null}</section>
       <div className="grid grid-cols-[1.4fr_90px_130px_130px] gap-[10px] max-[760px]:grid-cols-2 max-[420px]:grid-cols-1"><label className="max-[420px]:[grid-column:auto]">Name<input disabled={isSourceLocked} required maxLength={160} value={draft.name} onChange={(event) => update("name", event.target.value)} /></label><label>Level<input disabled={isSourceLocked} required type="number" min={-1} max={25} value={draft.level} onChange={(event) => update("level", Number(event.target.value))} /></label><label>Size<select className={editorSelectClassName} disabled={isSourceLocked} value={draft.size} onChange={(event) => update("size", enemySizeSchema.parse(event.target.value))}>{enemySizeSchema.options.map((size) => <option key={size} value={size}>{size.toUpperCase()}</option>)}</select></label><label>Rarity<select className={editorSelectClassName} disabled={isSourceLocked} value={draft.rarity} onChange={(event) => update("rarity", enemyRaritySchema.parse(event.target.value))}>{enemyRaritySchema.options.map((rarity) => <option key={rarity} value={rarity}>{rarity.toUpperCase()}</option>)}</select></label></div>
+      {!aiWorkspaceOpen ? traitControls : null}
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-[10px] max-[600px]:grid-cols-1">
-        <div className="grid min-w-0 gap-[10px]">
-          <label>Traits / type<input disabled={isSourceLocked} maxLength={400} value={draft.traitsText} onChange={(event) => update("traitsText", event.target.value)} placeholder="Aberration, aquatic, occult" /></label>
-          {!aiWorkspaceOpen ? traitControls : null}
-        </div>
-        <div className="grid min-w-0 gap-[10px]">
-          <label>Family<input disabled={isSourceLocked} maxLength={160} value={draft.family} onChange={(event) => update("family", event.target.value)} placeholder="Optional creature family" /></label>
-          {!aiWorkspaceOpen ? ancestryControl : null}
-        </div>
+        <label>Family<input disabled={isSourceLocked} maxLength={160} value={draft.family} onChange={(event) => update("family", event.target.value)} placeholder="Optional creature family" /></label>
+        {!aiWorkspaceOpen ? ancestryControl : null}
       </div>
       <RichMarkdownField campaignId={campaignId} label="Player-safe description" value={draft.playerDescription} isMarkdown={draft.playerDescriptionIsMarkdown} maxLength={4000} audience="player" onChange={(value, isMarkdown) => { update("playerDescription", value); update("playerDescriptionIsMarkdown", isMarkdown); }} />
       <EnemyStatBlockEditor value={draft.statBlock} onChange={(statBlock) => { setStatBlockIssues([]); update("statBlock", statBlock); }} disabled={isSourceLocked} issues={statBlockIssues} />

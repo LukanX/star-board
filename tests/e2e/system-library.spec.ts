@@ -5,6 +5,7 @@ import { getLocalE2eSupabaseConfig } from "./support/local-auth";
 import { localLibrarySql, sqlLiteral } from "../support/local-library-sql";
 import { referenceCatalogVersion, searchReferences } from "../../lib/references/catalog";
 import { enemyStatBlockSchema } from "../../lib/validation/enemy";
+import traitArtifact from "../../lib/references/creature-traits.generated.json";
 
 test("campaign owner and assigned editor share campaign-specific revisions", async ({ browser, page, campaign }) => {
   test.setTimeout(90000);
@@ -156,8 +157,11 @@ test("keeps brief references staged, warns about changed context and applies onl
   await page.goto(`/campaigns/${campaign.campaignId}/enemies`);
   await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
   const editor = page.locator("[data-enemy-editor]");
+  const manualTraits = editor.getByRole("combobox", { name: "Traits / type", exact: true });
+  await manualTraits.fill("Unrelated");
+  await manualTraits.press("Enter");
   await editor.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
-  await editor.getByRole("combobox", { name: "Ancestry reference", exact: true }).fill("Kasatha");
+  await editor.getByRole("combobox", { name: "Ancestry reference (optional)", exact: true }).fill("Kasatha");
   await editor.getByRole("option", { name: /^Kasatha/ }).click();
   await editor.getByRole("button", { name: "GENERATE BRIEF", exact: true }).click();
   await expect(editor.getByRole("button", { name: "APPLY PLAYER BRIEF", exact: true })).toBeVisible();
@@ -167,7 +171,9 @@ test("keeps brief references staged, warns about changed context and applies onl
   await expect(editor.getByRole("status").filter({ hasText: "have changed since this draft" })).toBeVisible();
   await expect(editor.getByText(/User-entered library revision 1/)).toBeVisible();
   await editor.getByRole("button", { name: "APPLY PLAYER BRIEF", exact: true }).click();
-  await expect(editor.getByRole("combobox", { name: "Ancestry reference", exact: true })).toHaveValue("Kasatha");
+  await expect(editor.getByRole("combobox", { name: "Ancestry reference (optional)", exact: true })).toHaveValue("Kasatha");
+  await expect(editor.getByRole("button", { name: "Remove Kasatha trait" })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "Remove Unrelated trait" })).toBeVisible();
   await expect(editor.locator("form.character-form")).toBeVisible();
   await expect(editor.getByText("A four-armed traveler.", { exact: true })).toBeVisible();
 });
@@ -218,19 +224,30 @@ test("saves explicit enemy ancestry/traits and clears a binding when its trait i
     const form = editor.locator("form.character-form");
     await expect(editor.getByText("SYSTEM REFERENCES", { exact: true })).toHaveCount(0);
     await form.getByLabel("Name", { exact: true }).fill(`Reference enemy ${Date.now()}`);
-    await editor.getByRole("combobox", { name: "Ancestry reference", exact: true }).fill("Kasatha");
+    const ancestry = editor.getByRole("combobox", { name: "Ancestry reference (optional)", exact: true });
+    await ancestry.fill("Kasatha");
     await editor.getByRole("option", { name: /^Kasatha/ }).click();
-    const addTrait = editor.getByRole("combobox", { name: "Add trait", exact: true });
-    await expect(addTrait.locator("../../..").getByLabel("Traits / type", { exact: true })).toBeVisible();
+    await expect(form.getByRole("button", { name: "Remove Kasatha trait" })).toBeVisible();
+    await ancestry.fill("Human");
+    await expect(form.getByRole("button", { name: "Remove Kasatha trait" })).toHaveCount(0);
+    await editor.getByRole("option", { name: /^Human/ }).first().click();
+    await expect(form.getByRole("button", { name: "Remove Human trait" })).toBeVisible();
+    await ancestry.fill("Entu Colony");
+    await editor.getByRole("option", { name: /^Entu Colony/ }).click();
+    await expect(form.getByRole("button", { name: "Remove Human trait" })).toHaveCount(0);
+    await expect(form.getByRole("button", { name: "Remove Entu Colony trait" })).toHaveCount(0);
+    await ancestry.fill("Kasatha");
+    await editor.getByRole("option", { name: /^Kasatha/ }).click();
+    const addTrait = form.getByRole("combobox", { name: "Traits / type", exact: true });
     await addTrait.fill("Undead");
     await editor.getByRole("option", { name: /^Undead/ }).click();
-    await expect(form.getByLabel("Traits / type", { exact: true })).toHaveValue("Undead");
-    const removeTrait = editor.getByRole("button", { name: "Remove Undead reference", exact: true });
+    await expect(addTrait).toHaveValue("");
+    const removeTrait = editor.getByRole("button", { name: "Remove Undead trait", exact: true });
     await expect(removeTrait.locator("..")).toHaveText("Undead");
     await expect(removeTrait.locator("svg")).toBeVisible();
     await removeTrait.click();
     await expect(removeTrait).toHaveCount(0);
-    await expect(form.getByLabel("Traits / type", { exact: true })).toHaveValue("Undead");
+    await expect(addTrait).toHaveValue("");
     await addTrait.fill("Undead");
     await editor.getByRole("option", { name: /^Undead/ }).click();
     await expect(removeTrait).toBeVisible();
@@ -242,15 +259,228 @@ test("saves explicit enemy ancestry/traits and clears a binding when its trait i
     enemyId = enemy.id;
     expect(enemy.system_references).toEqual({
       ancestry: searchReferences("ancestry", "Kasatha")[0].binding,
+      creatureTraits: expect.arrayContaining([
+        { id: "sf2e.creature-traits.kasatha", catalogVersion: expect.any(String) },
+        { id: "sf2e.creature-traits.undead", catalogVersion: expect.any(String) },
+      ]),
+    });
+    expect(enemy.traits).toEqual(["Kasatha", "Undead"]);
+    await page.goto(`/campaigns/${campaign.campaignId}/enemies/${enemyId}`);
+    await page.getByRole("button", { name: `Edit ${enemy.name}`, exact: true }).click();
+    await expect(editor.getByRole("button", { name: "Remove Kasatha trait" })).toBeVisible();
+    await expect(editor.getByRole("button", { name: "Remove Undead trait" })).toBeVisible();
+    const savedAncestry = editor.getByRole("combobox", { name: "Ancestry reference (optional)", exact: true });
+    await expect(savedAncestry).toHaveValue("Kasatha");
+    await savedAncestry.fill("");
+    await expect(editor.getByRole("button", { name: "Remove Kasatha trait" })).toHaveCount(0);
+    const savingEdit = page.waitForResponse((response) => response.url().endsWith(`${endpoint}/${enemyId}`) && response.request().method() === "PATCH");
+    await editor.getByRole("button", { name: "SAVE ENEMY", exact: true }).click();
+    const savedEdit = await savingEdit;
+    expect(savedEdit.ok(), await savedEdit.text()).toBeTruthy();
+    const edited = (await savedEdit.json()).enemy;
+    expect(edited.traits).toEqual(["Undead"]);
+    expect(edited.system_references).toEqual({
+      ancestry: null,
       creatureTraits: [{ id: "sf2e.creature-traits.undead", catalogVersion: expect.any(String) }],
     });
-    const updated = await page.request.patch(`${endpoint}/${enemyId}`, { data: { expectedUpdatedAt: enemy.updated_at, traits: ["Custom"] } });
+    const updated = await page.request.patch(`${endpoint}/${enemyId}`, { data: { expectedUpdatedAt: edited.updated_at, traits: ["Custom"] } });
     expect(updated.ok(), await updated.text()).toBeTruthy();
     const reread = await page.request.get(`${endpoint}/${enemyId}`);
-    expect((await reread.json()).enemy.system_references).toEqual({ ancestry: enemy.system_references.ancestry, creatureTraits: [] });
+    expect((await reread.json()).enemy.system_references).toEqual({ ancestry: null, creatureTraits: [] });
   } finally {
     if (enemyId) expect((await page.request.delete(`${endpoint}/${enemyId}`)).ok()).toBeTruthy();
   }
+});
+
+test("reopens reference suggestions when clicking an already focused input", async ({ page, campaign }) => {
+  test.setTimeout(60000);
+  await page.goto(`/campaigns/${campaign.campaignId}/enemies`);
+  await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
+  const editor = page.locator("[data-enemy-editor]");
+  const ancestry = editor.getByRole("combobox", { name: "Ancestry reference (optional)", exact: true });
+  await ancestry.fill("Kasatha");
+  await editor.getByRole("option", { name: /^Kasatha/ }).click();
+  await expect(ancestry).toBeFocused();
+  await expect(ancestry).toHaveAttribute("aria-expanded", "false");
+  await ancestry.click();
+  await expect(ancestry).toHaveAttribute("aria-expanded", "true");
+  await expect(editor.getByRole("option", { name: /^Kasatha/ })).toBeVisible();
+  await ancestry.press("Escape");
+
+  for (const { label, first, second } of [
+    { label: "Traits / type", first: "Acid", second: "Undead" },
+    { label: "Type / classification", first: "Zombie", second: "Fire" },
+  ]) {
+    if (label === "Type / classification") await editor.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
+    const traits = editor.getByRole("combobox", { name: label, exact: true });
+    const list = editor.getByRole("listbox", { name: `${label} suggestions`, exact: true });
+    await traits.fill(first);
+    await list.getByRole("option", { name: new RegExp(`^${first} Creature trait`) }).first().click();
+    await expect(traits).toHaveValue("");
+    await expect(editor.getByRole("button", { name: `Remove ${first} trait` })).toBeVisible();
+    await expect(traits).toBeFocused();
+    await expect(traits).toHaveAttribute("aria-expanded", "false");
+    await traits.click();
+    await expect(traits).toHaveAttribute("aria-expanded", "true");
+    await expect(list.getByRole("option").first()).toBeVisible();
+    await expect(list.getByRole("option", { name: new RegExp(`^${first} Creature trait`) })).toHaveCount(0);
+    await traits.press("Escape");
+    await expect(traits).toHaveAttribute("aria-expanded", "false");
+    await traits.click();
+    await expect(traits).toHaveAttribute("aria-expanded", "true");
+    await traits.fill(second);
+    await expect(list.getByRole("option", { name: new RegExp(`^${second} Creature trait`) }).first()).toBeVisible();
+    await traits.press("ArrowDown");
+    await traits.press("Enter");
+    await expect(traits).toHaveValue("");
+    await expect(editor.getByRole("button", { name: `Remove ${second} trait` })).toBeVisible();
+    await expect(traits).toHaveAttribute("aria-expanded", "false");
+    await traits.click();
+    await expect(list.getByRole("option").first()).toBeVisible();
+    await expect(list.getByRole("option", { name: new RegExp(`^(${first}|${second}) Creature trait`) })).toHaveCount(0);
+  }
+});
+
+test("browses the full trait catalog and edits custom and selected tags", async ({ page, campaign }) => {
+  test.setTimeout(90000);
+  let failNextPage = true;
+  await page.route("**/references?**", async (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    if (query.get("kind") === "creature_trait" && query.get("offset") === "20" && failNextPage) {
+      failNextPage = false;
+      await route.fulfill({ status: 503, json: { error: "Trait page unavailable for testing." } });
+    } else await route.continue();
+  });
+  await page.goto(`/campaigns/${campaign.campaignId}/enemies`);
+  await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
+  const editor = page.locator("[data-enemy-editor]");
+  const traits = editor.getByRole("combobox", { name: "Traits / type", exact: true });
+  await traits.focus();
+  const list = editor.getByRole("listbox", { name: "Traits / type suggestions" });
+  await expect(list.getByRole("option")).toHaveCount(20);
+  await list.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  await expect(editor.getByRole("alert")).toContainText("Trait page unavailable for testing.");
+  await expect(list.getByRole("option")).toHaveCount(20);
+  await editor.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(list.getByRole("option")).toHaveCount(40);
+  const loadMore = editor.getByRole("button", { name: "Load more traits", exact: true });
+  while (await loadMore.isVisible()) {
+    const count = await list.getByRole("option").count();
+    await loadMore.click();
+    await expect.poll(() => list.getByRole("option").count()).toBeGreaterThan(count);
+  }
+  await expect(list.getByRole("option")).toHaveCount(traitArtifact.records.length);
+  await expect(list.getByRole("option", { name: /^Zombie/ })).toBeVisible();
+  await traits.fill("Acid");
+  await editor.getByRole("option", { name: /^Acid/ }).click();
+  await expect(traits).toHaveValue("");
+  await traits.click();
+  await expect(list.getByRole("option", { name: /^Acid/ })).toHaveCount(0);
+  await traits.fill("Custom, Psychic");
+  await expect(editor.getByRole("button", { name: "Remove Custom trait" })).toBeVisible();
+  await traits.press("Enter");
+  await expect(editor.getByRole("button", { name: "Remove Psychic trait" })).toBeVisible();
+  await traits.fill("und");
+  await expect(list.getByRole("option", { name: /^Undead/ })).toBeVisible();
+  await list.getByRole("option", { name: /^Undead/ }).click();
+  await expect(editor.getByRole("button", { name: "Remove Undead trait", exact: true })).toBeVisible();
+  await editor.getByRole("button", { name: "Remove Undead trait", exact: true }).click();
+  await expect(editor.getByRole("button", { name: "Remove Undead trait", exact: true })).toHaveCount(0);
+  await expect(editor.getByRole("button", { name: "Remove Acid trait", exact: true })).toBeVisible();
+  await traits.fill("Fire");
+  await traits.press("Enter");
+  await expect(editor.getByRole("button", { name: "Remove Fire trait", exact: true })).toBeVisible();
+  await traits.click();
+  await expect(list).toHaveAttribute("aria-busy", "false");
+  await expect(list.getByRole("option", { name: /^Fire Creature trait · fire$/ })).toHaveCount(0);
+});
+
+test("validates custom tags and wraps the classification field on its own row", async ({ page, campaign }) => {
+  test.setTimeout(60000);
+  await page.goto(`/campaigns/${campaign.campaignId}/enemies`);
+  await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
+  const editor = page.locator("[data-enemy-editor]");
+  const traits = editor.getByRole("combobox", { name: "Traits / type", exact: true });
+  const form = editor.locator("form.character-form");
+  await traits.fill("Custom");
+  await traits.press("Enter");
+  await expect(editor.getByRole("button", { name: "Remove Custom trait" })).toBeVisible();
+  await traits.fill("custom");
+  await traits.press("Enter");
+  await expect(editor.getByRole("alert")).toContainText("already added");
+  await expect(traits).toHaveValue("custom");
+  await traits.fill("x".repeat(49));
+  await traits.press("Enter");
+  await expect(editor.getByRole("alert")).toContainText("48 characters or fewer");
+  await form.getByLabel("Name", { exact: true }).fill("Invalid trait test");
+  await form.getByRole("button", { name: "SAVE ENEMY", exact: true }).click();
+  await expect(form.getByRole("alert").filter({ hasText: "Too big" })).toContainText("48");
+  await traits.fill("");
+  const names = Array.from({ length: 31 }, (_, index) => `Test ${index}`);
+  await traits.fill(`${names.join(",")},`);
+  await expect(editor.getByRole("button", { name: /^Remove Test \d+ trait$/ })).toHaveCount(31);
+  await traits.fill("Extra");
+  await traits.press("Enter");
+  await expect(editor.getByRole("alert").filter({ hasText: "Maximum of 32 traits" })).toBeVisible();
+  await traits.fill("");
+  const ancestry = editor.getByRole("combobox", { name: "Ancestry reference (optional)", exact: true });
+  await ancestry.fill("Kasatha");
+  await editor.getByRole("option", { name: /^Kasatha/ }).click();
+  await expect(editor.getByRole("alert").filter({ hasText: "Remove a trait before adding this ancestry" })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "Remove Kasatha trait" })).toHaveCount(0);
+  await editor.getByRole("button", { name: "Remove Test 0 trait" }).click();
+  await ancestry.click();
+  await editor.getByRole("option", { name: /^Kasatha/ }).click();
+  await expect(editor.getByRole("button", { name: "Remove Kasatha trait" })).toBeVisible();
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const geometry = await traits.evaluate((input) => {
+      const field = input.parentElement!;
+      const label = input.closest("form")!.querySelector('input[placeholder="Optional creature family"]')!;
+      return { field: field.getBoundingClientRect().toJSON(), family: label.getBoundingClientRect().toJSON(),
+        tagsInside: Array.from(field.querySelectorAll("button")).every((button) => field.contains(button)) };
+    });
+    expect(geometry.tagsInside).toBe(true);
+    expect(geometry.field.bottom).toBeLessThan(geometry.family.top);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  }
+  await editor.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
+  const classification = editor.getByRole("combobox", { name: "Type / classification", exact: true });
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const geometry = await classification.evaluate((input) => {
+      const field = input.parentElement!;
+      const section = input.closest("section")!;
+      const level = section.querySelector('input[type="number"]')!;
+      return { field: field.getBoundingClientRect().toJSON(), level: level.getBoundingClientRect().toJSON() };
+    });
+    expect(geometry.field.top).toBeGreaterThan(geometry.level.bottom);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  }
+});
+
+test("keeps custom trait text available when the initial lookup fails", async ({ page, campaign }) => {
+  let failing = true;
+  await page.route("**/references?**", async (route) => {
+    if (new URL(route.request().url()).searchParams.get("kind") === "creature_trait" && failing) {
+      await route.fulfill({ status: 503, json: { error: "Trait lookup unavailable for testing." } });
+    } else await route.continue();
+  });
+  await page.goto(`/campaigns/${campaign.campaignId}/enemies`);
+  await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
+  const editor = page.locator("[data-enemy-editor]");
+  const traits = editor.getByRole("combobox", { name: "Traits / type", exact: true });
+  await traits.fill("Undead");
+  await expect(editor.getByRole("alert")).toContainText("Trait lookup unavailable for testing.");
+  await expect(traits).toHaveValue("Undead");
+  failing = false;
+  await editor.getByRole("button", { name: "Retry", exact: true }).click();
+  await traits.focus();
+  await expect(editor.getByRole("option", { name: /^Undead/ })).toBeVisible();
+  await traits.press("ArrowDown");
+  await traits.press("Enter");
+  await expect(traits).toHaveValue("");
+  await expect(editor.getByRole("button", { name: "Remove Undead trait", exact: true })).toBeVisible();
 });
 
 test("adds searched traits to the AI classification and generation requests", async ({ page, campaign }) => {
@@ -272,50 +502,57 @@ test("adds searched traits to the AI classification and generation requests", as
   await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
   const editor = page.locator("[data-enemy-editor]");
   await editor.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
-  const classification = editor.getByLabel("Type / classification", { exact: true });
-  const traitSearch = editor.getByRole("combobox", { name: "Add trait", exact: true });
-  await expect(traitSearch.locator("../../..").getByLabel("Type / classification", { exact: true })).toBeVisible();
+  const classification = editor.getByRole("combobox", { name: "Type / classification", exact: true });
+  const ancestry = editor.getByRole("combobox", { name: "Ancestry reference (optional)", exact: true });
   await expect(editor.getByText("SYSTEM REFERENCES", { exact: true })).toHaveCount(0);
-  await editor.getByRole("combobox", { name: "Ancestry reference", exact: true }).fill("Kasatha");
+  await ancestry.fill("Kasatha");
   await editor.getByRole("option", { name: /^Kasatha/ }).click();
+  await expect(editor.getByRole("button", { name: "Remove Kasatha trait" })).toBeVisible();
   await classification.fill("undead");
-  await traitSearch.fill("Undead");
   await editor.getByRole("option", { name: /^Undead/ }).click();
-  await expect(classification).toHaveValue("undead");
+  await expect(classification).toHaveValue("");
   await editor.getByRole("button", { name: "BACK TO EDITOR", exact: true }).click();
   await expect(editor.locator("form.character-form").getByLabel("Traits / type", { exact: true })).toHaveValue("");
   await editor.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
-  await expect(classification).toHaveValue("undead");
-  await expect(editor.getByRole("button", { name: "Remove Undead reference", exact: true })).toBeVisible();
+  await expect(classification).toHaveValue("");
+  await expect(editor.getByRole("button", { name: "Remove Undead trait", exact: true })).toBeVisible();
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    await traitSearch.focus();
-    await traitSearch.press("ArrowDown");
+    await classification.focus();
+    await classification.press("ArrowDown");
     await expect(editor.getByRole("option").first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    await traitSearch.press("Escape");
+    await classification.press("Escape");
   }
   await editor.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
   await expect(editor.getByRole("button", { name: "USE DRAFT", exact: true })).toBeVisible();
   expect(requests[0]).toMatchObject({
-    traits: ["undead"],
-    systemReferences: { ancestry: searchReferences("ancestry", "Kasatha")[0].binding, creatureTraits: [{ id: "sf2e.creature-traits.undead" }] },
+    traits: ["Kasatha", "Undead"],
+    systemReferences: { ancestry: searchReferences("ancestry", "Kasatha")[0].binding, creatureTraits: [{ id: "sf2e.creature-traits.kasatha" }, { id: "sf2e.creature-traits.undead" }] },
   });
-  await traitSearch.fill("Acid");
+  const candidateTraits = editor.getByRole("button", { name: /^(Keep|Unpin) traits unchanged$/ }).locator("../..").locator("input");
+  await ancestry.fill("Human");
+  await editor.getByRole("option", { name: /^Human/ }).first().click();
+  await expect(editor.getByRole("button", { name: "Remove Kasatha trait" })).toHaveCount(0);
+  await expect(editor.getByRole("button", { name: "Remove Human trait" })).toBeVisible();
+  await expect(candidateTraits).toHaveValue("Undead, Human");
+  await ancestry.fill("Kasatha");
+  await editor.getByRole("option", { name: /^Kasatha/ }).click();
+  await expect(candidateTraits).toHaveValue("Undead, Kasatha");
+  await classification.fill("Acid");
   await editor.getByRole("option", { name: /^Acid/ }).click();
-  await expect(classification).toHaveValue("undead, Acid");
-  await expect(editor.getByRole("button", { name: /^(Keep|Unpin) traits unchanged$/ }).locator("../..").locator("input")).toHaveValue("undead, Acid");
+  await expect(classification).toHaveValue("");
+  await expect(candidateTraits).toHaveValue("Undead, Kasatha, Acid");
   await editor.getByRole("textbox", { name: "WHAT SHOULD CHANGE?", exact: true }).fill("Make it more resilient.");
   await editor.getByRole("button", { name: "REVISE DRAFT", exact: true }).click();
   await expect.poll(() => requests.length).toBe(2);
-  expect(requests[1].traits).toEqual(["undead", "Acid"]);
+  expect(requests[1].traits).toEqual(["Undead", "Kasatha", "Acid"]);
   expect(requests[1].systemReferences.creatureTraits.map((binding) => binding.id)).toEqual([
-    "sf2e.creature-traits.undead", "sf2e.creature-traits.acid",
+    "sf2e.creature-traits.undead", "sf2e.creature-traits.kasatha", "sf2e.creature-traits.acid",
   ]);
   await editor.getByRole("button", { name: "USE DRAFT", exact: true }).click();
-  await expect(editor.locator("form.character-form").getByLabel("Traits / type", { exact: true })).toHaveValue("undead, Acid");
-  await expect(editor.getByRole("button", { name: "Remove Acid reference", exact: true })).toBeVisible();
-  await expect(editor.getByRole("combobox", { name: "Ancestry reference", exact: true })).toHaveValue("Kasatha");
+  await expect(editor.getByRole("button", { name: "Remove Acid trait", exact: true })).toBeVisible();
+  await expect(editor.getByRole("combobox", { name: "Ancestry reference (optional)", exact: true })).toHaveValue("Kasatha");
   const endpoint = `/api/campaigns/${campaign.campaignId}/enemies`;
   const saving = page.waitForResponse((response) => response.url().endsWith(endpoint) && response.request().method() === "POST");
   await editor.getByRole("button", { name: "SAVE ENEMY", exact: true }).click();
@@ -326,10 +563,11 @@ test("adds searched traits to the AI classification and generation requests", as
     const reread = await page.request.get(`${endpoint}/${enemy.id}`);
     expect(reread.ok()).toBeTruthy();
     expect((await reread.json()).enemy).toMatchObject({
-      traits: ["undead", "Acid"],
+      traits: ["Undead", "Kasatha", "Acid"],
       system_references: {
         ancestry: searchReferences("ancestry", "Kasatha")[0].binding,
         creatureTraits: expect.arrayContaining([
+          expect.objectContaining({ id: "sf2e.creature-traits.kasatha" }),
           expect.objectContaining({ id: "sf2e.creature-traits.undead" }),
           expect.objectContaining({ id: "sf2e.creature-traits.acid" }),
         ]),
