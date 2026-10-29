@@ -7,6 +7,7 @@ import type { CampaignPlacesContext } from "@/lib/campaign/places-server";
 import type { ApiPlace } from "@/lib/campaign/types";
 import type { ApiNpc } from "@/lib/campaign/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ancestryReferenceColumns } from "@/lib/references/records";
 
 export type CampaignNpcsResult = {
   role: "gm" | "player";
@@ -21,7 +22,7 @@ export type CampaignNpcResult = {
   related: NpcRelatedRecords;
 };
 
-const npcColumns = "id, author_id, name, species, role, description, description_is_markdown, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const npcColumns = `id, author_id, name, species, role, description, description_is_markdown, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at, ${ancestryReferenceColumns}`;
 
 function toPlaceSummary(place: Pick<ApiPlace, "id" | "name" | "kind">): RelatedPlaceSummary {
   return { id: place.id, name: place.name, kind: place.kind };

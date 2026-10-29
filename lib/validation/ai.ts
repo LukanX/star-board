@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { enemyAiCurrentDraftSchema, enemyAiDraftSchema, enemyAiProtectedFieldSchema, enemyBriefDraftSchema, enemyRaritySchema, enemySizeSchema } from "@/lib/validation/enemy";
 import { narrativeStyleTagsSchema } from "@/lib/validation/campaign-narrative-settings";
+import { referenceBindingSchema, enemyReferenceSelectionsSchema } from "@/lib/validation/reference";
 
 const campaignContextSchema = z.object({
   campaignId: z.string().uuid(),
@@ -156,6 +157,7 @@ export const missionGenerationInputSchema = campaignContextSchema.extend({
 });
 
 export const npcGenerationInputSchema = campaignContextSchema.extend({
+  ancestryReference: referenceBindingSchema.nullable().optional(),
   mode: z.enum(["create", "refine"]),
   model: z.string().trim().min(1).max(160).optional(),
   name: z.string().trim().max(160).optional(),
@@ -277,6 +279,7 @@ export const characterGenerationInputSchema = campaignContextSchema.extend({
 });
 
 export const enemyGenerationInputSchema = campaignContextSchema.extend({
+  systemReferences: enemyReferenceSelectionsSchema.optional(),
   mode: z.enum(["create", "refine"]),
   model: z.string().trim().min(1).max(160).optional(),
   feedback: z.string().trim().max(600).optional(),

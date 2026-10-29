@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildReferenceContext, searchReferences } from "@/lib/references/catalog";
 import {
   artStudioSessionKey,
   artStudioSessionPrefix,
@@ -73,6 +74,15 @@ function session(): ArtStudioSession {
 }
 
 describe("art studio session storage", () => {
+  it("retains the actual used reference context across session restore", () => {
+    const storage = new MemoryStorage();
+    const references = buildReferenceContext([{ kind: "ancestry", text: "Vesk", binding: searchReferences("ancestry", "Vesk")[0].binding }]).sources;
+    const npcIdentity = { ...identity, kind: "npc" as const };
+    const saved = { ...session(), drafts: [{ ...session().drafts[0], targetKind: "npc" as const, references }] };
+    writeArtStudioSession(npcIdentity, saved, storage);
+    expect(readArtStudioSession(npcIdentity, storage).drafts[0].references).toEqual(references);
+    expect(readArtStudioSession(npcIdentity, storage).drafts[0].references?.[0].name).toBe("Vesk");
+  });
   it("uses a campaign, kind, and entity-scoped key", () => {
     expect(artStudioSessionKey(identity)).toBe(`${artStudioSessionPrefix}campaign-1:place:place-1`);
     expect(artStudioSessionKey({ ...identity, entityId: null })).toContain(":place:new");

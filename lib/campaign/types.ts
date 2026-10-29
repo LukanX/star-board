@@ -1,6 +1,8 @@
 import type { PlaceRecord } from "@/lib/places";
 import type { NoteEntityType } from "@/lib/campaign/note-subject";
 import type { EnemyOrigin, EnemyRarity, EnemySize, EnemyStatBlockV1 } from "@/lib/enemies/types";
+import type { ReferenceBinding, ReferenceColumns } from "@/lib/references/types";
+import type { EnemyReferenceSelections } from "@/lib/validation/reference";
 
 export type CampaignRecord = { id: string; name: string; system: string; description: string; visual_style: string; created_by: string };
 export type CampaignMembership = { role: "gm" | "player"; display_name: string; campaign: CampaignRecord | CampaignRecord[] | null };
@@ -17,10 +19,11 @@ export type ApiJob = {
   art_path: string | null; art_subject: string | null; art_url?: string | null; art_prompt: string | null; art_provider: string | null;
   giver: { type: "NPC" | "FACTION"; name: string } | null; votes: number; voted: boolean;
 };
-export type ApiCharacter = { id: string; owner_id: string | null; is_active?: boolean; name: string; species: string; class_name: string; level: number; backstory_markdown: string; physical_description: string; physical_description_is_markdown?: boolean; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; can_edit?: boolean; can_generate_portrait?: boolean; portrait_ai_role?: "gm" | "player" | null };
-export type Character = { id: string; ownerId: string | null; isActive: boolean; name: string; species: string; className: string; level: number; subtitle: string; detail: string; color: "pink" | "cyan" | "purple" | "amber"; image: string | null; status: "ACTIVE" | "RESTING"; backstoryMarkdown: string; physicalDescription: string; physicalDescriptionIsMarkdown?: boolean; artPath?: string | null; artUrl?: string | null; artSubject?: string | null; artPrompt?: string | null; artProvider?: string | null; canEdit: boolean };
-export type CharacterDraft = { name: string; species: string; className: string; level: number; isActive: boolean; backstoryMarkdown: string; physicalDescription: string; physicalDescriptionIsMarkdown: boolean; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
-export type ApiNpc = { id: string; author_id: string; name: string; species: string; role: string; description: string; description_is_markdown?: boolean; player_notes_markdown: string; place_id: string | null; faction_id: string | null; gm_notes_markdown?: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
+type ReferenceDraftFields = { ancestryReference?: ReferenceBinding | null; classReference?: ReferenceBinding | null };
+export type ApiCharacter = ReferenceColumns & { id: string; owner_id: string | null; is_active?: boolean; name: string; species: string; class_name: string; level: number; backstory_markdown: string; physical_description: string; physical_description_is_markdown?: boolean; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; can_edit?: boolean; can_generate_portrait?: boolean; portrait_ai_role?: "gm" | "player" | null };
+export type Character = ReferenceDraftFields & { id: string; ownerId: string | null; isActive: boolean; name: string; species: string; className: string; level: number; subtitle: string; detail: string; color: "pink" | "cyan" | "purple" | "amber"; image: string | null; status: "ACTIVE" | "RESTING"; backstoryMarkdown: string; physicalDescription: string; physicalDescriptionIsMarkdown?: boolean; artPath?: string | null; artUrl?: string | null; artSubject?: string | null; artPrompt?: string | null; artProvider?: string | null; canEdit: boolean };
+export type CharacterDraft = ReferenceDraftFields & { name: string; species: string; className: string; level: number; isActive: boolean; backstoryMarkdown: string; physicalDescription: string; physicalDescriptionIsMarkdown: boolean; artSubject: string; artPath: string | null; artUrl: string | null; artPrompt: string | null; artProvider: string | null };
+export type ApiNpc = ReferenceColumns & { id: string; author_id: string; name: string; species: string; role: string; description: string; description_is_markdown?: boolean; player_notes_markdown: string; place_id: string | null; faction_id: string | null; gm_notes_markdown?: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
 export type NpcRecord = ApiNpc & { color: "pink" | "cyan" | "amber" };
 export type ApiFaction = { id: string; author_id: string; name: string; description: string; description_is_markdown?: boolean; status: string; player_notes_markdown: string; place_id: string | null; gm_notes_markdown?: string; art_path: string | null; art_subject: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null };
 export type FactionRecord = ApiFaction & { color: "pink" | "cyan" | "amber" };
@@ -35,6 +38,8 @@ export type CampaignNote = ApiCampaignNote & { accent: NoteAccent; age?: string 
 export type CampaignNoteEpisode = { id: string; title: string; status: string };
 export type ApiPlace = PlaceRecord & { author_id: string; description: string; description_is_markdown?: boolean; player_notes_markdown: string; art_subject: string | null; art_path: string | null; art_url?: string | null; art_prompt: string | null; art_provider?: string | null; created_at: string; updated_at: string; gm_notes_markdown?: string };
 export type ApiEnemy = {
+  system_references?: EnemyReferenceSelections;
+  system_reference_names?: Record<string, string>;
   id: string;
   campaign_id: string;
   author_id: string;

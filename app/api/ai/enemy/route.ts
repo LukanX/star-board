@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
-import { loadCampaignAiContext, loadCampaignNarrativeAiContext, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, loadCampaignNarrativeAiContext, recordAiGeneration as recordGeneration } from "@/lib/ai/assistance";
 import { buildEnemyPrompt } from "@/lib/ai/prompts";
 import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
 import { requireCampaignGM } from "@/lib/auth/permissions";
@@ -15,6 +15,8 @@ import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { dispatchEnemyBackgroundJob } from "@/lib/ai/enemy-jobs";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
+import { buildSystemReferenceContext, enemyLibrarySelections } from "@/lib/references/system-library";
+import { ReferenceError } from "@/lib/references/catalog";
 
 export const runtime = "nodejs";
 
@@ -74,7 +76,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: failure.message }, { status: failure.status });
     }
 
-    const prompt = buildEnemyPrompt(input.data, narrativeContext.campaign, linkedContext.context);
+    const referenceContext = await buildSystemReferenceContext(context.supabase, input.data.campaignId, enemyLibrarySelections(input.data.systemReferences, input.data.traits));
+    const recordAiGeneration: typeof recordGeneration = (supabase, details) => recordGeneration(supabase, { ...details, referenceSources: referenceContext.sources });
+    const prompt = buildEnemyPrompt(input.data, narrativeContext.campaign, linkedContext.context, referenceContext);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundEnemyGeneration(request)) {
@@ -94,6 +98,7 @@ export async function POST(request: Request) {
           provider: "openrouter",
           effective_model: selectedModel.id,
           status: "pending",
+          reference_sources: referenceContext.sources,
         })
         .select("id, created_at, status_updated_at")
         .single();
@@ -103,6 +108,7 @@ export async function POST(request: Request) {
       }
 
       const job = {
+        ...(referenceContext.sources.length ? { references: referenceContext.sources } : {}),
         generationRunId: generationRun.id,
         prompt,
         model: selectedModel.id,
@@ -125,6 +131,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         job: {
+          ...(referenceContext.sources.length ? { references: referenceContext.sources } : {}),
           generationRunId: generationRun.id,
           status: "pending",
           mode: input.data.mode,
@@ -169,8 +176,9 @@ export async function POST(request: Request) {
     const { error: auditError } = await recordAiGeneration(context.supabase, { campaignId: input.data.campaignId, userId: context.user.id, kind: "enemy", mode: input.data.mode, model: selectedModel.id, promptHash, provider: "openrouter", effectiveModel: providerResult.model ?? selectedModel.id, generationId: providerResult.generationId, inputTokens: providerResult.usage?.inputTokens, outputTokens: providerResult.usage?.outputTokens, costUsd: providerResult.usage?.cost, status: "complete" });
     if (auditError) return NextResponse.json({ error: "Enemy draft metadata could not be saved." }, { status: 503 });
 
-    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult.model ?? selectedModel.id });
-  } catch {
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult.model ?? selectedModel.id, references: referenceContext.sources });
+  } catch (error) {
+    if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "Enemy assistance is temporarily unavailable." }, { status: 503 });
   }
 }

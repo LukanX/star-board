@@ -4,6 +4,7 @@ import DirtyFormProvider from "@/components/campaign-shell/DirtyFormProvider";
 import EnemiesRouteView from "@/components/enemies/EnemiesRouteView";
 import EnemyPreview from "@/components/enemies/EnemyPreview";
 import EnemyPublicRecord from "@/components/enemies/EnemyPublicRecord";
+import EnemyTraitsField from "@/components/enemies/EnemyTraitsField";
 import type { ApiEnemy } from "@/lib/campaign/types";
 import { enemyStatBlockSchema } from "@/lib/validation/enemy";
 
@@ -48,6 +49,31 @@ const enemy: ApiEnemy = {
 function render(node: React.ReactNode) {
   return renderToStaticMarkup(<DirtyFormProvider>{node}</DirtyFormProvider>);
 }
+
+describe("enemy system references", () => {
+  it("renders removable trait tags within the input", () => {
+    const markup = renderToStaticMarkup(<EnemyTraitsField
+      campaignId={enemy.campaign_id}
+      label="Traits / type"
+      value="Undead"
+      query=""
+      disabled={false}
+      traitsLocked={false}
+      onChange={() => undefined}
+      onQueryChange={() => undefined}
+      onSelect={() => undefined}
+    />);
+
+    expect(markup).toContain(">Traits / type</label>");
+    expect(markup).toContain('role="combobox"');
+    expect(markup).toContain('aria-label="Remove Undead trait"');
+    expect(markup).toContain(">Undead</span>");
+    expect(markup).not.toContain("Undead · undead");
+    expect(markup).toContain("lucide-x");
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain("Type a trait and press Enter or comma");
+  });
+});
 
 describe("enemy archive UI secrecy", () => {
   it("keeps mechanics, GM notes, and provenance out of player records", () => {

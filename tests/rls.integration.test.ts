@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadEnv } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { buildReferenceContext, searchReferences } from "@/lib/references/catalog";
 
 const env = loadEnv("test", process.cwd(), "");
 const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -1283,6 +1284,50 @@ describeLocal("local Supabase RLS boundaries", () => {
     expect(marked.data?.physical_description).toBe("Tall\nSilver-eyed");
     expect(marked.data?.physical_description_is_markdown).toBe(true);
 
+  });
+
+  it("preserves owner and GM boundaries for reference columns and enforces paired identities", async () => {
+    const ancestry = searchReferences("ancestry", "Android")[0].binding;
+    const classReference = searchReferences("class", "Soldier")[0].binding;
+    const gmId = (await gmClient.auth.getUser()).data.user!.id;
+    const own = await playerClient.from("characters").insert({ campaign_id: campaignId, owner_id: playerId, name: "Reference owner", species: "Android" }).select("id").single();
+    const other = await gmClient.from("characters").insert({ campaign_id: campaignId, owner_id: gmId, name: "Reference GM", species: "Android" }).select("id").single();
+    expect(own.error).toBeNull();
+    expect(other.error).toBeNull();
+    const fields = { ancestry_reference_id: ancestry.id, ancestry_catalog_version: ancestry.catalogVersion };
+    const ownerUpdate = await playerClient.from("characters").update(fields).eq("id", own.data!.id).select("ancestry_reference_id").single();
+    expect(ownerUpdate.error).toBeNull();
+    expect(ownerUpdate.data?.ancestry_reference_id).toBe(ancestry.id);
+    const denied = await playerClient.from("characters").update(fields).eq("id", other.data!.id).select("id");
+    expect(denied.error).toBeNull();
+    expect(denied.data).toEqual([]);
+    const gmUpdate = await gmClient.from("characters").update({ class_name: "Soldier", class_reference_id: classReference.id, class_catalog_version: classReference.catalogVersion }).eq("id", own.data!.id).select("class_reference_id").single();
+    expect(gmUpdate.error).toBeNull();
+    const incomplete = await playerClient.from("characters").update({ ancestry_catalog_version: null }).eq("id", own.data!.id);
+    expect(incomplete.error?.code).toBe("23514");
+    const clear = await playerClient.from("characters").update({ ancestry_reference_id: null, ancestry_catalog_version: null }).eq("id", own.data!.id).select("ancestry_reference_id").single();
+    expect(clear.error).toBeNull();
+    expect(clear.data?.ancestry_reference_id).toBeNull();
+    const npc = await gmClient.from("npcs").insert({ campaign_id: campaignId, author_id: gmId, name: "Reference NPC", species: "Android", ...fields }).select("id").single();
+    expect(npc.error).toBeNull();
+    const npcDenied = await playerClient.from("npcs").update({ ancestry_reference_id: null, ancestry_catalog_version: null }).eq("id", npc.data!.id).select("id");
+    expect(npcDenied.error).toBeNull();
+    expect(npcDenied.data).toEqual([]);
+    const npcPair = await gmClient.from("npcs").update({ ancestry_catalog_version: null }).eq("id", npc.data!.id);
+    expect(npcPair.error?.code).toBe("23514");
+  });
+
+  it("stores bounded reference provenance without permitting arbitrary JSON shapes", async () => {
+    const binding = searchReferences("ancestry", "Vesk")[0].binding;
+    const sources = buildReferenceContext([{ kind: "ancestry", text: "Vesk", binding }]).sources;
+    const run = { campaign_id: campaignId, requested_by: (await gmClient.auth.getUser()).data.user!.id, kind: "image", mode: "create", model: "test/model", prompt_hash: "a".repeat(64), status: "complete", target_kind: "npc" };
+    const saved = await gmClient.from("ai_generation_runs").insert({ ...run, reference_sources: sources }).select("reference_sources").single();
+    expect(saved.error).toBeNull();
+    expect(saved.data?.reference_sources).toEqual(sources);
+    for (const invalid of [{ unexpected: true }, Array.from({ length: 35 }, () => ({})), [{ name: "x".repeat(65536) }]]) {
+      const result = await gmClient.from("ai_generation_runs").insert({ ...run, reference_sources: invalid });
+      expect(result.error?.code).toBe("23514");
+    }
   });
 
   it("enforces ownership transfer through the authorized RPC", async () => {

@@ -8,12 +8,15 @@ export type CampaignSection =
   | "enemies"
   | "episodes"
   | "notes"
+  | "library"
   | "members"
   | "settings";
 
-export type EntitySection = Exclude<CampaignSection, "overview" | "members" | "settings">;
+export type EntitySection = Exclude<CampaignSection, "overview" | "library" | "members" | "settings">;
 
-const campaignSections: readonly CampaignSection[] = ["overview", "jobs", "characters", "npcs", "factions", "places", "enemies", "episodes", "notes", "members", "settings"];
+const campaignSections: readonly CampaignSection[] = ["overview", "jobs", "characters", "npcs", "factions", "places", "enemies", "episodes", "notes", "library", "members", "settings"];
+
+export type CampaignLibrarySection = "ancestries" | "creature-traits" | "access" | "generation";
 
 function encodedSegment(value: string): string {
   return encodeURIComponent(value);
@@ -38,6 +41,11 @@ export function campaignSectionPath(campaignId: string, section: CampaignSection
 
 export function campaignEntityPath(campaignId: string, section: EntitySection, entityId: string): string {
   return `${campaignSectionPath(campaignId, section)}/${encodedSegment(entityId)}`;
+}
+
+export function campaignLibraryPath(campaignId: string, section: CampaignLibrarySection = "ancestries", referenceId?: string): string {
+  const path = `${campaignSectionPath(campaignId, "library")}/${section}`;
+  return referenceId === undefined ? path : `${path}/${encodedSegment(referenceId)}`;
 }
 
 export function getCampaignSectionFromPath(pathname: string, campaignId: string): CampaignSection {

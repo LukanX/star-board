@@ -1,0 +1,1579 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Metadata discovery only; not identity verification, permission, or excerpt approval.",
+  "foundrySource": {
+    "repository": "foundryvtt/pf2e",
+    "release": "sf2e-1.6.1",
+    "commit": "28d9d156f252d084371d994dc359509b49eadf18"
+  },
+  "records": [
+    {
+      "id": "sf2e.ancestries.Item.GfLwE884NoRC7cRi",
+      "name": "Android",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Android",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Android",
+        "pageId": 628,
+        "revisionId": 76106,
+        "pageUrl": "https://starfinderwiki.com/wiki/Android",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Android?oldid=76106",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Android?oldid=76106#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 2,
+        "characterCount": 644,
+        "citationCount": 2,
+        "sectionHash": "f51ca9079ebad91a72fb693dfc2641cac0f96ad90d7c45ae1b39ba9e517fc283"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.3Wox3ai1kgji07FE",
+      "name": "Astrazoan",
+      "foundryPublication": "Starfinder Galaxy Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Astrazoan",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Astrazoan",
+        "pageId": 2832,
+        "revisionId": 76105,
+        "pageUrl": "https://starfinderwiki.com/wiki/Astrazoan",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Astrazoan?oldid=76105",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Astrazoan?oldid=76105#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 417,
+        "citationCount": 1,
+        "sectionHash": "9ca42e14f6757a6a1e879af3f3619f55d203f6bb7a8efed1cd81a8fcea82e5ef"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.oHnxW7Wgf0EaGK14",
+      "name": "Atraxid",
+      "foundryPublication": "Starfinder Secrets of the Swarm Adventure Path",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Atraxid",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.FeoOVtm7zVhgxXtg",
+      "name": "Bantrid",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Bantrid",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Bantrid",
+        "pageId": 2858,
+        "revisionId": 82648,
+        "pageUrl": "https://starfinderwiki.com/wiki/Bantrid",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Bantrid?oldid=82648",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Bantrid?oldid=82648#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 2,
+        "characterCount": 633,
+        "citationCount": 1,
+        "sectionHash": "88a58a8164cb2c131b90389913f6fee94e8047b3232c4f5b7bb3c18b916cc1f3"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.3iuWdarohpDFhlxX",
+      "name": "Barathu",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Barathu",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Barathu",
+        "pageId": 999,
+        "revisionId": 76107,
+        "pageUrl": "https://starfinderwiki.com/wiki/Barathu",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Barathu?oldid=76107",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Barathu?oldid=76107#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 180,
+        "citationCount": 2,
+        "sectionHash": "c9e0bbac0413ba87f2681aa22e4666baa7f1a0210445787fd93d6445e23536da"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.SVj4h0ca15YwThuX",
+      "name": "Binnaquid",
+      "foundryPublication": "Starfinder Secrets of the Swarm Adventure Path",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Binnaquid",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.9p9GNLHDRocLlKVU",
+      "name": "Brenneri",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Brenneri",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Brenneri",
+        "pageId": 5126,
+        "revisionId": 74673,
+        "pageUrl": "https://starfinderwiki.com/wiki/Brenneri",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Brenneri?oldid=74673",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Brenneri?oldid=74673#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 189,
+        "citationCount": 0,
+        "sectionHash": "6eb862b19f61219d19715f9cc5380a8889128df526d4c5bd3a86fcb787b78676"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.KFNOUfQWPUBW5zSC",
+      "name": "Contemplative",
+      "foundryPublication": "Starfinder Galaxy Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Contemplative",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Contemplative",
+        "pageId": 1665,
+        "revisionId": 76738,
+        "pageUrl": "https://starfinderwiki.com/wiki/Contemplative",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Contemplative?oldid=76738",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Contemplative?oldid=76738#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 112,
+        "citationCount": 1,
+        "sectionHash": "e5e4ae09d70cdc6f078125866491300d03da57e22695e139d10e4998c26a3268"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.tvjMyXjibIywAPh2",
+      "name": "Copaxi",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Copaxi",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Copaxi",
+        "pageId": 3505,
+        "revisionId": 74634,
+        "pageUrl": "https://starfinderwiki.com/wiki/Copaxi",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Copaxi?oldid=74634",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Copaxi?oldid=74634#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 448,
+        "citationCount": 1,
+        "sectionHash": "99127b3072784e6e6da5aed8f6c578d960c566f1c2b3232e32bde8ac96d73d91"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.jNE2Zq46a9kQj7bi",
+      "name": "Dragonkin",
+      "foundryPublication": "Starfinder Galaxy Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Dragonkin",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Dragonkin",
+        "pageId": 2861,
+        "revisionId": 76109,
+        "pageUrl": "https://starfinderwiki.com/wiki/Dragonkin",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Dragonkin?oldid=76109",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Dragonkin?oldid=76109#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 471,
+        "citationCount": 1,
+        "sectionHash": "99d634caf0f9e97c0a949f6fff077af30ea95f3075684d08fd08f0b2683cb08c"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.BYj5ZvlXZdpaEgA6",
+      "name": "Dwarf",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Dwarf",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Dwarf",
+        "pageId": 1041,
+        "revisionId": 82658,
+        "pageUrl": "https://starfinderwiki.com/wiki/Dwarf",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Dwarf?oldid=82658",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Dwarf?oldid=82658#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.XKW1SziWusHoaCRd",
+      "name": "Elebrian",
+      "foundryPublication": "Starfinder Guilt of the Grave World",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Elebrian",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Elebrian",
+        "pageId": 2853,
+        "revisionId": 81905,
+        "pageUrl": "https://starfinderwiki.com/wiki/Elebrian",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Elebrian?oldid=81905",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Elebrian?oldid=81905#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 447,
+        "citationCount": 1,
+        "sectionHash": "d0ca4ef2753709eeba58d7c9d34c3d3bac445f0ccd517a398113befdae1c312d"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.PgKmsA2aKdbLU6O0",
+      "name": "Elf",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Elf",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Elf",
+        "pageId": 2182,
+        "revisionId": 76216,
+        "pageUrl": "https://starfinderwiki.com/wiki/Elf",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Elf?oldid=76216",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Elf?oldid=76216#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 310,
+        "citationCount": 1,
+        "sectionHash": "99f27249e0b59e69ff251fe7a7baa33e141a605862df330a1c6eaf744fc92327"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.HIfj37OghTgagFkx",
+      "name": "Entu Colony",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Entu_Colony",
+          "status": 404
+        },
+        {
+          "url": "https://starfinderwiki.com/wiki/Entu_colony",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.vlYBDZbj6zWBFR0b",
+      "name": "Fonqugon",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Fonqugon",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.yOnW818fHTfnwg2k",
+      "name": "Formian",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Formian",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Formian",
+        "pageId": 2082,
+        "revisionId": 74582,
+        "pageUrl": "https://starfinderwiki.com/wiki/Formian",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Formian?oldid=74582",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Formian?oldid=74582#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.fqn2WK47MN0gqax3",
+      "name": "G'folian",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/G'folian",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.bXICmub6qvXdiveN",
+      "name": "Gnarefuroid",
+      "foundryPublication": "Starfinder Absalom Station",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Gnarefuroid",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.CYlfsYLJcBOgqKtD",
+      "name": "Gnome",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Gnome",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Gnome",
+        "pageId": 2183,
+        "revisionId": 74587,
+        "pageUrl": "https://starfinderwiki.com/wiki/Gnome",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Gnome?oldid=74587",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Gnome?oldid=74587#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.sQfjTMDaZbT9DThq",
+      "name": "Goblin",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Goblin",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Goblin",
+        "pageId": 1321,
+        "revisionId": 74564,
+        "pageUrl": "https://starfinderwiki.com/wiki/Goblin",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Goblin?oldid=74564",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Goblin?oldid=74564#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 612,
+        "citationCount": 1,
+        "sectionHash": "e569bbe29c14525b3e4d2ac02e9779bf85e8b9fbd61b43efac616f0f929970d8"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.GgZAHbrjnzWOZy2v",
+      "name": "Halfling",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Halfling",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Halfling",
+        "pageId": 1659,
+        "revisionId": 74572,
+        "pageUrl": "https://starfinderwiki.com/wiki/Halfling",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Halfling?oldid=74572",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Halfling?oldid=74572#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.PlNDe6phAadFXxCN",
+      "name": "Hardor",
+      "foundryPublication": "Starfinder Secrets of the Swarm Adventure Path",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Hardor",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.IiG7DgeLWYrSNXuX",
+      "name": "Human",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Human",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Human",
+        "pageId": 123,
+        "revisionId": 74545,
+        "pageUrl": "https://starfinderwiki.com/wiki/Human",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Human?oldid=74545",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Human?oldid=74545#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 2,
+        "characterCount": 367,
+        "citationCount": 2,
+        "sectionHash": "1ff5353bfa7bd9c12edcb04ec1e389e8e0b5a7b55ae2bfa53daf71f2b44be573"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.RP7fqj4Rpu0IBf6t",
+      "name": "Ijtikri",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Ijtikri",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Ijtikri",
+        "pageId": 4899,
+        "revisionId": 74667,
+        "pageUrl": "https://starfinderwiki.com/wiki/Ijtikri",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Ijtikri?oldid=74667",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Ijtikri?oldid=74667#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 601,
+        "citationCount": 1,
+        "sectionHash": "9ffcfea64d1f9ecb143dbc377b70e000129e974081f3ee4062d919ecbf5986a8"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.HFVQhUxBt6UTtuny",
+      "name": "Ikeshti",
+      "foundryPublication": "Invasion's Edge Player's Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Ikeshti",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Ikeshti",
+        "pageId": 1634,
+        "revisionId": 76739,
+        "pageUrl": "https://starfinderwiki.com/wiki/Ikeshti",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Ikeshti?oldid=76739",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Ikeshti?oldid=76739#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.8GXuOAZR2i39RGji",
+      "name": "Izalguun",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Izalguun",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Izalguun",
+        "pageId": 4562,
+        "revisionId": 54274,
+        "pageUrl": "https://starfinderwiki.com/wiki/Izalguun",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Izalguun?oldid=54274",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Izalguun?oldid=54274#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 263,
+        "citationCount": 1,
+        "sectionHash": "4ec60e020a64d18d8187293cc92db0aaa46d7ad5795eea8e00ad6708ffcf9558"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.23MA5Ee7ExUfzrqk",
+      "name": "Kalo",
+      "foundryPublication": "Starfinder Galaxy Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Kalo",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Kalo",
+        "pageId": 2859,
+        "revisionId": 82826,
+        "pageUrl": "https://starfinderwiki.com/wiki/Kalo",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Kalo?oldid=82826",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Kalo?oldid=82826#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 3,
+        "characterCount": 1451,
+        "citationCount": 4,
+        "sectionHash": "7e1dd12e197d9675bbb1dbc1c437741405afe8a694d19ccf36cb42a0a3649d4e"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.H6dkr1GtoQhuQqJm",
+      "name": "Kasatha",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Kasatha",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Kasatha",
+        "pageId": 634,
+        "revisionId": 76741,
+        "pageUrl": "https://starfinderwiki.com/wiki/Kasatha",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Kasatha?oldid=76741",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Kasatha?oldid=76741#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 466,
+        "citationCount": 1,
+        "sectionHash": "b1e2e0ab23e4afbd9d51c79f737253b32a2958f22b6e1273d3d1cce6afb57cdf"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.AjSZKAwWEw0AfAJR",
+      "name": "Khizar",
+      "foundryPublication": "Starfinder Murder in Metal City Deluxe Adventure",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Khizar",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Khizar",
+        "pageId": 2846,
+        "revisionId": 76139,
+        "pageUrl": "https://starfinderwiki.com/wiki/Khizar",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Khizar?oldid=76139",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Khizar?oldid=76139#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 734,
+        "citationCount": 1,
+        "sectionHash": "cdc91f145de8ebbaa66d565b961021ac08c703084b33eac5aeeb55862c9bfae5"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.ZDExBZqdqYUtv5dg",
+      "name": "Lashunta",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Lashunta",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Lashunta",
+        "pageId": 677,
+        "revisionId": 76359,
+        "pageUrl": "https://starfinderwiki.com/wiki/Lashunta",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Lashunta?oldid=76359",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Lashunta?oldid=76359#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 1100,
+        "citationCount": 2,
+        "sectionHash": "3b62ef104068ab3f0aca4672855d37da087ece4a75ab3c91df258515862e09d8"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.cdhgByGG1WtuaK73",
+      "name": "Leshy",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Leshy",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.akHnz8mYVUNCQ02e",
+      "name": "Living Hologram",
+      "foundryPublication": "Starfinder Tech Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Living_Hologram",
+          "status": 404
+        },
+        {
+          "url": "https://starfinderwiki.com/wiki/Living_hologram",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Living_hologram",
+        "pageId": 3013,
+        "revisionId": 48020,
+        "pageUrl": "https://starfinderwiki.com/wiki/Living_hologram",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Living_hologram?oldid=48020",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Living_hologram?oldid=48020#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 314,
+        "citationCount": 1,
+        "sectionHash": "c0bac8ffe3fc29b93b7386889ca229e8a2be22513bdd2e8973f3cef5fb0d79b4"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.q6fTXrRTneiqXs63",
+      "name": "Madrosarai",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Madrosarai",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.XcmRKGimGvezRawa",
+      "name": "Maraquoi",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Maraquoi",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Maraquoi",
+        "pageId": 2907,
+        "revisionId": 82755,
+        "pageUrl": "https://starfinderwiki.com/wiki/Maraquoi",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Maraquoi?oldid=82755",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Maraquoi?oldid=82755#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 254,
+        "citationCount": 1,
+        "sectionHash": "aaa25ba3cd63e949c318906f391a0842950f8323f5f8a76864e93d9be3403244"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.1PqfYUqdVQGtLdfr",
+      "name": "Mecenaic",
+      "foundryPublication": "Starfinder Secrets of the Swarm Adventure Path",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Mecenaic",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.62AMzNlZzxTG0oxE",
+      "name": "Moyishuu",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Moyishuu",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Moyishuu",
+        "pageId": 5789,
+        "revisionId": 74678,
+        "pageUrl": "https://starfinderwiki.com/wiki/Moyishuu",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Moyishuu?oldid=74678",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Moyishuu?oldid=74678#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 233,
+        "citationCount": 1,
+        "sectionHash": "1efba77ec78e529d121658965dcf5e9e8ab8a6a07f31feec16e7334ff82c64bd"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.waaL4y6dUPzy8Emb",
+      "name": "Novian",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Novian",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Novian",
+        "pageId": 10956,
+        "revisionId": 83079,
+        "pageUrl": "https://starfinderwiki.com/wiki/Novian",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Novian?oldid=83079",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Novian?oldid=83079#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.YCt1j4GcD3WsfEvQ",
+      "name": "Nuar",
+      "foundryPublication": "Starfinder Absalom Station",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Nuar",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Nuar",
+        "pageId": 2874,
+        "revisionId": 74612,
+        "pageUrl": "https://starfinderwiki.com/wiki/Nuar",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Nuar?oldid=74612",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Nuar?oldid=74612#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 274,
+        "citationCount": 1,
+        "sectionHash": "21d3540aaf15453f78e876c67bdacb3e4508dd96c3bf2a2e99fedd4ffec35191"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.lSGWXjcbOa6O5fTx",
+      "name": "Orc",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Orc",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Orc",
+        "pageId": 2184,
+        "revisionId": 74588,
+        "pageUrl": "https://starfinderwiki.com/wiki/Orc",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Orc?oldid=74588",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Orc?oldid=74588#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 132,
+        "citationCount": 1,
+        "sectionHash": "2e71bdaa6305133c465e955680994d23cdaa59e001e9f1297e65ff7cd30cd191"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.RKv77bXjesIUAPxG",
+      "name": "Ord",
+      "foundryPublication": "Starfinder Secrets of the Swarm Adventure Path",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Ord",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.6BG5tO0g9kCFfTym",
+      "name": "Orocoran",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Orocoran",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Orocoran",
+        "pageId": 1564,
+        "revisionId": 77087,
+        "pageUrl": "https://starfinderwiki.com/wiki/Orocoran",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Orocoran?oldid=77087",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Orocoran?oldid=77087#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 305,
+        "citationCount": 1,
+        "sectionHash": "c93b9aff37d2f0569e8efbc9d371a17ecc928595d2261f8eefcbe16f80fe6cdf"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.r1f3ChFtmCRQ9fMj",
+      "name": "Osharu",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Osharu",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Osharu",
+        "pageId": 3697,
+        "revisionId": 74644,
+        "pageUrl": "https://starfinderwiki.com/wiki/Osharu",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Osharu?oldid=74644",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Osharu?oldid=74644#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.75TqHknsQuinDLjn",
+      "name": "Pahtra",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Pahtra",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Pahtra",
+        "pageId": 3698,
+        "revisionId": 76130,
+        "pageUrl": "https://starfinderwiki.com/wiki/Pahtra",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Pahtra?oldid=76130",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Pahtra?oldid=76130#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 534,
+        "citationCount": 2,
+        "sectionHash": "f5e00a68b985294704eb2286e6dbc58e7d4d133c3da8ea4d9d9a514d39b8e264"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.5GW7nKNbRjjruxIc",
+      "name": "Phasorq",
+      "foundryPublication": "Starfinder Secrets of the Swarm Adventure Path",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Phasorq",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.lU4TJFs95esViIHI",
+      "name": "Raxilite",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Raxilite",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.WfllaPpt1pxGVMAG",
+      "name": "Ryphorian",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Ryphorian",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Ryphorian",
+        "pageId": 2848,
+        "revisionId": 83048,
+        "pageUrl": "https://starfinderwiki.com/wiki/Ryphorian",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Ryphorian?oldid=83048",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Ryphorian?oldid=83048#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 1340,
+        "citationCount": 3,
+        "sectionHash": "74c71b8a8dba29bdb4e32c49f1b38b3b9e67b061ec2fcedc78b9103aaf795fb4"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.i1fnTVBTRYSqFY2c",
+      "name": "Sarcesian",
+      "foundryPublication": "Starfinder Galaxy Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Sarcesian",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Sarcesian",
+        "pageId": 1566,
+        "revisionId": 77089,
+        "pageUrl": "https://starfinderwiki.com/wiki/Sarcesian",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Sarcesian?oldid=77089",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Sarcesian?oldid=77089#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 351,
+        "citationCount": 2,
+        "sectionHash": "6e08d976e7f0ee239671cf032d734499f2669fe326e4681dc32c7c88bb072a32"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.FjBJNHdiWAvu1lV7",
+      "name": "Shirren",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Shirren",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Shirren",
+        "pageId": 1161,
+        "revisionId": 76221,
+        "pageUrl": "https://starfinderwiki.com/wiki/Shirren",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Shirren?oldid=76221",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Shirren?oldid=76221#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 2,
+        "characterCount": 924,
+        "citationCount": 2,
+        "sectionHash": "c374c6cf5a1b74cdedf79191ca39831afc5f719d0cc20ef6e2c5c61a14e35a28"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.CURlEp5fEl0WJq9L",
+      "name": "Shobhad",
+      "foundryPublication": "Invasion's Edge Player's Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Shobhad",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Shobhad",
+        "pageId": 1633,
+        "revisionId": 76135,
+        "pageUrl": "https://starfinderwiki.com/wiki/Shobhad",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Shobhad?oldid=76135",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Shobhad?oldid=76135#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 145,
+        "citationCount": 1,
+        "sectionHash": "14c3beacc10845ca580aed9e1114c6f6f73440e3da2c2d1d31fb2de41e4d8ae7"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.0qcXAQo7iZkZXNO9",
+      "name": "Skittermander",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Skittermander",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Skittermander",
+        "pageId": 2919,
+        "revisionId": 76136,
+        "pageUrl": "https://starfinderwiki.com/wiki/Skittermander",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Skittermander?oldid=76136",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Skittermander?oldid=76136#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 2,
+        "characterCount": 593,
+        "citationCount": 1,
+        "sectionHash": "d3e077869a81d0c8aec42fec536a4ee84bfae12ea5c972fbba0784090d18f1cb"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.aprkTkhSLZpceLDG",
+      "name": "SRO",
+      "foundryPublication": "Starfinder Tech Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/SRO",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Sentient_robotic_organism",
+        "pageId": 2840,
+        "revisionId": 74805,
+        "pageUrl": "https://starfinderwiki.com/wiki/Sentient_robotic_organism",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Sentient_robotic_organism?oldid=74805",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Sentient_robotic_organism?oldid=74805#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 129,
+        "citationCount": 1,
+        "sectionHash": "2708586dc096fa841c288783dfb2e605fc49da1eb303014745b494635f0759bf"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.Fhhxk7toaVGjwoMY",
+      "name": "Talphi",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Talphi",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.mvomk7uS0Gfh72sg",
+      "name": "Trox",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Trox",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Trox",
+        "pageId": 3701,
+        "revisionId": 82649,
+        "pageUrl": "https://starfinderwiki.com/wiki/Trox",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Trox?oldid=82649",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Trox?oldid=82649#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 277,
+        "citationCount": 1,
+        "sectionHash": "f799a5eb79caee5bf9775f64ed2c22aae7b8fe8df0b7881f42273431b0a013ab"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.1gJeLPnHFATPQej2",
+      "name": "Urog",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Urog",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Urog",
+        "pageId": 2847,
+        "revisionId": 82746,
+        "pageUrl": "https://starfinderwiki.com/wiki/Urog",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Urog?oldid=82746",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Urog?oldid=82746#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 2,
+        "characterCount": 619,
+        "citationCount": 1,
+        "sectionHash": "dc952ffe17173b13f665c403ef419c2f7f093743ceeac411cf4ec1663cf3e10d"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.WmgIz3fJAh4xJ9Gk",
+      "name": "Verthani",
+      "foundryPublication": "Starfinder Tech Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Verthani",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Verthani",
+        "pageId": 2857,
+        "revisionId": 76760,
+        "pageUrl": "https://starfinderwiki.com/wiki/Verthani",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Verthani?oldid=76760",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Verthani?oldid=76760#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 465,
+        "citationCount": 3,
+        "sectionHash": "12c13b17297a070a901e105907356dc77fc33b598888ec33ea8b8a227831d6b8"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.06FBb4UDg64S5AYI",
+      "name": "Vesk",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Vesk",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Vesk",
+        "pageId": 1138,
+        "revisionId": 76137,
+        "pageUrl": "https://starfinderwiki.com/wiki/Vesk",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Vesk?oldid=76137",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Vesk?oldid=76137#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 2,
+        "characterCount": 753,
+        "citationCount": 2,
+        "sectionHash": "cc14aba407c967162cddd51150cdd34efd679600fbd51318362933b4558d9a4a"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.mBsOLC7cRc7nkzV2",
+      "name": "Vlaka",
+      "foundryPublication": "Starfinder Galaxy Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Vlaka",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Vlaka",
+        "pageId": 3702,
+        "revisionId": 76103,
+        "pageUrl": "https://starfinderwiki.com/wiki/Vlaka",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Vlaka?oldid=76103",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Vlaka?oldid=76103#Appearance"
+      },
+      "discoveryStatus": "found",
+      "appearance": {
+        "blockCount": 1,
+        "characterCount": 231,
+        "citationCount": 1,
+        "sectionHash": "b70a5246a9ffc40b30d3e748d31782a1bff92ed2094d93f3685b8bfc9641bb2f"
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.Bgn9LCnpSZNJdXht",
+      "name": "Vulkarisu",
+      "foundryPublication": "Beyond the Blood Door Player's Guide",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Vulkarisu",
+          "status": 404
+        }
+      ],
+      "source": null,
+      "discoveryStatus": "missing-page",
+      "appearance": null,
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.oKcAbl5mPNkFYhQM",
+      "name": "Worlanisi",
+      "foundryPublication": "Starfinder Galactic Ancestries",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Worlanisi",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Worlanisi",
+        "pageId": 12844,
+        "revisionId": 74531,
+        "pageUrl": "https://starfinderwiki.com/wiki/Worlanisi",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Worlanisi?oldid=74531",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Worlanisi?oldid=74531#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    },
+    {
+      "id": "sf2e.ancestries.Item.P6PcVnCkh4XMdefw",
+      "name": "Ysoki",
+      "foundryPublication": "Starfinder Player Core",
+      "attempts": [
+        {
+          "url": "https://starfinderwiki.com/wiki/Ysoki",
+          "status": 200
+        }
+      ],
+      "source": {
+        "title": "Ysoki",
+        "pageId": 630,
+        "revisionId": 76737,
+        "pageUrl": "https://starfinderwiki.com/wiki/Ysoki",
+        "revisionUrl": "https://starfinderwiki.com/wiki/Ysoki?oldid=76737",
+        "sectionUrl": "https://starfinderwiki.com/wiki/Ysoki?oldid=76737#Appearance"
+      },
+      "discoveryStatus": "missing-section",
+      "appearance": {
+        "blockCount": 0,
+        "characterCount": 0,
+        "citationCount": 0,
+        "sectionHash": null
+      },
+      "identityReview": "pending",
+      "reusePermission": "unresolved",
+      "excerptStatus": "not-imported"
+    }
+  ]
+}

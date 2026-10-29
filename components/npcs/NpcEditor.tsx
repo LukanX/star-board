@@ -17,10 +17,13 @@ import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { RelatedFactionSummary } from "@/lib/campaign/detail-types";
 import type { ApiNpc, ApiPlace } from "@/lib/campaign/types";
 import { flattenPlaceTree } from "@/lib/places";
+import ReferenceCombobox from "@/components/ui/ReferenceCombobox";
+import { readReferenceBinding, referenceMatchesText, type ReferenceBinding } from "@/lib/references/types";
 
 type NpcDraft = {
   name: string;
   species: string;
+  ancestryReference: ReferenceBinding | null;
   role: string;
   description: string;
   descriptionIsMarkdown: boolean;
@@ -38,6 +41,7 @@ type NpcDraft = {
 const emptyNpcDraft: NpcDraft = {
   name: "",
   species: "",
+  ancestryReference: null,
   role: "",
   description: "",
   descriptionIsMarkdown: false,
@@ -57,6 +61,7 @@ function toDraft(npc?: ApiNpc): NpcDraft {
     ? {
         name: npc.name,
         species: npc.species,
+        ancestryReference: readReferenceBinding(npc, "ancestry"),
         role: npc.role,
         description: npc.description,
         descriptionIsMarkdown: npc.description_is_markdown ?? false,
@@ -92,6 +97,9 @@ export default function NpcEditor({
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [workspaceReference, setWorkspaceReference] = useState<{ text: string; binding: ReferenceBinding | null } | null>(null);
+  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
+  const activeReference = workspaceReference ?? { text: draft.species, binding: draft.ancestryReference };
   const { setDirty, clearDirty, confirmNavigation } = useDirtyForm();
   const setDraft = (updater: (current: NpcDraft) => NpcDraft) => {
     setDirty();
@@ -117,6 +125,7 @@ export default function NpcEditor({
           trackUnsavedUploads: true,
           url: draft.artUrl,
           subject: draft.artSubject,
+          npcReferenceContext: { species: draft.species, ancestryReference: draft.ancestryReference },
           currentPrompt: draft.artPrompt,
           onSubjectChange: (value) => update("artSubject", value),
           onChange: (value) => update("artPath", value),
@@ -203,6 +212,16 @@ export default function NpcEditor({
         endpoint="/api/ai/npc"
         entityLabel="NPC"
         mode={npc ? "refine" : "create"}
+        requestContextKey={JSON.stringify({ ancestryReference: activeReference.binding })}
+        prepareRequestFields={(values) => {
+          const species = values.species ?? draft.species;
+          const binding = referenceMatchesText(activeReference.binding, species, activeReference.text);
+          setWorkspaceReference({ text: species, binding });
+          return { ancestryReference: binding };
+        }}
+        renderBriefField={({ field, value, onChange, disabled }) => field.key === "species" ? (
+          <ReferenceCombobox campaignId={campaignId} kind="ancestry" label={field.label} value={value} binding={referenceMatchesText(activeReference.binding, value, activeReference.text)} disabled={disabled} onChange={(text, binding) => { setWorkspaceReference({ text, binding }); onChange(text); }} />
+        ) : undefined}
         requestFields={{
           name: draft.name,
           species: draft.species,
@@ -264,9 +283,12 @@ export default function NpcEditor({
               multiline: true,
             },
         ]}
-        onApply={(candidate) =>
+        onApply={(candidate) => {
+          const ancestryReference = referenceMatchesText(activeReference.binding, candidate.species ?? draft.species, activeReference.text);
+          setReferenceNotice(activeReference.binding && !ancestryReference ? "The AI draft changed Species. Its previous reference was cleared; select a new reference if desired." : null);
           setDraft((current) => ({
             ...current,
+            ancestryReference,
             name: candidate.name ?? current.name,
             species: candidate.species ?? current.species,
             role: candidate.role ?? current.role,
@@ -276,15 +298,15 @@ export default function NpcEditor({
               candidate.playerNotes ?? current.playerNotesMarkdown,
             gmNotesMarkdown: candidate.gmNotes ?? current.gmNotesMarkdown,
             artSubject: candidate.visualPrompt ?? current.artSubject,
-          }))
-        }
+          }));
+        }}
       />
       <form
         hidden={assistantOpen}
         className="character-form grid gap-[13px] [&_label]:grid [&_label]:gap-[7px] [&_label]:text-[var(--dim)] [&_label]:font-mono [&_label]:text-[8px] [&_label]:tracking-[.12em] [&_input]:w-full [&_input]:border [&_input]:border-[rgba(139,151,169,.28)] [&_input]:outline-0 [&_input]:p-[10px_12px] [&_input]:bg-[#0a1118] [&_input]:text-[var(--ink)] [&_input]:font-mono [&_input]:text-[11px] [&_input]:h-[42px] [&_input:focus]:border-[var(--cyan)] [&_input:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_input::placeholder]:text-[#4d5a6b] [&_textarea]:w-full [&_textarea]:border [&_textarea]:border-[rgba(139,151,169,.28)] [&_textarea]:outline-0 [&_textarea]:p-[10px_12px] [&_textarea]:bg-[#0a1118] [&_textarea]:text-[var(--ink)] [&_textarea]:font-mono [&_textarea]:text-[11px] [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:leading-[1.55] [&_textarea:focus]:border-[var(--cyan)] [&_textarea:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_textarea::placeholder]:text-[#4d5a6b]"
         onSubmit={save}
       >
-        <div className="character-form-grid grid grid-cols-[1.4fr_1fr_1.2fr_80px] gap-[10px] max-[760px]:grid-cols-2 max-[420px]:grid-cols-1">
+        <div className="character-form-grid grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)] items-start gap-[10px] max-[760px]:grid-cols-2 max-[420px]:grid-cols-1">
           <label className="max-[760px]:[grid-column:1/-1] max-[420px]:[grid-column:auto]">
             Name
             <input
@@ -294,14 +316,7 @@ export default function NpcEditor({
               onChange={(event) => update("name", event.target.value)}
             />
           </label>
-          <label>
-            Species
-            <input
-              maxLength={120}
-              value={draft.species}
-              onChange={(event) => update("species", event.target.value)}
-            />
-          </label>
+          <ReferenceCombobox campaignId={campaignId} kind="ancestry" label="Species" value={draft.species} binding={draft.ancestryReference} onChange={(species, ancestryReference) => { setDraft((current) => ({ ...current, species, ancestryReference })); setWorkspaceReference(null); setReferenceNotice(null); }} />
           <label>
             Role
             <input
@@ -311,6 +326,7 @@ export default function NpcEditor({
             />
           </label>
         </div>
+        {referenceNotice ? <p role="status" className="m-0 text-[10px] text-[var(--amber)]">{referenceNotice}</p> : null}
         <RichMarkdownField
           campaignId={campaignId}
           label="Description"

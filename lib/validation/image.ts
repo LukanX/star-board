@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { defaultImageAspectRatio, imageAspectRatioValues, imageResolutionValues, imageSizeOptions, imageSizeValues } from "@/lib/ai/image-options";
 import { visualStyleTextSchema } from "@/lib/validation/visual-style";
+import { npcReferenceContextSchema, referenceBindingSchema, referenceStatusesSchema } from "@/lib/validation/reference";
 
 export const imagePromptMaxLength = 3000;
 export const imagePurposes = ["entity-art", "style-preview"] as const;
@@ -11,6 +12,8 @@ export const imageGenerationInputSchema = z.object({
   mode: z.enum(["create", "refine"]),
   targetKind: z.enum(imageTargetKinds),
   characterId: z.string().uuid().optional(),
+  npcReferenceContext: npcReferenceContextSchema.optional(),
+  enemyReferenceContext: z.object({ ancestryReference: referenceBindingSchema.nullable().optional() }).strict().optional(),
   purpose: z.enum(imagePurposes).default("entity-art"),
   model: z.string().trim().min(1).max(160).optional(),
   subject: z.string().trim().min(1).max(1200),
@@ -21,7 +24,11 @@ export const imageGenerationInputSchema = z.object({
   size: z.enum(imageSizeValues).optional(),
   refinement: z.string().trim().max(600).optional(),
   currentPrompt: z.string().trim().max(imagePromptMaxLength).optional(),
-}).superRefine(({ aspectRatio, size, targetKind, characterId, parentPlaceId, purpose, visualStyleId, visualStyleOverride }, context) => {
+}).superRefine(({ aspectRatio, size, targetKind, characterId, parentPlaceId, purpose, visualStyleId, visualStyleOverride, npcReferenceContext, enemyReferenceContext }, context) => {
+  if (enemyReferenceContext && targetKind !== "enemy") context.addIssue({ code: "custom", path: ["enemyReferenceContext"], message: "Enemy reference context is only valid for enemy artwork." });
+  if (npcReferenceContext && targetKind !== "npc") {
+    context.addIssue({ code: "custom", path: ["npcReferenceContext"], message: "NPC reference context is only valid for NPC artwork." });
+  }
   if (size && !imageSizeOptions[aspectRatio].some((option) => option.value === size)) {
     context.addIssue({ code: "custom", path: ["size"], message: `Size ${size} does not match aspect ratio ${aspectRatio}.` });
   }
@@ -49,6 +56,7 @@ export const imageGenerationInputSchema = z.object({
 });
 
 export const imageBackgroundJobSchema = z.object({
+  references: referenceStatusesSchema.optional(),
   generationRunId: z.string().uuid(),
   prompt: z.string().trim().min(1).max(imagePromptMaxLength),
   model: z.string().trim().min(1).max(160),
@@ -66,6 +74,7 @@ export const imageBackgroundJobSchema = z.object({
 export type ImageBackgroundJob = z.input<typeof imageBackgroundJobSchema>;
 
 export const imageDraftSchema = z.object({
+  references: referenceStatusesSchema.optional(),
   generationRunId: z.string().uuid(),
   targetKind: z.enum(imageTargetKinds),
   characterId: z.string().uuid().optional(),

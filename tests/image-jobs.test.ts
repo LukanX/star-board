@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { createImageBackgroundSignature, dispatchImageBackgroundJob, parseImageBackgroundJob, verifyImageBackgroundSignature } from "@/lib/ai/image-jobs";
+import { librarySource } from "./support/library-reference";
 
 const job = {
   generationRunId: "00000000-0000-4000-8000-000000000003",
@@ -11,6 +12,14 @@ const job = {
 };
 
 describe("image background jobs", () => {
+  it("covers reference provenance with the worker signature", () => {
+    const references = [librarySource];
+    const groundedJob = { ...job, references };
+    const signature = createImageBackgroundSignature(groundedJob, "worker-secret");
+    expect(verifyImageBackgroundSignature(parseImageBackgroundJob(groundedJob).data!, signature, "worker-secret")).toBe(true);
+    expect(verifyImageBackgroundSignature(groundedJob, signature, "worker-secret")).toBe(true);
+    expect(verifyImageBackgroundSignature({ ...groundedJob, references: [] }, signature, "worker-secret")).toBe(false);
+  });
   it("accepts an unchanged signed job and rejects a modified payload", () => {
     const signature = createImageBackgroundSignature(job, "worker-secret");
     const legacyCanonicalJob = JSON.stringify({

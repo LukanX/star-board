@@ -123,6 +123,7 @@ export default async function handler(request: Request) {
     if (!draft.success) throw new Error("The AI response did not match the enemy draft format.");
 
     const { data: completedRun, error: completeError } = await supabase.from("ai_generation_runs").update({
+      ...(input.data.references ? { reference_sources: input.data.references } : {}),
       status: "complete",
       status_updated_at: new Date().toISOString(),
       effective_model: response.model,

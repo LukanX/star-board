@@ -4,12 +4,14 @@ import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
 import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { createCharacterSchema } from "@/lib/validation/character";
+import { ReferenceError } from "@/lib/references/catalog";
+import { characterReferenceColumns, prepareReferenceSelection, referenceColumnValues } from "@/lib/references/records";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 
 export const runtime = "nodejs";
 
-const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const characterColumns = `id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at, ${characterReferenceColumns}`;
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId } = await params;
@@ -86,6 +88,9 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Only a campaign GM can choose another character owner or leave a character unassigned." }, { status: 403 });
     }
 
+    const ancestry = prepareReferenceSelection("ancestry", input.data.species, input.data.ancestryReference);
+    const characterClass = prepareReferenceSelection("class", input.data.className, input.data.classReference);
+
     const narrativeFields = [
       { markdown: input.data.backstoryMarkdown, audience: "player" as const },
       ...(input.data.physicalDescriptionIsMarkdown
@@ -105,6 +110,8 @@ export async function POST(request: Request, { params }: RouteContext) {
         name: input.data.name,
         species: input.data.species,
         class_name: input.data.className,
+        ...referenceColumnValues("ancestry", ancestry),
+        ...referenceColumnValues("class", characterClass),
         level: input.data.level,
         backstory_markdown: input.data.backstoryMarkdown,
         physical_description: input.data.physicalDescription,
@@ -124,7 +131,8 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     const [character] = await addCampaignArtUrls(context.supabase, [data]);
     return NextResponse.json({ character: { ...character, can_edit: role === "gm" || character.owner_id === context.user.id } }, { status: 201 });
-  } catch {
+  } catch (error) {
+    if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
 }

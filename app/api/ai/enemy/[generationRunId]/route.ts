@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getEnemyJobStaleMessage } from "@/lib/ai/enemy-job-lifecycle";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
 import { enemyAiDraftSchema } from "@/lib/validation/enemy";
+import { referenceStatusesSchema } from "@/lib/validation/reference";
 
 type RouteContext = { params: Promise<{ generationRunId: string }> };
 
@@ -25,7 +26,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     const { data: run, error } = await context.supabase
       .from("ai_generation_runs")
-      .select("id, campaign_id, requested_by, kind, mode, model, effective_model, draft, created_at, status, status_updated_at, error_message")
+      .select("id, campaign_id, requested_by, kind, mode, model, effective_model, draft, created_at, status, status_updated_at, error_message, reference_sources")
       .eq("id", generationRunId)
       .eq("kind", "enemy")
       .maybeSingle();
@@ -57,6 +58,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       job: {
         generationRunId: run.id,
         status: "complete",
+        ...(run.reference_sources == null ? {} : { references: referenceStatusesSchema.parse(run.reference_sources) }),
         mode: run.mode,
         model: run.effective_model ?? run.model,
         createdAt: new Date(run.created_at).toISOString(),

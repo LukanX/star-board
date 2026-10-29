@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { referenceBindingSchema } from "@/lib/validation/reference";
 
 const npcFields = {
   name: z.string().trim().min(1).max(160),
   species: z.string().trim().max(120).default(""),
+  ancestryReference: referenceBindingSchema.nullable().optional(),
   role: z.string().trim().max(160).default(""),
   description: z.string().max(4000).default(""),
   descriptionIsMarkdown: z.boolean().default(false),
@@ -23,6 +25,7 @@ export const createNpcSchema = z.object({
 export const updateNpcSchema = z.object({
   name: npcFields.name.optional(),
   species: npcFields.species.optional(),
+  ancestryReference: npcFields.ancestryReference,
   role: npcFields.role.optional(),
   description: npcFields.description.optional(),
   descriptionIsMarkdown: z.boolean().optional(),

@@ -3,6 +3,7 @@ import { getCampaignCredentialForGeneration } from "@/lib/ai/campaign-credential
 import { addCampaignArtUrls } from "@/lib/storage/campaign-art";
 import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import type { ApiCharacter } from "@/lib/campaign/types";
+import { characterReferenceColumns } from "@/lib/references/records";
 
 export type CampaignCharactersResult = {
   role: "gm" | "player";
@@ -10,7 +11,7 @@ export type CampaignCharactersResult = {
   characters: ApiCharacter[];
 };
 
-const characterColumns = "id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const characterColumns = `id, owner_id, is_active, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown, art_subject, art_path, art_prompt, art_provider, created_at, updated_at, ${characterReferenceColumns}`;
 
 async function portraitCapability(campaignId: string, character: { owner_id: string | null }, membership: { role: "gm" | "player" }, userId: string) {
   const portraitAiRole = membership.role === "gm" ? "gm" : character.owner_id === userId ? "player" : null;

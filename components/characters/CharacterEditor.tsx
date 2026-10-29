@@ -10,6 +10,8 @@ import { useDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 import { editorPanelClassName } from "@/components/ui/editorStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { ApiCampaignMember, ApiCharacter, CharacterDraft } from "@/lib/campaign/types";
+import ReferenceCombobox from "@/components/ui/ReferenceCombobox";
+import { readReferenceBinding } from "@/lib/references/types";
 
 const emptyDraft: CharacterDraft = {
   name: "",
@@ -49,6 +51,8 @@ export default function CharacterEditor({
       ? {
           name: character.name,
           species: character.species,
+          ancestryReference: readReferenceBinding(character, "ancestry"),
+          classReference: readReferenceBinding(character, "class"),
           className: character.class_name,
           level: character.level,
           isActive: character.is_active !== false,
@@ -148,6 +152,7 @@ export default function CharacterEditor({
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          {canGeneratePortrait ? <p className="text-[10px] text-[var(--muted)]">Portrait AI uses saved identity and appearance. Save Character before generating with changed Species, Class, or appearance.</p> : null}
           {canGeneratePortrait ? (
             <button
               className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px bg-[rgba(255,255,255,.035)] text-[var(--muted)] hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)]"
@@ -193,7 +198,7 @@ export default function CharacterEditor({
         className="character-form grid gap-[13px] [&_label]:grid [&_label]:gap-[7px] [&_label]:text-[var(--dim)] [&_label]:font-mono [&_label]:text-[8px] [&_label]:tracking-[.12em] [&_input]:w-full [&_input]:border [&_input]:border-[rgba(139,151,169,.28)] [&_input]:outline-0 [&_input]:p-[10px_12px] [&_input]:bg-[#0a1118] [&_input]:text-[var(--ink)] [&_input]:font-mono [&_input]:text-[11px] [&_input]:h-[42px] [&_input:focus]:border-[var(--cyan)] [&_input:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_input::placeholder]:text-[#4d5a6b] [&_textarea]:w-full [&_textarea]:border [&_textarea]:border-[rgba(139,151,169,.28)] [&_textarea]:outline-0 [&_textarea]:p-[10px_12px] [&_textarea]:bg-[#0a1118] [&_textarea]:text-[var(--ink)] [&_textarea]:font-mono [&_textarea]:text-[11px] [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:leading-[1.55] [&_textarea:focus]:border-[var(--cyan)] [&_textarea:focus]:shadow-[0_0_0_2px_rgba(98,232,255,.1)] [&_textarea::placeholder]:text-[#4d5a6b]"
         onSubmit={save}
       >
-        <div className="character-form-grid grid grid-cols-[1.4fr_1fr_1.2fr_80px] gap-[10px] max-[760px]:grid-cols-2 max-[420px]:grid-cols-1">
+        <div className="character-form-grid grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)_80px] items-start gap-[10px] max-[760px]:grid-cols-2 max-[420px]:grid-cols-1">
           <label className="max-[760px]:[grid-column:1/-1] max-[420px]:[grid-column:auto]">
             Name
             <input
@@ -202,20 +207,8 @@ export default function CharacterEditor({
               onChange={(event) => update("name", event.target.value)}
             />
           </label>
-          <label>
-            Species
-            <input
-              value={draft.species}
-              onChange={(event) => update("species", event.target.value)}
-            />
-          </label>
-          <label>
-            Class
-            <input
-              value={draft.className}
-              onChange={(event) => update("className", event.target.value)}
-            />
-          </label>
+          <ReferenceCombobox campaignId={campaignId} kind="ancestry" label="Species" value={draft.species} binding={draft.ancestryReference} onChange={(species, ancestryReference) => { setDirty(); setDraft((current) => ({ ...current, species, ancestryReference })); }} />
+          <ReferenceCombobox campaignId={campaignId} kind="class" label="Class" value={draft.className} binding={draft.classReference} onChange={(className, classReference) => { setDirty(); setDraft((current) => ({ ...current, className, classReference })); }} />
           <label>
             Level
             <input

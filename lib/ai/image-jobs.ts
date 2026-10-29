@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { imageBackgroundJobSchema, type ImageBackgroundJob } from "@/lib/validation/image";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/service";
+import { referenceStatusesSchema } from "@/lib/validation/reference";
 
 export const imageBackgroundFunctionName = "generate-image-background";
 
@@ -14,6 +15,7 @@ function canonicalImageBackgroundJob(job: ImageBackgroundJob) {
     ...(job.size ? { size: job.size } : {}),
     ...(job.resolution ? { resolution: job.resolution } : {}),
     ...(job.supportedParameters ? { supportedParameters: job.supportedParameters } : {}),
+    ...(job.references ? { references: referenceStatusesSchema.parse(job.references) } : {}),
   };
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { EnemyJobCancelledError, waitForEnemyBackgroundJob, type EnemyBackgroundJob } from "@/lib/ai/enemy-job-polling";
+import { librarySource } from "./support/library-reference";
 
 const job: EnemyBackgroundJob = {
   generationRunId: "00000000-0000-4000-8000-000000000003",
@@ -65,6 +66,19 @@ describe("enemy background polling", () => {
     const fetchImpl = vi.fn().mockResolvedValue(response({ job: { status: "failed" }, error: "Provider unavailable" }));
 
     await expect(waitForEnemyBackgroundJob(job, { fetchImpl, wait: waitImmediately, now: freshNow })).rejects.toThrow("Provider unavailable");
+  });
+
+  it("preserves completion provenance and accepts legacy status responses", async () => {
+    const onReferences = vi.fn();
+    const sources = [librarySource];
+    const complete = vi.fn().mockResolvedValue(response({ job: { status: "complete", draft, references: sources } }));
+    await waitForEnemyBackgroundJob(job, { fetchImpl: complete, wait: waitImmediately, now: freshNow, onReferences });
+    expect(onReferences).toHaveBeenLastCalledWith(sources);
+    const legacy = vi.fn().mockImplementation(async () => response({ job: { status: "complete", draft } }));
+    await waitForEnemyBackgroundJob({ ...job, references: sources }, { fetchImpl: legacy, wait: waitImmediately, now: freshNow, onReferences });
+    expect(onReferences).toHaveBeenLastCalledWith(sources);
+    await waitForEnemyBackgroundJob(job, { fetchImpl: legacy, wait: waitImmediately, now: freshNow, onReferences });
+    expect(onReferences).toHaveBeenLastCalledWith([]);
   });
 
   it("allows transient failures before stopping", async () => {

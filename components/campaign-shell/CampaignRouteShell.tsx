@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
   BriefcaseBusiness,
+  BookOpen,
   FileText,
   FolderKanban,
   Gauge,
@@ -38,6 +39,7 @@ const icons = {
   places: Map,
   enemies: Skull,
   notes: FileText,
+  library: BookOpen,
   members: UsersRound,
   settings: SlidersHorizontal,
 } satisfies Record<CampaignSection, typeof Gauge>;

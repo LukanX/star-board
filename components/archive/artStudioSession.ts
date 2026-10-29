@@ -1,5 +1,6 @@
 import type { ImageDraft } from "@/lib/ai/image-job-polling";
 import { imageAspectRatioValues, imageSizeValues } from "@/lib/ai/image-options";
+import { referenceStatusesSchema } from "@/lib/validation/reference";
 
 export type ArtStudioKind = Exclude<ImageDraft["targetKind"], "visual-style">;
 export type ArtStudioIdentity = {
@@ -51,6 +52,8 @@ function isNullableString(value: unknown): value is string | null {
 
 function parseDraftMetadata(value: unknown, kind: ArtStudioKind): ArtStudioDraftMetadata | null {
   if (!isRecord(value)) return null;
+  const references = value.references === undefined ? undefined : referenceStatusesSchema.safeParse(value.references);
+  if (references && !references.success) return null;
   if (
     value.targetKind !== kind
     || value.purpose !== "entity-art"
@@ -89,6 +92,7 @@ function parseDraftMetadata(value: unknown, kind: ArtStudioKind): ArtStudioDraft
     temporaryPath: value.temporaryPath,
     styleId: value.styleId,
     contextPlaceId: value.contextPlaceId,
+    ...(references?.success ? { references: references.data } : {}),
   };
 }
 

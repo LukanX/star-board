@@ -1,0 +1,1351 @@
+{
+  "catalogVersion": "sf2e-1.6.1-a46139b5a66a83a0",
+  "source": {
+    "repository": "foundryvtt/pf2e",
+    "release": "sf2e-1.6.1",
+    "commit": "28d9d156f252d084371d994dc359509b49eadf18",
+    "schemaVersion": 1,
+    "contentRevision": 1,
+    "packs": [
+      "ancestries",
+      "classes"
+    ],
+    "includedFields": [
+      "_id",
+      "name",
+      "type",
+      "system.publication"
+    ],
+    "excludedContent": [
+      "source prose",
+      "naming lists",
+      "artwork",
+      "rule elements",
+      "premium modules"
+    ]
+  },
+  "inputs": [
+    {
+      "path": "packs/sf2e/journals/ancestries.json",
+      "hash": "7a927f2d8f5ba620944ba3eca363b5e672ef6a46f2deec2831beefa835947801"
+    },
+    {
+      "path": "packs/sf2e/ancestries/android.json",
+      "hash": "6fc9584d3142e3813ff6daf59c53a2670b66629a285a93473688ea638240cf92"
+    },
+    {
+      "path": "packs/sf2e/ancestries/astrazoan.json",
+      "hash": "7cbf5c5c7740b7b1b3b1dee3cdeeb751b3e2145efc92f1c65317f7fa42aed3be"
+    },
+    {
+      "path": "packs/sf2e/ancestries/atraxid.json",
+      "hash": "caeb0c4e4eb2068db6a8cb74ae5569ecd17a8d4a00d0e27512d6ff280af67198"
+    },
+    {
+      "path": "packs/sf2e/ancestries/bantrid.json",
+      "hash": "cc1b0f7188251a599cd3990aa96ebf8601733141bb7bfa562a066b1515bf330d"
+    },
+    {
+      "path": "packs/sf2e/ancestries/barathu.json",
+      "hash": "d431f036d6f15a83289c93869ac90d318c658c174fdc34165dbbbb1c6f6cc313"
+    },
+    {
+      "path": "packs/sf2e/ancestries/binnaquid.json",
+      "hash": "d8fdb424b409a9b1d32526124a46659ba7696b8d34fbf6a0daa0412715f45983"
+    },
+    {
+      "path": "packs/sf2e/ancestries/brenneri.json",
+      "hash": "ce34022012e46be7c4bf202fb7a201da24004680a24a7db86b4a8251a1800d98"
+    },
+    {
+      "path": "packs/sf2e/ancestries/contemplative.json",
+      "hash": "fea17920fb29b2f6a704fc071cf401d13e1a46ed10361dec2aca56b95b00b7b3"
+    },
+    {
+      "path": "packs/sf2e/ancestries/copaxi.json",
+      "hash": "771754f5c3877fb72a7e11f1ed34e7f6d70036849ab0af7d395ac1be68aa7365"
+    },
+    {
+      "path": "packs/sf2e/ancestries/dragonkin.json",
+      "hash": "2a5c3f4558b838c8f77fb61e0d2935d6ac7a0f31451aa75df88ae575819cede1"
+    },
+    {
+      "path": "packs/sf2e/ancestries/dwarf.json",
+      "hash": "2bbcb0add78951f3543eb2c5402d19e9de5b66a9b8c53d457a74d303cfc47913"
+    },
+    {
+      "path": "packs/sf2e/ancestries/elebrian.json",
+      "hash": "1316918770fdff517f0cfab30ae0bbcaaa23fbe6d4e4a1b92fda0e22eb6c08f5"
+    },
+    {
+      "path": "packs/sf2e/ancestries/elf.json",
+      "hash": "b5b9d08e89efe3b71fdd08aac309ce54035fe6bc4e933b4bfdac4ec547bafb72"
+    },
+    {
+      "path": "packs/sf2e/ancestries/entu-colony.json",
+      "hash": "a8400d618ad5a8796937f3162bbfb95914e1c8c0ff4de4feafa07e51c25902cd"
+    },
+    {
+      "path": "packs/sf2e/ancestries/fonqugon.json",
+      "hash": "ea27bfc3b9167ed5a5d58f2cc070af589bc180d5305e05f666e6a44775f5c8ef"
+    },
+    {
+      "path": "packs/sf2e/ancestries/formian.json",
+      "hash": "6253cfbad4d0d357999e4d2f0ddb3473e9327ea642094ca0f1ebcbe7a5985cb5"
+    },
+    {
+      "path": "packs/sf2e/ancestries/gfolian.json",
+      "hash": "46e6c5265db05e5f513112b773dcc1a0d791444f2d4351c16790e5bd8eead3d7"
+    },
+    {
+      "path": "packs/sf2e/ancestries/gnarefuroid.json",
+      "hash": "785cbbfae21642c99ffa552391cc3ccbc03d31d1f85d75b6c8f594fcd79652ed"
+    },
+    {
+      "path": "packs/sf2e/ancestries/gnome.json",
+      "hash": "d1e12ec3616625bb89dbde9fc76078b5f37169c35812b0860120beabb5187c43"
+    },
+    {
+      "path": "packs/sf2e/ancestries/goblin.json",
+      "hash": "22ed1b68155f4fec668b61e41aa67cf63dc0a87f3d5e8fbdc9a739b99990767c"
+    },
+    {
+      "path": "packs/sf2e/ancestries/halfling.json",
+      "hash": "890d595364124e0629e6dda87a89ef6f2cd87031828f29a71af84b399e9b4bb1"
+    },
+    {
+      "path": "packs/sf2e/ancestries/hardor.json",
+      "hash": "7bcc05833834dcf697c347c11a5c0d6f358656e2b6efea7680505f5e11dcaedb"
+    },
+    {
+      "path": "packs/sf2e/ancestries/human.json",
+      "hash": "66163377c5ba0acd339ff61d0d78897a0cd2286eecee9c3bad167e2ba70135eb"
+    },
+    {
+      "path": "packs/sf2e/ancestries/ijtikri.json",
+      "hash": "3259fe54534e0972a078265f0a346aed3f73cba6dec4c751e17ffa1ef1873d88"
+    },
+    {
+      "path": "packs/sf2e/ancestries/ikeshti.json",
+      "hash": "1ef355e290a7bbd3a0550ba90d5f86c342906c07300afdae00aaf74efb2b35cd"
+    },
+    {
+      "path": "packs/sf2e/ancestries/izalguun.json",
+      "hash": "e20077712f765c669c88bddbdc4cdb0bdc071bb3ec70630a0c489023326e8162"
+    },
+    {
+      "path": "packs/sf2e/ancestries/kalo.json",
+      "hash": "c44c653abdb5471ba814a9be5a877822109a1bb4041ddabe706d4e941ff252ba"
+    },
+    {
+      "path": "packs/sf2e/ancestries/kasatha.json",
+      "hash": "27a3d0a80f9bb4afdd2df985d3e217dcded2146d1e67203daa53c5c6e6e8d926"
+    },
+    {
+      "path": "packs/sf2e/ancestries/khizar.json",
+      "hash": "8dd0fd900837fbf177ce1d095d25e815754d98200215dc686cf81587db24cbf4"
+    },
+    {
+      "path": "packs/sf2e/ancestries/lashunta.json",
+      "hash": "4e1a34932deb7dc1433383641dc19b757e1f1c22094fdfe81e978acfac016f1a"
+    },
+    {
+      "path": "packs/sf2e/ancestries/leshy.json",
+      "hash": "adac51da47b4fd008dbb2ea1e339381d34d1430c05f837f63ae1ddb803bbbee2"
+    },
+    {
+      "path": "packs/sf2e/ancestries/living-hologram.json",
+      "hash": "74573ff4a221707e437c59f22d54a5c613b8e67dff144933dcfee71c88c2a4bd"
+    },
+    {
+      "path": "packs/sf2e/ancestries/madrosarai.json",
+      "hash": "dd9efdc1a97e6753a2a3425fc5caec7a12cfde7cd101a327160b5fb79b3ece8a"
+    },
+    {
+      "path": "packs/sf2e/ancestries/maraquoi.json",
+      "hash": "bfb3bb5adf8c3af3c4a065e386aac9745e365204bc9657f25834eca7a6a8eda5"
+    },
+    {
+      "path": "packs/sf2e/ancestries/mecenaic.json",
+      "hash": "407190016fc661202583ab717e8f88c3710e850c2f9d53e74bce151df4815371"
+    },
+    {
+      "path": "packs/sf2e/ancestries/moyishuu.json",
+      "hash": "64882b9ffb093aa157fb73f39527daec1597d877294cf61734336c853b6791bd"
+    },
+    {
+      "path": "packs/sf2e/ancestries/novian.json",
+      "hash": "91ca58490e496f14b89f9a3b572a1da1b32189273476b6b438fb174dc5eabc8c"
+    },
+    {
+      "path": "packs/sf2e/ancestries/nuar.json",
+      "hash": "24ea0c94ed806ca73c7740a72bf84a099fa553e1b78e80c97b5c6d7a84df117c"
+    },
+    {
+      "path": "packs/sf2e/ancestries/orc.json",
+      "hash": "8238ee4906533474c26c9cfce03520ea6eba88cee558c5a94616e1ef2504efc1"
+    },
+    {
+      "path": "packs/sf2e/ancestries/ord.json",
+      "hash": "fd9dd35997bb5a78305fd4f6798a2588fae3dd9ccd9d5c2950669bdbc5c17b80"
+    },
+    {
+      "path": "packs/sf2e/ancestries/orocoran.json",
+      "hash": "575c033dc1a93263bdce9ebb8507927182e7858e673102f9cfd7911d0a85f17c"
+    },
+    {
+      "path": "packs/sf2e/ancestries/osharu.json",
+      "hash": "4c9b8ffd310b4aafa3f959335770b99f1df720ce625c33e2f5575ab53bbea74b"
+    },
+    {
+      "path": "packs/sf2e/ancestries/pahtra.json",
+      "hash": "a21c4b1fcc0ce5e624275314ff47c5e086be1e45cce9d0f465d9f32f8ed2d61f"
+    },
+    {
+      "path": "packs/sf2e/ancestries/phasorq.json",
+      "hash": "5509cb153234b594e308ff36f0e36fab8ec66d3f97988d32a3436e43023e3839"
+    },
+    {
+      "path": "packs/sf2e/ancestries/raxilite.json",
+      "hash": "a607eb9cd162c16ab67a87720b130d2fd71a391f17f9fa648a6288112e649f35"
+    },
+    {
+      "path": "packs/sf2e/ancestries/ryphorian.json",
+      "hash": "d6ae697fc3650bbb42c977c11e2384f2e9eab1ae088ba6f2ab2aacc8aacfac99"
+    },
+    {
+      "path": "packs/sf2e/ancestries/sarcesian.json",
+      "hash": "89fbf36a42e0747b143b906ff04738b38717dfa08b3846d2fb10cee1ceef864d"
+    },
+    {
+      "path": "packs/sf2e/ancestries/shirren.json",
+      "hash": "e358ffbefd514649141f4ee9efa147cbb4b3486de39eb3bf205945de94818bb6"
+    },
+    {
+      "path": "packs/sf2e/ancestries/shobhad.json",
+      "hash": "e5ce97ab717fde7814d6a7fc1c232c1e287ac8a3acd2fa141fc3d140338496b4"
+    },
+    {
+      "path": "packs/sf2e/ancestries/skittermander.json",
+      "hash": "3954038327b5d8fed74aebd1823b61dfcc36d242107195c9e7fa8acc7af7f825"
+    },
+    {
+      "path": "packs/sf2e/ancestries/sro.json",
+      "hash": "0720dda13617878458415bcb2df4d4f0e9be90e6793be1aef267745d6dad2edb"
+    },
+    {
+      "path": "packs/sf2e/ancestries/talphi.json",
+      "hash": "db9b7c5fa52e06858c7b9e47d9aff0b6276028f64fb611ed7d8c81f100d480b1"
+    },
+    {
+      "path": "packs/sf2e/ancestries/trox.json",
+      "hash": "9112784a748f5fec1d15f395262a29d9fa42c4c8fe06e756dbcf0e035a8b7064"
+    },
+    {
+      "path": "packs/sf2e/ancestries/urog.json",
+      "hash": "f927a278ddbb7ac30b7261497aabe4a2c901639cd46f20e69523365f2b74f839"
+    },
+    {
+      "path": "packs/sf2e/ancestries/verthani.json",
+      "hash": "c9bb63b8ce1c76731ea00cdb1ff6d86b77e67d589c592bfe3576ada6b8bb5c0d"
+    },
+    {
+      "path": "packs/sf2e/ancestries/vesk.json",
+      "hash": "6e7e601234cabc1230be4087faa21242862f1ffb671db571aa0300c3e889e113"
+    },
+    {
+      "path": "packs/sf2e/ancestries/vlaka.json",
+      "hash": "90b233a78c5dd5e03aa5f4832954cef83033cf56aeec214bd4866607a04ff1b0"
+    },
+    {
+      "path": "packs/sf2e/ancestries/vulkarisu.json",
+      "hash": "97ebe05cc0e7a24a5ca590a7578be0d1508f420e51515d881610359f7b55e9f2"
+    },
+    {
+      "path": "packs/sf2e/ancestries/worlanisi.json",
+      "hash": "9bc6c338bbd65a3ed51781e855cf82285e70321a3188b3fab08e3327d5632c48"
+    },
+    {
+      "path": "packs/sf2e/ancestries/ysoki.json",
+      "hash": "b654c9fbee3728268bf2d14b7e0783564f5ba5339e151d0c21f9a46f581e016c"
+    },
+    {
+      "path": "packs/sf2e/classes/envoy.json",
+      "hash": "596a733e96a93b2f221841e3d8b769ea696eab7528c08c31a49d49e5dffb3e97"
+    },
+    {
+      "path": "packs/sf2e/classes/mechanic.json",
+      "hash": "bf3c5a08914d122fe6c09cf2d82198772153c4417d87351c65ea5e4d74733e9f"
+    },
+    {
+      "path": "packs/sf2e/classes/mystic.json",
+      "hash": "5a98c39ad7340f5be64f6d9ff86b8add7848fa060e851d5dd81445fb0c12d1e5"
+    },
+    {
+      "path": "packs/sf2e/classes/operative.json",
+      "hash": "9b2eb371ae8562a4eaaf29f1e1dbb8262925db5050cb87bc53252ccc090b4dcb"
+    },
+    {
+      "path": "packs/sf2e/classes/solarian.json",
+      "hash": "23e1fe6a71a4cb9611a081a24d81ea1bb9568e39a5fb60cd00c508564112e1bf"
+    },
+    {
+      "path": "packs/sf2e/classes/soldier.json",
+      "hash": "29bb82a288af107d6a852d5234afa5c0cec7c14d2f33e87ad3aae20836735a8f"
+    },
+    {
+      "path": "packs/sf2e/classes/technomancer.json",
+      "hash": "ac67da87d12c5a0ef5dfda08bf6413ad69ab0266673606b9149ba3da125705d3"
+    },
+    {
+      "path": "packs/sf2e/classes/witchwarper.json",
+      "hash": "cf7d8337e642aa2fd7f9b0541bffd890643031c1991b96290cd16dd280e0458a"
+    }
+  ],
+  "records": [
+    {
+      "id": "sf2e.ancestries.Item.GfLwE884NoRC7cRi",
+      "kind": "ancestry",
+      "name": "Android",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/android.json",
+      "sourceHash": "6fc9584d3142e3813ff6daf59c53a2670b66629a285a93473688ea638240cf92",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/android.json",
+      "pageId": "dyusFHHyaQOaQhZ0",
+      "journalId": "Cf6Ej0OgFpqg2VoF",
+      "facts": [
+        "Humanoid biomechanical body.",
+        "Visible circuitry can glow; do not assume exposed robot machinery."
+      ],
+      "summary": "",
+      "anatomy": "available",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.3Wox3ai1kgji07FE",
+      "kind": "ancestry",
+      "name": "Astrazoan",
+      "aliases": [],
+      "publication": "Starfinder Galaxy Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/astrazoan.json",
+      "sourceHash": "7cbf5c5c7740b7b1b3b1dee3cdeeb751b3e2145efc92f1c65317f7fa42aed3be",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/astrazoan.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.oHnxW7Wgf0EaGK14",
+      "kind": "ancestry",
+      "name": "Atraxid",
+      "aliases": [],
+      "publication": "Starfinder Secrets of the Swarm Adventure Path",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/atraxid.json",
+      "sourceHash": "caeb0c4e4eb2068db6a8cb74ae5569ecd17a8d4a00d0e27512d6ff280af67198",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/atraxid.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.FeoOVtm7zVhgxXtg",
+      "kind": "ancestry",
+      "name": "Bantrid",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/bantrid.json",
+      "sourceHash": "cc1b0f7188251a599cd3990aa96ebf8601733141bb7bfa562a066b1515bf330d",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/bantrid.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.3iuWdarohpDFhlxX",
+      "kind": "ancestry",
+      "name": "Barathu",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/barathu.json",
+      "sourceHash": "d431f036d6f15a83289c93869ac90d318c658c174fdc34165dbbbb1c6f6cc313",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/barathu.json",
+      "pageId": "CFvzqUAC03CP6sJI",
+      "journalId": "Cf6Ej0OgFpqg2VoF",
+      "facts": [
+        "Floating, inflated body with hanging tentacles or limbs, rather than a standard humanoid silhouette.",
+        "Body form and coloration are variable."
+      ],
+      "summary": "",
+      "anatomy": "available",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.SVj4h0ca15YwThuX",
+      "kind": "ancestry",
+      "name": "Binnaquid",
+      "aliases": [],
+      "publication": "Starfinder Secrets of the Swarm Adventure Path",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/binnaquid.json",
+      "sourceHash": "d8fdb424b409a9b1d32526124a46659ba7696b8d34fbf6a0daa0412715f45983",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/binnaquid.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.9p9GNLHDRocLlKVU",
+      "kind": "ancestry",
+      "name": "Brenneri",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/brenneri.json",
+      "sourceHash": "ce34022012e46be7c4bf202fb7a201da24004680a24a7db86b4a8251a1800d98",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/brenneri.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.KFNOUfQWPUBW5zSC",
+      "kind": "ancestry",
+      "name": "Contemplative",
+      "aliases": [],
+      "publication": "Starfinder Galaxy Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/contemplative.json",
+      "sourceHash": "fea17920fb29b2f6a704fc071cf401d13e1a46ed10361dec2aca56b95b00b7b3",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/contemplative.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.tvjMyXjibIywAPh2",
+      "kind": "ancestry",
+      "name": "Copaxi",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/copaxi.json",
+      "sourceHash": "771754f5c3877fb72a7e11f1ed34e7f6d70036849ab0af7d395ac1be68aa7365",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/copaxi.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.jNE2Zq46a9kQj7bi",
+      "kind": "ancestry",
+      "name": "Dragonkin",
+      "aliases": [],
+      "publication": "Starfinder Galaxy Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/dragonkin.json",
+      "sourceHash": "2a5c3f4558b838c8f77fb61e0d2935d6ac7a0f31451aa75df88ae575819cede1",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/dragonkin.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.BYj5ZvlXZdpaEgA6",
+      "kind": "ancestry",
+      "name": "Dwarf",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/dwarf.json",
+      "sourceHash": "2bbcb0add78951f3543eb2c5402d19e9de5b66a9b8c53d457a74d303cfc47913",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/dwarf.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.XKW1SziWusHoaCRd",
+      "kind": "ancestry",
+      "name": "Elebrian",
+      "aliases": [],
+      "publication": "Starfinder Guilt of the Grave World",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/elebrian.json",
+      "sourceHash": "1316918770fdff517f0cfab30ae0bbcaaa23fbe6d4e4a1b92fda0e22eb6c08f5",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/elebrian.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.PgKmsA2aKdbLU6O0",
+      "kind": "ancestry",
+      "name": "Elf",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/elf.json",
+      "sourceHash": "b5b9d08e89efe3b71fdd08aac309ce54035fe6bc4e933b4bfdac4ec547bafb72",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/elf.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.HIfj37OghTgagFkx",
+      "kind": "ancestry",
+      "name": "Entu Colony",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/entu-colony.json",
+      "sourceHash": "a8400d618ad5a8796937f3162bbfb95914e1c8c0ff4de4feafa07e51c25902cd",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/entu-colony.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.vlYBDZbj6zWBFR0b",
+      "kind": "ancestry",
+      "name": "Fonqugon",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/fonqugon.json",
+      "sourceHash": "ea27bfc3b9167ed5a5d58f2cc070af589bc180d5305e05f666e6a44775f5c8ef",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/fonqugon.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.yOnW818fHTfnwg2k",
+      "kind": "ancestry",
+      "name": "Formian",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/formian.json",
+      "sourceHash": "6253cfbad4d0d357999e4d2f0ddb3473e9327ea642094ca0f1ebcbe7a5985cb5",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/formian.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.fqn2WK47MN0gqax3",
+      "kind": "ancestry",
+      "name": "G'folian",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/gfolian.json",
+      "sourceHash": "46e6c5265db05e5f513112b773dcc1a0d791444f2d4351c16790e5bd8eead3d7",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/gfolian.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.bXICmub6qvXdiveN",
+      "kind": "ancestry",
+      "name": "Gnarefuroid",
+      "aliases": [],
+      "publication": "Starfinder Absalom Station",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/gnarefuroid.json",
+      "sourceHash": "785cbbfae21642c99ffa552391cc3ccbc03d31d1f85d75b6c8f594fcd79652ed",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/gnarefuroid.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.CYlfsYLJcBOgqKtD",
+      "kind": "ancestry",
+      "name": "Gnome",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/gnome.json",
+      "sourceHash": "d1e12ec3616625bb89dbde9fc76078b5f37169c35812b0860120beabb5187c43",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/gnome.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.sQfjTMDaZbT9DThq",
+      "kind": "ancestry",
+      "name": "Goblin",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/goblin.json",
+      "sourceHash": "22ed1b68155f4fec668b61e41aa67cf63dc0a87f3d5e8fbdc9a739b99990767c",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/goblin.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.GgZAHbrjnzWOZy2v",
+      "kind": "ancestry",
+      "name": "Halfling",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/halfling.json",
+      "sourceHash": "890d595364124e0629e6dda87a89ef6f2cd87031828f29a71af84b399e9b4bb1",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/halfling.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.PlNDe6phAadFXxCN",
+      "kind": "ancestry",
+      "name": "Hardor",
+      "aliases": [],
+      "publication": "Starfinder Secrets of the Swarm Adventure Path",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/hardor.json",
+      "sourceHash": "7bcc05833834dcf697c347c11a5c0d6f358656e2b6efea7680505f5e11dcaedb",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/hardor.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.IiG7DgeLWYrSNXuX",
+      "kind": "ancestry",
+      "name": "Human",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/human.json",
+      "sourceHash": "66163377c5ba0acd339ff61d0d78897a0cd2286eecee9c3bad167e2ba70135eb",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/human.json",
+      "pageId": "7pU8yM7yPMw92SY3",
+      "journalId": "Cf6Ej0OgFpqg2VoF",
+      "facts": [
+        "Human anatomy with individually varied skin, hair, facial features, and build."
+      ],
+      "summary": "",
+      "anatomy": "available",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.RP7fqj4Rpu0IBf6t",
+      "kind": "ancestry",
+      "name": "Ijtikri",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/ijtikri.json",
+      "sourceHash": "3259fe54534e0972a078265f0a346aed3f73cba6dec4c751e17ffa1ef1873d88",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/ijtikri.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.HFVQhUxBt6UTtuny",
+      "kind": "ancestry",
+      "name": "Ikeshti",
+      "aliases": [],
+      "publication": "Invasion's Edge Player's Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/ikeshti.json",
+      "sourceHash": "1ef355e290a7bbd3a0550ba90d5f86c342906c07300afdae00aaf74efb2b35cd",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/ikeshti.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.8GXuOAZR2i39RGji",
+      "kind": "ancestry",
+      "name": "Izalguun",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/izalguun.json",
+      "sourceHash": "e20077712f765c669c88bddbdc4cdb0bdc071bb3ec70630a0c489023326e8162",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/izalguun.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.23MA5Ee7ExUfzrqk",
+      "kind": "ancestry",
+      "name": "Kalo",
+      "aliases": [],
+      "publication": "Starfinder Galaxy Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/kalo.json",
+      "sourceHash": "c44c653abdb5471ba814a9be5a877822109a1bb4041ddabe706d4e941ff252ba",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/kalo.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.H6dkr1GtoQhuQqJm",
+      "kind": "ancestry",
+      "name": "Kasatha",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/kasatha.json",
+      "sourceHash": "27a3d0a80f9bb4afdd2df985d3e217dcded2146d1e67203daa53c5c6e6e8d926",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/kasatha.json",
+      "pageId": "PKGmC9bntc0F90mY",
+      "journalId": "Cf6Ej0OgFpqg2VoF",
+      "facts": [
+        "Four arms on a tall humanoid body.",
+        "Gray skin, black eyes, and a skull elongated toward the back."
+      ],
+      "summary": "",
+      "anatomy": "available",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.AjSZKAwWEw0AfAJR",
+      "kind": "ancestry",
+      "name": "Khizar",
+      "aliases": [],
+      "publication": "Starfinder Murder in Metal City Deluxe Adventure",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/khizar.json",
+      "sourceHash": "8dd0fd900837fbf177ce1d095d25e815754d98200215dc686cf81587db24cbf4",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/khizar.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.ZDExBZqdqYUtv5dg",
+      "kind": "ancestry",
+      "name": "Lashunta",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/lashunta.json",
+      "sourceHash": "4e1a34932deb7dc1433383641dc19b757e1f1c22094fdfe81e978acfac016f1a",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/lashunta.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.cdhgByGG1WtuaK73",
+      "kind": "ancestry",
+      "name": "Leshy",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/leshy.json",
+      "sourceHash": "adac51da47b4fd008dbb2ea1e339381d34d1430c05f837f63ae1ddb803bbbee2",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/leshy.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.akHnz8mYVUNCQ02e",
+      "kind": "ancestry",
+      "name": "Living Hologram",
+      "aliases": [],
+      "publication": "Starfinder Tech Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/living-hologram.json",
+      "sourceHash": "74573ff4a221707e437c59f22d54a5c613b8e67dff144933dcfee71c88c2a4bd",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/living-hologram.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.q6fTXrRTneiqXs63",
+      "kind": "ancestry",
+      "name": "Madrosarai",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/madrosarai.json",
+      "sourceHash": "dd9efdc1a97e6753a2a3425fc5caec7a12cfde7cd101a327160b5fb79b3ece8a",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/madrosarai.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.XcmRKGimGvezRawa",
+      "kind": "ancestry",
+      "name": "Maraquoi",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/maraquoi.json",
+      "sourceHash": "bfb3bb5adf8c3af3c4a065e386aac9745e365204bc9657f25834eca7a6a8eda5",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/maraquoi.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.1PqfYUqdVQGtLdfr",
+      "kind": "ancestry",
+      "name": "Mecenaic",
+      "aliases": [],
+      "publication": "Starfinder Secrets of the Swarm Adventure Path",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/mecenaic.json",
+      "sourceHash": "407190016fc661202583ab717e8f88c3710e850c2f9d53e74bce151df4815371",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/mecenaic.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.62AMzNlZzxTG0oxE",
+      "kind": "ancestry",
+      "name": "Moyishuu",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/moyishuu.json",
+      "sourceHash": "64882b9ffb093aa157fb73f39527daec1597d877294cf61734336c853b6791bd",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/moyishuu.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.waaL4y6dUPzy8Emb",
+      "kind": "ancestry",
+      "name": "Novian",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/novian.json",
+      "sourceHash": "91ca58490e496f14b89f9a3b572a1da1b32189273476b6b438fb174dc5eabc8c",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/novian.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.YCt1j4GcD3WsfEvQ",
+      "kind": "ancestry",
+      "name": "Nuar",
+      "aliases": [],
+      "publication": "Starfinder Absalom Station",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/nuar.json",
+      "sourceHash": "24ea0c94ed806ca73c7740a72bf84a099fa553e1b78e80c97b5c6d7a84df117c",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/nuar.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.lSGWXjcbOa6O5fTx",
+      "kind": "ancestry",
+      "name": "Orc",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/orc.json",
+      "sourceHash": "8238ee4906533474c26c9cfce03520ea6eba88cee558c5a94616e1ef2504efc1",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/orc.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.RKv77bXjesIUAPxG",
+      "kind": "ancestry",
+      "name": "Ord",
+      "aliases": [],
+      "publication": "Starfinder Secrets of the Swarm Adventure Path",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/ord.json",
+      "sourceHash": "fd9dd35997bb5a78305fd4f6798a2588fae3dd9ccd9d5c2950669bdbc5c17b80",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/ord.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.6BG5tO0g9kCFfTym",
+      "kind": "ancestry",
+      "name": "Orocoran",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/orocoran.json",
+      "sourceHash": "575c033dc1a93263bdce9ebb8507927182e7858e673102f9cfd7911d0a85f17c",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/orocoran.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.r1f3ChFtmCRQ9fMj",
+      "kind": "ancestry",
+      "name": "Osharu",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/osharu.json",
+      "sourceHash": "4c9b8ffd310b4aafa3f959335770b99f1df720ce625c33e2f5575ab53bbea74b",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/osharu.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.75TqHknsQuinDLjn",
+      "kind": "ancestry",
+      "name": "Pahtra",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/pahtra.json",
+      "sourceHash": "a21c4b1fcc0ce5e624275314ff47c5e086be1e45cce9d0f465d9f32f8ed2d61f",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/pahtra.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.5GW7nKNbRjjruxIc",
+      "kind": "ancestry",
+      "name": "Phasorq",
+      "aliases": [],
+      "publication": "Starfinder Secrets of the Swarm Adventure Path",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/phasorq.json",
+      "sourceHash": "5509cb153234b594e308ff36f0e36fab8ec66d3f97988d32a3436e43023e3839",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/phasorq.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.lU4TJFs95esViIHI",
+      "kind": "ancestry",
+      "name": "Raxilite",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/raxilite.json",
+      "sourceHash": "a607eb9cd162c16ab67a87720b130d2fd71a391f17f9fa648a6288112e649f35",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/raxilite.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.WfllaPpt1pxGVMAG",
+      "kind": "ancestry",
+      "name": "Ryphorian",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/ryphorian.json",
+      "sourceHash": "d6ae697fc3650bbb42c977c11e2384f2e9eab1ae088ba6f2ab2aacc8aacfac99",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/ryphorian.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.i1fnTVBTRYSqFY2c",
+      "kind": "ancestry",
+      "name": "Sarcesian",
+      "aliases": [],
+      "publication": "Starfinder Galaxy Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/sarcesian.json",
+      "sourceHash": "89fbf36a42e0747b143b906ff04738b38717dfa08b3846d2fb10cee1ceef864d",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/sarcesian.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.FjBJNHdiWAvu1lV7",
+      "kind": "ancestry",
+      "name": "Shirren",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/shirren.json",
+      "sourceHash": "e358ffbefd514649141f4ee9efa147cbb4b3486de39eb3bf205945de94818bb6",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/shirren.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.CURlEp5fEl0WJq9L",
+      "kind": "ancestry",
+      "name": "Shobhad",
+      "aliases": [],
+      "publication": "Invasion's Edge Player's Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/shobhad.json",
+      "sourceHash": "e5ce97ab717fde7814d6a7fc1c232c1e287ac8a3acd2fa141fc3d140338496b4",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/shobhad.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.0qcXAQo7iZkZXNO9",
+      "kind": "ancestry",
+      "name": "Skittermander",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/skittermander.json",
+      "sourceHash": "3954038327b5d8fed74aebd1823b61dfcc36d242107195c9e7fa8acc7af7f825",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/skittermander.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.aprkTkhSLZpceLDG",
+      "kind": "ancestry",
+      "name": "SRO",
+      "aliases": [],
+      "publication": "Starfinder Tech Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/sro.json",
+      "sourceHash": "0720dda13617878458415bcb2df4d4f0e9be90e6793be1aef267745d6dad2edb",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/sro.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.Fhhxk7toaVGjwoMY",
+      "kind": "ancestry",
+      "name": "Talphi",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/talphi.json",
+      "sourceHash": "db9b7c5fa52e06858c7b9e47d9aff0b6276028f64fb611ed7d8c81f100d480b1",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/talphi.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.mvomk7uS0Gfh72sg",
+      "kind": "ancestry",
+      "name": "Trox",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/trox.json",
+      "sourceHash": "9112784a748f5fec1d15f395262a29d9fa42c4c8fe06e756dbcf0e035a8b7064",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/trox.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.1gJeLPnHFATPQej2",
+      "kind": "ancestry",
+      "name": "Urog",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/urog.json",
+      "sourceHash": "f927a278ddbb7ac30b7261497aabe4a2c901639cd46f20e69523365f2b74f839",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/urog.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.WmgIz3fJAh4xJ9Gk",
+      "kind": "ancestry",
+      "name": "Verthani",
+      "aliases": [],
+      "publication": "Starfinder Tech Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/verthani.json",
+      "sourceHash": "c9bb63b8ce1c76731ea00cdb1ff6d86b77e67d589c592bfe3576ada6b8bb5c0d",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/verthani.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.06FBb4UDg64S5AYI",
+      "kind": "ancestry",
+      "name": "Vesk",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/vesk.json",
+      "sourceHash": "6e7e601234cabc1230be4087faa21242862f1ffb671db571aa0300c3e889e113",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/vesk.json",
+      "pageId": "JxPJE2NPYNZ54EUO",
+      "journalId": "Cf6Ej0OgFpqg2VoF",
+      "facts": [
+        "Muscular, scaled humanoid with a strong tail, claws, and teeth.",
+        "Bony head and jaw projections; scale colors can vary."
+      ],
+      "summary": "",
+      "anatomy": "available",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.mBsOLC7cRc7nkzV2",
+      "kind": "ancestry",
+      "name": "Vlaka",
+      "aliases": [],
+      "publication": "Starfinder Galaxy Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/vlaka.json",
+      "sourceHash": "90b233a78c5dd5e03aa5f4832954cef83033cf56aeec214bd4866607a04ff1b0",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/vlaka.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.Bgn9LCnpSZNJdXht",
+      "kind": "ancestry",
+      "name": "Vulkarisu",
+      "aliases": [],
+      "publication": "Beyond the Blood Door Player's Guide",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/vulkarisu.json",
+      "sourceHash": "97ebe05cc0e7a24a5ca590a7578be0d1508f420e51515d881610359f7b55e9f2",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/vulkarisu.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.oKcAbl5mPNkFYhQM",
+      "kind": "ancestry",
+      "name": "Worlanisi",
+      "aliases": [],
+      "publication": "Starfinder Galactic Ancestries",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/worlanisi.json",
+      "sourceHash": "9bc6c338bbd65a3ed51781e855cf82285e70321a3188b3fab08e3327d5632c48",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/worlanisi.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.ancestries.Item.P6PcVnCkh4XMdefw",
+      "kind": "ancestry",
+      "name": "Ysoki",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/ancestries/ysoki.json",
+      "sourceHash": "b654c9fbee3728268bf2d14b7e0783564f5ba5339e151d0c21f9a46f581e016c",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/ancestries/ysoki.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.classes.Item.wu88dOKl86DTo427",
+      "kind": "class",
+      "name": "Envoy",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/classes/envoy.json",
+      "sourceHash": "596a733e96a93b2f221841e3d8b769ea696eab7528c08c31a49d49e5dffb3e97",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/classes/envoy.json",
+      "facts": [],
+      "summary": "A coordination and social expertise role; no required uniform or equipment.",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.classes.Item.PMX0vxZeLdaofMVd",
+      "kind": "class",
+      "name": "Mechanic",
+      "aliases": [],
+      "publication": "Starfinder Tech Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/classes/mechanic.json",
+      "sourceHash": "bf3c5a08914d122fe6c09cf2d82198772153c4417d87351c65ea5e4d74733e9f",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/classes/mechanic.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.classes.Item.FYCUzPaaCU4G66Wz",
+      "kind": "class",
+      "name": "Mystic",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/classes/mystic.json",
+      "sourceHash": "5a98c39ad7340f5be64f6d9ff86b8add7848fa060e851d5dd81445fb0c12d1e5",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/classes/mystic.json",
+      "facts": [],
+      "summary": "A magical role associated with connections; appearance and equipment remain individual.",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.classes.Item.cUWBC21I0XbzP44A",
+      "kind": "class",
+      "name": "Operative",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/classes/operative.json",
+      "sourceHash": "9b2eb371ae8562a4eaaf29f1e1dbb8262925db5050cb87bc53252ccc090b4dcb",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/classes/operative.json",
+      "facts": [],
+      "summary": "A precision and specialist expertise role; do not prescribe a specific weapon or outfit.",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.classes.Item.zAI2ugYWzbUnmaez",
+      "kind": "class",
+      "name": "Solarian",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/classes/solarian.json",
+      "sourceHash": "23e1fe6a71a4cb9611a081a24d81ea1bb9568e39a5fb60cd00c508564112e1bf",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/classes/solarian.json",
+      "facts": [],
+      "summary": "A cosmic-energy martial role; show manifestations only when the subject calls for them.",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.classes.Item.sGupLSC7oqsN18sI",
+      "kind": "class",
+      "name": "Soldier",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/classes/soldier.json",
+      "sourceHash": "29bb82a288af107d6a852d5234afa5c0cec7c14d2f33e87ad3aae20836735a8f",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/classes/soldier.json",
+      "facts": [],
+      "summary": "An area-fire and defensive combat role; do not invent mandatory armor or a weapon loadout.",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.classes.Item.hqRClk6ZQpjENv2C",
+      "kind": "class",
+      "name": "Technomancer",
+      "aliases": [],
+      "publication": "Starfinder Tech Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/classes/technomancer.json",
+      "sourceHash": "ac67da87d12c5a0ef5dfda08bf6413ad69ab0266673606b9149ba3da125705d3",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/classes/technomancer.json",
+      "facts": [],
+      "summary": "",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    },
+    {
+      "id": "sf2e.classes.Item.QhD0tldbCGmGYeoQ",
+      "kind": "class",
+      "name": "Witchwarper",
+      "aliases": [],
+      "publication": "Starfinder Player Core",
+      "declaredLicense": "ORC",
+      "sourcePath": "packs/sf2e/classes/witchwarper.json",
+      "sourceHash": "cf7d8337e642aa2fd7f9b0541bffd890643031c1991b96290cd16dd280e0458a",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/packs/sf2e/classes/witchwarper.json",
+      "facts": [],
+      "summary": "A reality-altering magical role; do not invent required physical mutations.",
+      "anatomy": "not-reviewed",
+      "naming": "not-approved"
+    }
+  ]
+}

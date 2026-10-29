@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { enemyStatBlockSchema } from "@/lib/validation/enemy";
+import { librarySource } from "./support/library-reference";
 
 const mocks = vi.hoisted(() => ({ getAuthenticatedUser: vi.fn() }));
 
@@ -131,5 +132,18 @@ describe("GET /api/ai/enemy/[generationRunId]", () => {
 
     expect(response.status).toBe(502);
     expect((await response.json()).error).toContain("no valid draft");
+  });
+
+  it("returns the stored revision rather than resolving newer library text", async () => {
+    const supabase = createSupabaseMock({
+      id: generationRunId, status: "complete", draft, reference_sources: [librarySource],
+      created_at: "2026-08-27T12:00:00.000Z", status_updated_at: "2026-08-27T12:01:00.000Z",
+    });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    const response = await GET(new Request("http://localhost"), params());
+    expect(response.status).toBe(200);
+    expect((await response.json()).job.references).toEqual([librarySource]);
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledWith("ai_generation_runs");
   });
 });

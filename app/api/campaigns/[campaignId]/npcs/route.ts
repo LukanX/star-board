@@ -6,12 +6,14 @@ import { maskPlayerFacingEntityMarkdownBatch } from "@/lib/campaign/note-links";
 import { validateCampaignFaction } from "@/lib/factions";
 import { validateCampaignPlace } from "@/lib/places";
 import { createNpcSchema } from "@/lib/validation/npc";
+import { ReferenceError } from "@/lib/references/catalog";
+import { ancestryReferenceColumns, prepareReferenceSelection, referenceColumnValues } from "@/lib/references/records";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 
 export const runtime = "nodejs";
 
-const npcColumns = "id, author_id, name, species, role, description, description_is_markdown, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const npcColumns = `id, author_id, name, species, role, description, description_is_markdown, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at, ${ancestryReferenceColumns}`;
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId } = await params;
@@ -99,6 +101,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "GM access is required." }, { status: 403 });
     }
 
+    const ancestry = prepareReferenceSelection("ancestry", input.data.species, input.data.ancestryReference);
     const narrativeFields = [
       ...(input.data.descriptionIsMarkdown ? [{ markdown: input.data.description, audience: "player" as const }] : []),
       { markdown: input.data.playerNotesMarkdown, audience: "player" as const },
@@ -135,6 +138,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         author_id: context.user.id,
         name: input.data.name,
         species: input.data.species,
+        ...referenceColumnValues("ancestry", ancestry),
         role: input.data.role,
         description: input.data.description,
         description_is_markdown: input.data.descriptionIsMarkdown,
@@ -168,7 +172,8 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     const [npc] = await addCampaignArtUrls(context.supabase, [{ ...data, gm_notes_markdown: input.data.gmNotesMarkdown }]);
     return NextResponse.json({ npc }, { status: 201 });
-  } catch {
+  } catch (error) {
+    if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
 }

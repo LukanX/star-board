@@ -6,12 +6,15 @@ import { validateCampaignEntityLinkFields } from "@/lib/campaign/note-links";
 import { validateCampaignFaction } from "@/lib/factions";
 import { validateCampaignPlace } from "@/lib/places";
 import { updateNpcSchema } from "@/lib/validation/npc";
+import { ReferenceError } from "@/lib/references/catalog";
+import { ancestryReferenceColumns, prepareReferenceSelection, referenceColumnValues } from "@/lib/references/records";
+import { readReferenceBinding } from "@/lib/references/types";
 
 type RouteContext = { params: Promise<{ campaignId: string; npcId: string }> };
 
 export const runtime = "nodejs";
 
-const npcColumns = "id, author_id, name, species, role, description, description_is_markdown, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at";
+const npcColumns = `id, author_id, name, species, role, description, description_is_markdown, player_notes_markdown, place_id, faction_id, art_subject, art_path, art_prompt, art_provider, created_at, updated_at, ${ancestryReferenceColumns}`;
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { campaignId, npcId } = await params;
@@ -121,7 +124,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     const { data: previousNpc, error: previousNpcError } = await context.supabase
       .from("npcs")
-      .select("art_path, description, description_is_markdown")
+      .select(`art_path, description, description_is_markdown, species, updated_at, ${ancestryReferenceColumns}`)
       .eq("id", npcId)
       .eq("campaign_id", campaignId)
       .maybeSingle();
@@ -130,6 +133,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unable to load NPC art." }, { status: 503 });
     }
     if (!previousNpc) return NextResponse.json({ error: "NPC not found." }, { status: 404 });
+
+    const previousAncestry = readReferenceBinding(previousNpc, "ancestry");
+    const ancestry = prepareReferenceSelection("ancestry", input.data.species ?? previousNpc.species, input.data.ancestryReference, { text: previousNpc.species, binding: previousAncestry });
+    const guardIdentity = (input.data.species !== undefined || input.data.ancestryReference !== undefined) && Boolean(previousAncestry || ancestry);
 
     const nextDescription = input.data.description ?? previousNpc.description;
     const nextDescriptionIsMarkdown = input.data.descriptionIsMarkdown
@@ -145,6 +152,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
 
     const update = {
+      ...referenceColumnValues("ancestry", ancestry),
       ...(input.data.name === undefined ? {} : { name: input.data.name }),
       ...(input.data.species === undefined ? {} : { species: input.data.species }),
       ...(input.data.role === undefined ? {} : { role: input.data.role }),
@@ -159,15 +167,18 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       ...(input.data.artProvider === undefined ? {} : { art_provider: input.data.artProvider }),
       updated_by: context.user.id,
     };
-    const { data, error } = await context.supabase
+    let updateQuery = context.supabase
       .from("npcs")
       .update(update)
       .eq("id", npcId)
-      .eq("campaign_id", campaignId)
+      .eq("campaign_id", campaignId);
+    if (guardIdentity) updateQuery = updateQuery.eq("updated_at", previousNpc.updated_at);
+    const { data, error } = await updateQuery
       .select(npcColumns)
       .single();
 
     if (error) {
+      if (guardIdentity && error.code === "PGRST116") return NextResponse.json({ error: "NPC identity changed. Refresh and review before saving." }, { status: 409 });
       return NextResponse.json({ error: "Unable to update NPC." }, { status: 400 });
     }
 
@@ -190,7 +201,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const gmNotesMarkdown = input.data.gmNotesMarkdown === undefined ? undefined : input.data.gmNotesMarkdown;
     const [npcWithArt] = await addCampaignArtUrls(context.supabase, [data]);
     return NextResponse.json({ npc: { ...npcWithArt, ...(gmNotesMarkdown === undefined ? {} : { gm_notes_markdown: gmNotesMarkdown }) } });
-  } catch {
+  } catch (error) {
+    if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "Campaign service is not configured." }, { status: 503 });
   }
 }

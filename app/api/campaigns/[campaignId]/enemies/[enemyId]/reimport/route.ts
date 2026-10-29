@@ -126,6 +126,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       p_source: payload,
       p_expected_updated_at: input.data.expectedUpdatedAt,
       p_authored: {
+        ...(preserved?.systemReferences ? { systemReferences: preserved.systemReferences } : {}),
         playerDescription,
         playerDescriptionIsMarkdown,
         isRevealed: preserved?.isRevealed ?? current.is_revealed,
@@ -136,7 +137,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         artProvider: artChanged ? null : (preserved?.artProvider === undefined ? (current.art_provider ?? null) : preserved.artProvider),
       },
     });
-    if (error) return NextResponse.json({ error: error.code === "40001" ? "The enemy source changed after this preview was created." : "Unable to reimport enemy source." }, { status: error.code === "40001" ? 409 : 400 });
+    if (error) return NextResponse.json({ error: error.code === "40001" || error.code === "PT409" ? "The enemy source changed after this preview was created." : "Unable to reimport enemy source." }, { status: error.code === "40001" || error.code === "PT409" ? 409 : 400 });
     if (typeof updatedId !== "string") return NextResponse.json({ error: "Enemy was reimported without an identifier." }, { status: 503 });
 
     const enemy = await readCampaignEnemyForRole(context.supabase, campaignId, enemyId, "gm");

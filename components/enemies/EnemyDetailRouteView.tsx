@@ -5,6 +5,7 @@ import { FileSearch } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { CampaignArtEditorSlot } from "@/components/archive/CampaignArtField";
 import EnemyEditor from "@/components/enemies/EnemyEditor";
+import EnemyFoundryExport from "@/components/enemies/EnemyFoundryExport";
 import EnemyPublicRecord from "@/components/enemies/EnemyPublicRecord";
 import EntityNotesPanel from "@/components/notes/EntityNotesPanel";
 import { RecordDeleteAction, RecordEditAction } from "@/components/ui/RecordActions";
@@ -66,7 +67,7 @@ export default function EnemyDetailRouteView({ campaignId, initialResult, entity
     }
   };
 
-  const actions = isGM ? <div className="flex flex-wrap items-center justify-end gap-2"><RecordEditAction recordName={enemy.name} disabled={isDeleting} onClick={() => { setError(null); setReimportPreview(null); setEditorOpen(true); }} />{enemy.source_provider === "aon" ? <button className={actionClassName} disabled={isReimporting} onClick={() => void previewReimport()} type="button"><FileSearch aria-hidden="true" size={15} /> {isReimporting ? "PREVIEWING..." : "REVIEW SOURCE UPDATE"}</button> : null}</div> : undefined;
+  const actions = isGM ? <div className="flex flex-wrap items-center justify-end gap-2"><RecordEditAction recordName={enemy.name} disabled={isDeleting} onClick={() => { setError(null); setReimportPreview(null); setEditorOpen(true); }} /><EnemyFoundryExport campaignId={campaignId} enemyId={enemy.id} />{enemy.source_provider === "aon" ? <button className={actionClassName} disabled={isReimporting} onClick={() => void previewReimport()} type="button"><FileSearch aria-hidden="true" size={15} /> {isReimporting ? "PREVIEWING..." : "REVIEW SOURCE UPDATE"}</button> : null}</div> : undefined;
 
   return <><CampaignArtEditorSlot />{editorOpen ? <EnemyEditor key={`${enemy.id}:${reimportPreview?.sourceSnapshot.contentHash ?? "manual"}`} campaignId={campaignId} enemy={enemy} initialImportPreview={reimportPreview} onCancel={() => { setEditorOpen(false); setReimportPreview(null); }} onSaved={(saved) => { setEnemy(saved); setEditorOpen(false); setReimportPreview(null); }} /> : <><EnemyPublicRecord campaignId={campaignId} enemy={enemy} isGM={isGM} actions={actions} />{isGM ? <div className="character-form-actions flex items-center gap-[10px] max-[760px]:flex-wrap"><RecordDeleteAction recordName={enemy.name} disabled={isDeleting} onClick={() => void deleteEnemy()} /></div> : null}<EntityNotesPanel campaignId={campaignId} entity={{ type: "enemy", id: enemy.id }} entityLabel={enemy.name} initialResult={entityNotes} /></>}{error ? <p className="m-0 mt-3 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}</>;
 }

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
-import { loadCampaignAiContext, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, recordAiGeneration as recordGeneration } from "@/lib/ai/assistance";
 import { loadCharacterPortraitAccess } from "@/lib/ai/character-portrait-access";
 import { generateJson } from "@/lib/ai/client";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
@@ -14,6 +14,9 @@ import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/li
 import { getServerEnv } from "@/lib/env";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 import { characterDraftSchema, characterGenerationInputSchema, characterReviewDraftSchema } from "@/lib/validation/ai";
+import { ReferenceError } from "@/lib/references/catalog";
+import { buildSystemReferenceContext } from "@/lib/references/system-library";
+import { readReferenceBinding } from "@/lib/references/types";
 
 export const runtime = "nodejs";
 
@@ -60,6 +63,11 @@ export async function POST(request: Request) {
     }
 
     const access = portraitAccess.access;
+    const referenceContext = await buildSystemReferenceContext(context.supabase, input.data.campaignId, [
+      { kind: "ancestry", text: access.character.species, binding: readReferenceBinding(access.character, "ancestry") },
+      { kind: "class", text: access.character.class_name, binding: readReferenceBinding(access.character, "class") },
+    ]);
+    const recordAiGeneration: typeof recordGeneration = (supabase, details) => recordGeneration(supabase, { ...details, referenceSources: referenceContext.sources });
 
     if (access.role === "player" && input.data.model) {
       return NextResponse.json({ error: "Players must use the campaign default text model." }, { status: 403 });
@@ -124,7 +132,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: failure.message }, { status: failure.status });
     }
 
-    const prompt = buildCharacterPrompt(promptInput, aiContext.campaign, linkedContext.context);
+    const prompt = buildCharacterPrompt(promptInput, aiContext.campaign, linkedContext.context, referenceContext);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
     let rawDraft: unknown;
@@ -166,8 +174,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Character prompt metadata could not be saved." }, { status: 503 });
     }
 
-    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult?.model ?? selectedModel.id });
-  } catch {
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult?.model ?? selectedModel.id, references: referenceContext.sources });
+  } catch (error) {
+    if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "Character prompt generation is temporarily unavailable." }, { status: 503 });
   }
 }

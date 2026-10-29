@@ -4,7 +4,7 @@ import { mergeProtectedDraftFields } from "@/lib/ai/draft-refinement";
 import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
-import { loadCampaignAiContext, loadCampaignNarrativeAiContext, recordAiGeneration } from "@/lib/ai/assistance";
+import { loadCampaignAiContext, loadCampaignNarrativeAiContext, recordAiGeneration as recordGeneration } from "@/lib/ai/assistance";
 import { buildNpcPrompt } from "@/lib/ai/prompts";
 import { linkedEntityContextFailure, loadLinkedEntityContext } from "@/lib/ai/linked-entity-context";
 import { requireCampaignGM } from "@/lib/auth/permissions";
@@ -13,6 +13,8 @@ import { npcDraftSchema, npcGenerationInputSchema, npcReviewDraftSchema } from "
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
+import { ReferenceError } from "@/lib/references/catalog";
+import { buildSystemReferenceContext } from "@/lib/references/system-library";
 
 export const runtime = "nodejs";
 
@@ -37,6 +39,9 @@ export async function POST(request: Request) {
     if (!context) {
       return NextResponse.json({ error: "GM access is required for AI NPC assistance." }, { status: 403 });
     }
+
+    const referenceContext = await buildSystemReferenceContext(context.supabase, input.data.campaignId, [{ kind: "ancestry", text: input.data.species ?? "", binding: input.data.ancestryReference }]);
+    const recordAiGeneration: typeof recordGeneration = (supabase, details) => recordGeneration(supabase, { ...details, referenceSources: referenceContext.sources });
 
     let campaignCredential;
     try {
@@ -75,7 +80,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: failure.message }, { status: failure.status });
     }
 
-    const prompt = buildNpcPrompt(input.data, narrativeContext.campaign, linkedContext.context);
+    const prompt = buildNpcPrompt(input.data, narrativeContext.campaign, linkedContext.context, referenceContext);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     let rawDraft: unknown;
     let providerResult: Awaited<ReturnType<typeof generateJson>> | null = null;
@@ -115,8 +120,9 @@ export async function POST(request: Request) {
 
     if (auditError) return NextResponse.json({ error: "NPC draft metadata could not be saved." }, { status: 503 });
 
-    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult?.model ?? selectedModel.id });
-  } catch {
+    return NextResponse.json({ draft: reviewedDraft.data, model: providerResult?.model ?? selectedModel.id, references: referenceContext.sources });
+  } catch (error) {
+    if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return NextResponse.json({ error: "NPC assistance is temporarily unavailable." }, { status: 503 });
   }
 }

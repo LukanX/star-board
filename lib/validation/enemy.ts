@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { enemyReferenceSelectionsSchema, referenceStatusesSchema } from "@/lib/validation/reference";
 import { parseAonCreatureUrl } from "@/lib/enemies/aon-url";
 
 const shortText = (max: number) => z.string().trim().max(max);
@@ -302,6 +303,7 @@ export const enemyDetailsSchema = z.object({
 });
 
 export const createEnemySchema = z.object({
+  systemReferences: enemyReferenceSelectionsSchema.optional(),
   ...enemyPublicFields,
   ...enemyClassificationFields,
   statBlock: enemyStatBlockSchema,
@@ -346,6 +348,7 @@ export const createEnemySchema = z.object({
 });
 
 export const updateEnemySchema = z.object({
+  systemReferences: enemyReferenceSelectionsSchema.optional(),
   name: enemyPublicFields.name.optional(),
   playerDescription: enemyPublicFields.playerDescription.optional(),
   playerDescriptionIsMarkdown: z.boolean().optional(),
@@ -414,6 +417,7 @@ export const enemyAiCurrentDraftSchema = z.object({
 }).partial().optional();
 
 export const enemyBackgroundJobSchema = z.object({
+  references: referenceStatusesSchema.optional(),
   generationRunId: z.string().uuid(),
   prompt: z.string().trim().min(1).max(200000),
   model: z.string().trim().min(1).max(160),
@@ -453,6 +457,7 @@ export const enemyReimportRequestSchema = z.object({
   url: aonSourceUrlField.optional(),
   sourceUrl: aonSourceUrlField.optional(),
   preserved: z.object({
+    systemReferences: enemyReferenceSelectionsSchema.optional(),
     playerDescription: z.string().max(4000),
     playerDescriptionIsMarkdown: z.boolean().optional(),
     isRevealed: z.boolean(),

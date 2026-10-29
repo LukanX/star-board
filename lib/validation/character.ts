@@ -1,9 +1,12 @@
 import { z } from "zod";
+import { referenceBindingSchema } from "@/lib/validation/reference";
 
 const characterFieldSchema = z.object({
   name: z.string().trim().min(1).max(160),
   species: z.string().trim().max(120),
   className: z.string().trim().max(160),
+  ancestryReference: referenceBindingSchema.nullable().optional(),
+  classReference: referenceBindingSchema.nullable().optional(),
   level: z.number().int().min(1).max(20),
   isActive: z.boolean(),
   backstoryMarkdown: z.string().max(20000),

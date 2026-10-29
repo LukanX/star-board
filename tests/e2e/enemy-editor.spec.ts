@@ -1,4 +1,61 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "./fixtures";
+import { enemyStatBlockSchema } from "../../lib/validation/enemy";
+
+test("keeps the recall knowledge checkbox compact and aligned in both enemy editors", async ({ page, campaign }) => {
+  await page.route("**/api/ai/enemy", async (route) => {
+    const statBlock = enemyStatBlockSchema.parse({ schemaVersion: 1 });
+    statBlock.defenses.armorClass = 18;
+    statBlock.defenses.hitPoints = [{ label: "HP", value: 30, notes: "" }];
+    await route.fulfill({ status: 200, json: { references: [], draft: {
+      name: "Recall test", playerDescription: "A test creature.", level: 1, size: "medium", rarity: "common",
+      traits: [], family: null, statBlock,
+      gmNotesMarkdown: "", artSubject: "",
+    } } });
+  });
+  await page.goto(`/campaigns/${campaign.campaignId}/enemies`);
+  await page.getByRole("button", { name: "ADD ENEMY", exact: true }).click();
+  const editor = page.locator('[data-enemy-editor="true"]');
+
+  for (const workspace of ["manual", "ai"]) {
+    if (workspace === "ai") {
+      await editor.getByRole("button", { name: "OPEN AI WORKSPACE", exact: true }).click();
+      await editor.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
+      await expect(editor.getByRole("button", { name: "USE DRAFT", exact: true })).toBeVisible();
+    }
+    const checkbox = editor.getByRole("checkbox", { name: "Include recall knowledge", exact: true });
+    const panel = checkbox.locator("xpath=ancestor::section[1]");
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      const geometry = await checkbox.evaluate((input) => {
+        const label = input.closest("label")!;
+        const box = input.getBoundingClientRect();
+        const text = label.getBoundingClientRect();
+        return { width: box.width, height: box.height, left: box.left - text.left,
+          centerOffset: Math.abs((box.top + box.height / 2) - (text.top + text.height / 2)),
+          labelDisplay: getComputedStyle(label).display };
+      });
+      expect(geometry.width).toBeGreaterThanOrEqual(14);
+      expect(geometry.width).toBeLessThanOrEqual(18);
+      expect(geometry.height).toBeGreaterThanOrEqual(14);
+      expect(geometry.height).toBeLessThanOrEqual(18);
+      expect(geometry.left).toBeLessThanOrEqual(2);
+      expect(geometry.centerOffset).toBeLessThanOrEqual(2);
+      expect(geometry.labelDisplay).toContain("flex");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    }
+    await expect(panel.getByText("No recall knowledge recorded.")).toBeVisible();
+    await checkbox.focus();
+    await checkbox.press("Space");
+    await expect(checkbox).toHaveCSS("outline-width", "2px");
+    await expect(checkbox).toHaveCSS("outline-style", "solid");
+    await expect(checkbox).toBeChecked();
+    await expect(panel.getByLabel("DC", { exact: true })).toBeVisible();
+    await checkbox.press("Space");
+    await expect(checkbox).not.toBeChecked();
+    await expect(panel.getByText("No recall knowledge recorded.")).toBeVisible();
+  }
+});
 
 test("creates and hydrates a readable enemy stat block", async ({ page, campaign }) => {
   const enemyName = `Playwright Threat ${Date.now()}`;
@@ -19,6 +76,8 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
     await form.locator("select").nth(1).selectOption("common");
     await form.getByLabel("Traits / type", { exact: true }).fill("aberration, occult");
     await form.getByLabel("Player-safe description", { exact: true }).fill("A threat assembled for the editor workflow.");
+    await expect(form.getByRole("button", { name: "Remove aberration trait" })).toBeVisible();
+    await expect(form.getByRole("button", { name: "Remove occult trait" })).toBeVisible();
 
     await form.getByLabel("Armor class", { exact: true }).fill("20");
     const hitPoints = form.locator('[data-enemy-repeatable="hit points"]');
@@ -79,6 +138,27 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
     await expect(editor).toHaveCount(0);
     await page.getByRole("link", { name: "OPEN FULL RECORD", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/campaigns/${campaign.campaignId}/enemies/${enemyId}$`));
+    const exportResponsePromise = page.waitForResponse((response) => response.url().includes(`/enemies/${enemyId}/export/foundry`), { timeout: 15000 });
+    await page.getByRole("button", { name: "Export enemy to Foundry VTT", exact: true }).click();
+    const exportResponse = await exportResponsePromise;
+    const exportResponseBody = await exportResponse.text();
+    expect(exportResponse.ok(), exportResponseBody).toBeTruthy();
+    const exportReview = page.getByRole("region", { name: "Foundry export warnings" });
+    await expect(exportReview).toBeVisible({ timeout: 10000 });
+    await expect(exportReview).toContainText("Some entries are text-only or need manual setup in Foundry.");
+    const downloadPromise = page.waitForEvent("download");
+    await exportReview.getByRole("button", { name: "DOWNLOAD WITH WARNINGS", exact: true }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/-foundry-actor\.json$/);
+    const downloadPath = await download.path();
+    const exportedActor = JSON.parse(await readFile(downloadPath, "utf8")) as Record<string, unknown>;
+    expect(exportedActor.name).toBe(enemyName);
+    expect(exportedActor.type).toBe("npc");
+    expect(exportedActor).not.toHaveProperty("campaign_id");
+    expect(exportedActor).not.toHaveProperty("gm_notes_markdown");
+    expect(exportedActor).not.toHaveProperty("source_snapshot");
+    expect(JSON.stringify(exportedActor)).not.toContain(campaign.campaignId);
+
     const statBlock = page.locator('[data-enemy-stat-block="true"]');
     await expect(statBlock).toContainText("120");
     await expect(statBlock).toContainText("30 feet");
@@ -216,6 +296,8 @@ test("creates and hydrates a readable enemy stat block", async ({ page, campaign
     const hydratedEditor = page.locator('[data-enemy-editor="true"]');
     const hydratedForm = hydratedEditor.locator("form.character-form");
     await expect(hydratedForm.locator('input[required][maxlength="160"]')).toHaveValue(enemyName);
+    await expect(hydratedForm.getByRole("button", { name: "Remove aberration trait" })).toBeVisible();
+    await expect(hydratedForm.getByRole("button", { name: "Remove occult trait" })).toBeVisible();
     await expect(hydratedForm.getByLabel("Value", { exact: true })).toHaveValue("120");
     await expect(hydratedForm.getByLabel("Speed", { exact: true })).toHaveValue("30 feet");
     await expect(hydratedForm.locator('[data-enemy-repeatable="strikes"]').getByLabel("Name", { exact: true })).toHaveValue("Void blade");

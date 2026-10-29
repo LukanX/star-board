@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ReferenceColumns } from "@/lib/references/types";
 
 export type CharacterPortraitAccessFailure = "membership" | "not-found" | "forbidden";
 
-export type CharacterPortraitRecord = {
+export type CharacterPortraitRecord = ReferenceColumns & {
   id: string;
   campaign_id: string;
   owner_id: string | null;
@@ -40,7 +41,7 @@ export async function loadCharacterPortraitAccess(
       .maybeSingle(),
     supabase
       .from("characters")
-      .select("id, campaign_id, owner_id, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown")
+      .select("id, campaign_id, owner_id, name, species, class_name, level, backstory_markdown, physical_description, physical_description_is_markdown, ancestry_reference_id, ancestry_catalog_version, class_reference_id, class_catalog_version")
       .eq("campaign_id", campaignId)
       .eq("id", characterId)
       .maybeSingle(),

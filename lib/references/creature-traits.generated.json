@@ -1,0 +1,2091 @@
+{
+  "catalogVersion": "sf2e-1.6.1-traits-88ab72334ac11df1",
+  "source": {
+    "repository": "foundryvtt/pf2e",
+    "release": "sf2e-1.6.1",
+    "commit": "28d9d156f252d084371d994dc359509b49eadf18",
+    "schemaVersion": 1,
+    "contentRevision": 1,
+    "packs": [
+      "ancestries",
+      "classes"
+    ],
+    "includedFields": [
+      "_id",
+      "name",
+      "type",
+      "system.publication"
+    ],
+    "excludedContent": [
+      "source prose",
+      "naming lists",
+      "artwork",
+      "rule elements",
+      "premium modules"
+    ]
+  },
+  "inputs": [
+    {
+      "path": "src/scripts/config/traits.ts",
+      "hash": "30d6cf6818ed091354afe3e61118233d8e1a2c58914ac613739d073ed90f7ad4"
+    },
+    {
+      "path": "src/scripts/config/index.ts",
+      "hash": "ad4d4d5ffcf26f57b5247527a8389d23008888279c280de5b9e44416960f45ed"
+    },
+    {
+      "path": "static/lang/en.json",
+      "hash": "f9442854d045a0e08fcdb5d80752c2010ded6614720b905e05e61124a39b9e8f"
+    },
+    {
+      "path": "static/lang/sf2e-overrides-en.json",
+      "hash": "5f7ff5e6a2d931661e7d7733fca76059a648abd29ff66847e56d45fff9fc1359"
+    }
+  ],
+  "records": [
+    {
+      "id": "sf2e.creature-traits.aberration",
+      "kind": "creature_trait",
+      "slug": "aberration",
+      "name": "Aberration",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.acid",
+      "kind": "creature_trait",
+      "slug": "acid",
+      "name": "Acid",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.aeon",
+      "kind": "creature_trait",
+      "slug": "aeon",
+      "name": "Aeon",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.aesir",
+      "kind": "creature_trait",
+      "slug": "aesir",
+      "name": "Aesir",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.agathion",
+      "kind": "creature_trait",
+      "slug": "agathion",
+      "name": "Agathion",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.air",
+      "kind": "creature_trait",
+      "slug": "air",
+      "name": "Air",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.aiuvarin",
+      "kind": "creature_trait",
+      "slug": "aiuvarin",
+      "name": "Aiuvarin",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.alchemical",
+      "kind": "creature_trait",
+      "slug": "alchemical",
+      "name": "Alchemical",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.amphibious",
+      "kind": "creature_trait",
+      "slug": "amphibious",
+      "name": "Amphibious",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.anadi",
+      "kind": "creature_trait",
+      "slug": "anadi",
+      "name": "Anadi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.android",
+      "kind": "creature_trait",
+      "slug": "android",
+      "name": "Android",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.angel",
+      "kind": "creature_trait",
+      "slug": "angel",
+      "name": "Angel",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.animal",
+      "kind": "creature_trait",
+      "slug": "animal",
+      "name": "Animal",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.anugobu",
+      "kind": "creature_trait",
+      "slug": "anugobu",
+      "name": "Anugobu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.aphorite",
+      "kind": "creature_trait",
+      "slug": "aphorite",
+      "name": "Aphorite",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.aquatic",
+      "kind": "creature_trait",
+      "slug": "aquatic",
+      "name": "Aquatic",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.arcane",
+      "kind": "creature_trait",
+      "slug": "arcane",
+      "name": "Arcane",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.archon",
+      "kind": "creature_trait",
+      "slug": "archon",
+      "name": "Archon",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ardande",
+      "kind": "creature_trait",
+      "slug": "ardande",
+      "name": "Ardande",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.astral",
+      "kind": "creature_trait",
+      "slug": "astral",
+      "name": "Astral",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.astrazoan",
+      "kind": "creature_trait",
+      "slug": "astrazoan",
+      "name": "Astrazoan",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.asura",
+      "kind": "creature_trait",
+      "slug": "asura",
+      "name": "Asura",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.athamaru",
+      "kind": "creature_trait",
+      "slug": "athamaru",
+      "name": "Athamaru",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.atraxid",
+      "kind": "creature_trait",
+      "slug": "atraxid",
+      "name": "Atraxid",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.automaton",
+      "kind": "creature_trait",
+      "slug": "automaton",
+      "name": "Automaton",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.awakened-animal",
+      "kind": "creature_trait",
+      "slug": "awakened-animal",
+      "name": "Awakened Animal",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.azarketi",
+      "kind": "creature_trait",
+      "slug": "azarketi",
+      "name": "Azarketi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.azata",
+      "kind": "creature_trait",
+      "slug": "azata",
+      "name": "Azata",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.bantrid",
+      "kind": "creature_trait",
+      "slug": "bantrid",
+      "name": "Bantrid",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.barathu",
+      "kind": "creature_trait",
+      "slug": "barathu",
+      "name": "Barathu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.beast",
+      "kind": "creature_trait",
+      "slug": "beast",
+      "name": "Beast",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.beastkin",
+      "kind": "creature_trait",
+      "slug": "beastkin",
+      "name": "Beastkin",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.binnaquid",
+      "kind": "creature_trait",
+      "slug": "binnaquid",
+      "name": "Binnaquid",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.biotech",
+      "kind": "creature_trait",
+      "slug": "biotech",
+      "name": "Biotech",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.blight",
+      "kind": "creature_trait",
+      "slug": "blight",
+      "name": "Blight",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.boggard",
+      "kind": "creature_trait",
+      "slug": "boggard",
+      "name": "Boggard",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.borai",
+      "kind": "creature_trait",
+      "slug": "borai",
+      "name": "Borai",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.brenneri",
+      "kind": "creature_trait",
+      "slug": "brenneri",
+      "name": "Brenneri",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.bugbear",
+      "kind": "creature_trait",
+      "slug": "bugbear",
+      "name": "Bugbear",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.caligni",
+      "kind": "creature_trait",
+      "slug": "caligni",
+      "name": "Caligni",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.catfolk",
+      "kind": "creature_trait",
+      "slug": "catfolk",
+      "name": "Catfolk",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.celestial",
+      "kind": "creature_trait",
+      "slug": "celestial",
+      "name": "Celestial",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.centaur",
+      "kind": "creature_trait",
+      "slug": "centaur",
+      "name": "Centaur",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.changeling",
+      "kind": "creature_trait",
+      "slug": "changeling",
+      "name": "Changeling",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.charau-ka",
+      "kind": "creature_trait",
+      "slug": "charau-ka",
+      "name": "Charau-ka",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.clockwork",
+      "kind": "creature_trait",
+      "slug": "clockwork",
+      "name": "Clockwork",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.cold",
+      "kind": "creature_trait",
+      "slug": "cold",
+      "name": "Cold",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.conrasu",
+      "kind": "creature_trait",
+      "slug": "conrasu",
+      "name": "Conrasu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.construct",
+      "kind": "creature_trait",
+      "slug": "construct",
+      "name": "Construct",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.contemplative",
+      "kind": "creature_trait",
+      "slug": "contemplative",
+      "name": "Contemplative",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.copaxi",
+      "kind": "creature_trait",
+      "slug": "copaxi",
+      "name": "Copaxi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.corpsefolk",
+      "kind": "creature_trait",
+      "slug": "corpsefolk",
+      "name": "Corpsefolk",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.coshyco",
+      "kind": "creature_trait",
+      "slug": "coshyco",
+      "name": "Coshyco",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.cosmic",
+      "kind": "creature_trait",
+      "slug": "cosmic",
+      "name": "Cosmic",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.couatl",
+      "kind": "creature_trait",
+      "slug": "couatl",
+      "name": "Coatl",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.cyborg",
+      "kind": "creature_trait",
+      "slug": "cyborg",
+      "name": "Cyborg",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.daemon",
+      "kind": "creature_trait",
+      "slug": "daemon",
+      "name": "Daemon",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.darvakka",
+      "kind": "creature_trait",
+      "slug": "darvakka",
+      "name": "Darvakka",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.demon",
+      "kind": "creature_trait",
+      "slug": "demon",
+      "name": "Demon",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dero",
+      "kind": "creature_trait",
+      "slug": "dero",
+      "name": "Dero",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.devil",
+      "kind": "creature_trait",
+      "slug": "devil",
+      "name": "Devil",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dhampir",
+      "kind": "creature_trait",
+      "slug": "dhampir",
+      "name": "Dhampir",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dinosaur",
+      "kind": "creature_trait",
+      "slug": "dinosaur",
+      "name": "Dinosaur",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.div",
+      "kind": "creature_trait",
+      "slug": "div",
+      "name": "Div",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.divine",
+      "kind": "creature_trait",
+      "slug": "divine",
+      "name": "Divine",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dragon",
+      "kind": "creature_trait",
+      "slug": "dragon",
+      "name": "Dragon",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dragonblood",
+      "kind": "creature_trait",
+      "slug": "dragonblood",
+      "name": "Dragonblood",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dragonet",
+      "kind": "creature_trait",
+      "slug": "dragonet",
+      "name": "Dragonet",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dragonkin",
+      "kind": "creature_trait",
+      "slug": "dragonkin",
+      "name": "Dragonkin",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dream",
+      "kind": "creature_trait",
+      "slug": "dream",
+      "name": "Dream",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.drift",
+      "kind": "creature_trait",
+      "slug": "drift",
+      "name": "Drift",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dromaar",
+      "kind": "creature_trait",
+      "slug": "dromaar",
+      "name": "Dromaar",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.drow",
+      "kind": "creature_trait",
+      "slug": "drow",
+      "name": "Drow",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.duergar",
+      "kind": "creature_trait",
+      "slug": "duergar",
+      "name": "Hryngar",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.duskwalker",
+      "kind": "creature_trait",
+      "slug": "duskwalker",
+      "name": "Duskwalker",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.dwarf",
+      "kind": "creature_trait",
+      "slug": "dwarf",
+      "name": "Dwarf",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.earth",
+      "kind": "creature_trait",
+      "slug": "earth",
+      "name": "Earth",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.eidolon",
+      "kind": "creature_trait",
+      "slug": "eidolon",
+      "name": "Eidolon",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.elebrian",
+      "kind": "creature_trait",
+      "slug": "elebrian",
+      "name": "Elebrian",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.electricity",
+      "kind": "creature_trait",
+      "slug": "electricity",
+      "name": "Electricity",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.elemental",
+      "kind": "creature_trait",
+      "slug": "elemental",
+      "name": "Elemental",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.elf",
+      "kind": "creature_trait",
+      "slug": "elf",
+      "name": "Elf",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.entu-colony",
+      "kind": "creature_trait",
+      "slug": "entu-colony",
+      "name": "Entu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ethereal",
+      "kind": "creature_trait",
+      "slug": "ethereal",
+      "name": "Ethereal",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.experiment",
+      "kind": "creature_trait",
+      "slug": "experiment",
+      "name": "Experiment",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.fetchling",
+      "kind": "creature_trait",
+      "slug": "fetchling",
+      "name": "Fetchling",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.fey",
+      "kind": "creature_trait",
+      "slug": "fey",
+      "name": "Fey",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.fiend",
+      "kind": "creature_trait",
+      "slug": "fiend",
+      "name": "Fiend",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.fire",
+      "kind": "creature_trait",
+      "slug": "fire",
+      "name": "Fire",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.fleshwarp",
+      "kind": "creature_trait",
+      "slug": "fleshwarp",
+      "name": "Fleshwarp",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.fonqugon",
+      "kind": "creature_trait",
+      "slug": "fonqugon",
+      "name": "Fonqugon",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.force",
+      "kind": "creature_trait",
+      "slug": "force",
+      "name": "Force",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.formian",
+      "kind": "creature_trait",
+      "slug": "formian",
+      "name": "Formian",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.fungus",
+      "kind": "creature_trait",
+      "slug": "fungus",
+      "name": "Fungus",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ganzi",
+      "kind": "creature_trait",
+      "slug": "ganzi",
+      "name": "Ganzi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.gap-touched",
+      "kind": "creature_trait",
+      "slug": "gap-touched",
+      "name": "Gap-touched",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.genie",
+      "kind": "creature_trait",
+      "slug": "genie",
+      "name": "Genie",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.geniekin",
+      "kind": "creature_trait",
+      "slug": "geniekin",
+      "name": "Geniekin",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.gfolian",
+      "kind": "creature_trait",
+      "slug": "gfolian",
+      "name": "G'folian",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ghoran",
+      "kind": "creature_trait",
+      "slug": "ghoran",
+      "name": "Ghoran",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ghost",
+      "kind": "creature_trait",
+      "slug": "ghost",
+      "name": "Ghost",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ghoul",
+      "kind": "creature_trait",
+      "slug": "ghoul",
+      "name": "Ghoul",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ghul",
+      "kind": "creature_trait",
+      "slug": "ghul",
+      "name": "Ghul",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.giant",
+      "kind": "creature_trait",
+      "slug": "giant",
+      "name": "Giant",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.gigas",
+      "kind": "creature_trait",
+      "slug": "gigas",
+      "name": "Gigas",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.girtablilu",
+      "kind": "creature_trait",
+      "slug": "girtablilu",
+      "name": "Girtablilu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.gnarefuroid",
+      "kind": "creature_trait",
+      "slug": "gnarefuroid",
+      "name": "Gnarefuroid",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.gnome",
+      "kind": "creature_trait",
+      "slug": "gnome",
+      "name": "Gnome",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.goblin",
+      "kind": "creature_trait",
+      "slug": "goblin",
+      "name": "Goblin",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.golem",
+      "kind": "creature_trait",
+      "slug": "golem",
+      "name": "Golem",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.goloma",
+      "kind": "creature_trait",
+      "slug": "goloma",
+      "name": "Goloma",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.graveknight",
+      "kind": "creature_trait",
+      "slug": "graveknight",
+      "name": "Graveknight",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.gremlin",
+      "kind": "creature_trait",
+      "slug": "gremlin",
+      "name": "Gremlin",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.grioth",
+      "kind": "creature_trait",
+      "slug": "grioth",
+      "name": "Grioth",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.hag",
+      "kind": "creature_trait",
+      "slug": "hag",
+      "name": "Hag",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.halfling",
+      "kind": "creature_trait",
+      "slug": "halfling",
+      "name": "Halfling",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.hantu",
+      "kind": "creature_trait",
+      "slug": "hantu",
+      "name": "Hantu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.hardor",
+      "kind": "creature_trait",
+      "slug": "hardor",
+      "name": "Hardor",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.herald",
+      "kind": "creature_trait",
+      "slug": "herald",
+      "name": "Herald",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.hobgoblin",
+      "kind": "creature_trait",
+      "slug": "hobgoblin",
+      "name": "Hobgoblin",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.holy",
+      "kind": "creature_trait",
+      "slug": "holy",
+      "name": "Holy",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.hryngar",
+      "kind": "creature_trait",
+      "slug": "hryngar",
+      "name": "Hryngar",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.human",
+      "kind": "creature_trait",
+      "slug": "human",
+      "name": "Human",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.humanoid",
+      "kind": "creature_trait",
+      "slug": "humanoid",
+      "name": "Humanoid",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.hungerseed",
+      "kind": "creature_trait",
+      "slug": "hungerseed",
+      "name": "Hungerseed",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ijtikri",
+      "kind": "creature_trait",
+      "slug": "ijtikri",
+      "name": "Ijtikri",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ikeshti",
+      "kind": "creature_trait",
+      "slug": "ikeshti",
+      "name": "Ikeshti",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.illusion",
+      "kind": "creature_trait",
+      "slug": "illusion",
+      "name": "Illusion",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.incorporeal",
+      "kind": "creature_trait",
+      "slug": "incorporeal",
+      "name": "Incorporeal",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.inevitable",
+      "kind": "creature_trait",
+      "slug": "inevitable",
+      "name": "Inevitable",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.izalguun",
+      "kind": "creature_trait",
+      "slug": "izalguun",
+      "name": "Izalguun",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.jinsul",
+      "kind": "creature_trait",
+      "slug": "jinsul",
+      "name": "Jinsul",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.jotunborn",
+      "kind": "creature_trait",
+      "slug": "jotunborn",
+      "name": "Jotunborn",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kaiju",
+      "kind": "creature_trait",
+      "slug": "kaiju",
+      "name": "Kaiju",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kalo",
+      "kind": "creature_trait",
+      "slug": "kalo",
+      "name": "Kalo",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kami",
+      "kind": "creature_trait",
+      "slug": "kami",
+      "name": "Kami",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kasatha",
+      "kind": "creature_trait",
+      "slug": "kasatha",
+      "name": "Kasatha",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kashrishi",
+      "kind": "creature_trait",
+      "slug": "kashrishi",
+      "name": "Kashrishi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.khizar",
+      "kind": "creature_trait",
+      "slug": "khizar",
+      "name": "Khizar",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kholo",
+      "kind": "creature_trait",
+      "slug": "kholo",
+      "name": "Kholo",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kitsune",
+      "kind": "creature_trait",
+      "slug": "kitsune",
+      "name": "Kitsune",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kobold",
+      "kind": "creature_trait",
+      "slug": "kobold",
+      "name": "Kobold",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kothama",
+      "kind": "creature_trait",
+      "slug": "kothama",
+      "name": "Kothama",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kovintus",
+      "kind": "creature_trait",
+      "slug": "kovintus",
+      "name": "Kovintus",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.kucharn",
+      "kind": "creature_trait",
+      "slug": "kucharn",
+      "name": "Kucharn",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.lashunta",
+      "kind": "creature_trait",
+      "slug": "lashunta",
+      "name": "Lashunta",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.leshy",
+      "kind": "creature_trait",
+      "slug": "leshy",
+      "name": "Leshy",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.light",
+      "kind": "creature_trait",
+      "slug": "light",
+      "name": "Light",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.lilu",
+      "kind": "creature_trait",
+      "slug": "lilu",
+      "name": "Lilu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.living-hologram",
+      "kind": "creature_trait",
+      "slug": "living-hologram",
+      "name": "Living Hologram",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.lizardfolk",
+      "kind": "creature_trait",
+      "slug": "lizardfolk",
+      "name": "Lizardfolk",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.locathah",
+      "kind": "creature_trait",
+      "slug": "locathah",
+      "name": "Athamaru",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.madrosarai",
+      "kind": "creature_trait",
+      "slug": "madrosarai",
+      "name": "Madrosarai",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.maftet",
+      "kind": "creature_trait",
+      "slug": "maftet",
+      "name": "Maftet",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.maraquoi",
+      "kind": "creature_trait",
+      "slug": "maraquoi",
+      "name": "Maraquoi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.mecenaic",
+      "kind": "creature_trait",
+      "slug": "mecenaic",
+      "name": "Mecenaic",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.mental",
+      "kind": "creature_trait",
+      "slug": "mental",
+      "name": "Mental",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.merfolk",
+      "kind": "creature_trait",
+      "slug": "merfolk",
+      "name": "Merfolk",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.metal",
+      "kind": "creature_trait",
+      "slug": "metal",
+      "name": "Metal",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.mindless",
+      "kind": "creature_trait",
+      "slug": "mindless",
+      "name": "Mindless",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.minion",
+      "kind": "creature_trait",
+      "slug": "minion",
+      "name": "Minion",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.minotaur",
+      "kind": "creature_trait",
+      "slug": "minotaur",
+      "name": "Minotaur",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.monitor",
+      "kind": "creature_trait",
+      "slug": "monitor",
+      "name": "Monitor",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.morlock",
+      "kind": "creature_trait",
+      "slug": "morlock",
+      "name": "Morlock",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.mortic",
+      "kind": "creature_trait",
+      "slug": "mortic",
+      "name": "Mortic",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.moyishuu",
+      "kind": "creature_trait",
+      "slug": "moyishuu",
+      "name": "Moyishuu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.mummy",
+      "kind": "creature_trait",
+      "slug": "mummy",
+      "name": "Mummy",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.munavri",
+      "kind": "creature_trait",
+      "slug": "munavri",
+      "name": "Munavri",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.mutant",
+      "kind": "creature_trait",
+      "slug": "mutant",
+      "name": "Mutant",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.mythic",
+      "kind": "creature_trait",
+      "slug": "mythic",
+      "name": "Mythic",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.naari",
+      "kind": "creature_trait",
+      "slug": "naari",
+      "name": "Naari",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.nagaji",
+      "kind": "creature_trait",
+      "slug": "nagaji",
+      "name": "Nagaji",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.nephilim",
+      "kind": "creature_trait",
+      "slug": "nephilim",
+      "name": "Nephilim",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.nindoru",
+      "kind": "creature_trait",
+      "slug": "nindoru",
+      "name": "Nindoru",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.novian",
+      "kind": "creature_trait",
+      "slug": "novian",
+      "name": "Novian",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.nuar",
+      "kind": "creature_trait",
+      "slug": "nuar",
+      "name": "Nuar",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.nymph",
+      "kind": "creature_trait",
+      "slug": "nymph",
+      "name": "Nymph",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.occult",
+      "kind": "creature_trait",
+      "slug": "occult",
+      "name": "Occult",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.oni",
+      "kind": "creature_trait",
+      "slug": "oni",
+      "name": "Oni",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ooze",
+      "kind": "creature_trait",
+      "slug": "ooze",
+      "name": "Ooze",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.orc",
+      "kind": "creature_trait",
+      "slug": "orc",
+      "name": "Orc",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ord",
+      "kind": "creature_trait",
+      "slug": "ord",
+      "name": "Ord",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.oread",
+      "kind": "creature_trait",
+      "slug": "oread",
+      "name": "Oread",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.orocoran",
+      "kind": "creature_trait",
+      "slug": "orocoran",
+      "name": "Orocoran",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.osharu",
+      "kind": "creature_trait",
+      "slug": "osharu",
+      "name": "Osharu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.paaridar",
+      "kind": "creature_trait",
+      "slug": "paaridar",
+      "name": "Paaridar",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.pahtra",
+      "kind": "creature_trait",
+      "slug": "pahtra",
+      "name": "Pahtra",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.palinthanos",
+      "kind": "creature_trait",
+      "slug": "palinthanos",
+      "name": "Palinthanos",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.persona-flirt",
+      "kind": "creature_trait",
+      "slug": "persona-flirt",
+      "name": "Persona: Flirt",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.persona-guardian",
+      "kind": "creature_trait",
+      "slug": "persona-guardian",
+      "name": "Persona: Guardian",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.persona-leader",
+      "kind": "creature_trait",
+      "slug": "persona-leader",
+      "name": "Persona: Leader",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.persona-scholar",
+      "kind": "creature_trait",
+      "slug": "persona-scholar",
+      "name": "Persona: Scholar",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.persona-scoundrel",
+      "kind": "creature_trait",
+      "slug": "persona-scoundrel",
+      "name": "Persona: Scoundrel",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.persona-underdog",
+      "kind": "creature_trait",
+      "slug": "persona-underdog",
+      "name": "Persona: Underdog",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.persona-warrior",
+      "kind": "creature_trait",
+      "slug": "persona-warrior",
+      "name": "Persona: Warrior",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.persona-wildcard",
+      "kind": "creature_trait",
+      "slug": "persona-wildcard",
+      "name": "Persona: Wildcard",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.petitioner",
+      "kind": "creature_trait",
+      "slug": "petitioner",
+      "name": "Petitioner",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.phantom",
+      "kind": "creature_trait",
+      "slug": "phantom",
+      "name": "Phantom",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.phasorq",
+      "kind": "creature_trait",
+      "slug": "phasorq",
+      "name": "Phasorq",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.plant",
+      "kind": "creature_trait",
+      "slug": "plant",
+      "name": "Plant",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.poison",
+      "kind": "creature_trait",
+      "slug": "poison",
+      "name": "Poison",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.poppet",
+      "kind": "creature_trait",
+      "slug": "poppet",
+      "name": "Poppet",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.primal",
+      "kind": "creature_trait",
+      "slug": "primal",
+      "name": "Primal",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.prismeni",
+      "kind": "creature_trait",
+      "slug": "prismeni",
+      "name": "Prismeni",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.protean",
+      "kind": "creature_trait",
+      "slug": "protean",
+      "name": "Protean",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.psychopomp",
+      "kind": "creature_trait",
+      "slug": "psychopomp",
+      "name": "Psychopomp",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.qlippoth",
+      "kind": "creature_trait",
+      "slug": "qlippoth",
+      "name": "Qlippoth",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.rakshasa",
+      "kind": "creature_trait",
+      "slug": "rakshasa",
+      "name": "Rakshasa",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ratfolk",
+      "kind": "creature_trait",
+      "slug": "ratfolk",
+      "name": "Ysoki",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.raxilite",
+      "kind": "creature_trait",
+      "slug": "raxilite",
+      "name": "Raxilite",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.reflection",
+      "kind": "creature_trait",
+      "slug": "reflection",
+      "name": "Reflection",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.robot",
+      "kind": "creature_trait",
+      "slug": "robot",
+      "name": "Robot",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.ryphorian",
+      "kind": "creature_trait",
+      "slug": "ryphorian",
+      "name": "Ryphorian",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sahkil",
+      "kind": "creature_trait",
+      "slug": "sahkil",
+      "name": "Sahkil",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.samsaran",
+      "kind": "creature_trait",
+      "slug": "samsaran",
+      "name": "Samsaran",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sarangay",
+      "kind": "creature_trait",
+      "slug": "sarangay",
+      "name": "Sarangay",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sarcesian",
+      "kind": "creature_trait",
+      "slug": "sarcesian",
+      "name": "Sarcesian",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sea-devil",
+      "kind": "creature_trait",
+      "slug": "sea-devil",
+      "name": "Sea Devil",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sedacthy",
+      "kind": "creature_trait",
+      "slug": "sedacthy",
+      "name": "Sedacthy",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.serpentfolk",
+      "kind": "creature_trait",
+      "slug": "serpentfolk",
+      "name": "Serpentfolk",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.seugathi",
+      "kind": "creature_trait",
+      "slug": "seugathi",
+      "name": "Seugathi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.shabti",
+      "kind": "creature_trait",
+      "slug": "shabti",
+      "name": "Shabti",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.shade",
+      "kind": "creature_trait",
+      "slug": "shade",
+      "name": "Shade",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.shadow",
+      "kind": "creature_trait",
+      "slug": "shadow",
+      "name": "Shadow",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.shirren",
+      "kind": "creature_trait",
+      "slug": "shirren",
+      "name": "Shirren",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.shisk",
+      "kind": "creature_trait",
+      "slug": "shisk",
+      "name": "Shisk",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.shobhad",
+      "kind": "creature_trait",
+      "slug": "shobhad",
+      "name": "Shobhad",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.shoony",
+      "kind": "creature_trait",
+      "slug": "shoony",
+      "name": "Shoony",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.siktempora",
+      "kind": "creature_trait",
+      "slug": "siktempora",
+      "name": "Siktempora",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.skeleton",
+      "kind": "creature_trait",
+      "slug": "skeleton",
+      "name": "Skeleton",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.skelm",
+      "kind": "creature_trait",
+      "slug": "skelm",
+      "name": "Skelm",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.skittermander",
+      "kind": "creature_trait",
+      "slug": "skittermander",
+      "name": "Skittermander",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.skulk",
+      "kind": "creature_trait",
+      "slug": "skulk",
+      "name": "Skulk",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sonic",
+      "kind": "creature_trait",
+      "slug": "sonic",
+      "name": "Sonic",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.soulbound",
+      "kind": "creature_trait",
+      "slug": "soulbound",
+      "name": "Soulbound",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.spectra",
+      "kind": "creature_trait",
+      "slug": "spectra",
+      "name": "Spectra",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.spirit",
+      "kind": "creature_trait",
+      "slug": "spirit",
+      "name": "Spirit",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sporeborn",
+      "kind": "creature_trait",
+      "slug": "sporeborn",
+      "name": "Sporeborn",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.spriggan",
+      "kind": "creature_trait",
+      "slug": "spriggan",
+      "name": "Spriggan",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sprite",
+      "kind": "creature_trait",
+      "slug": "sprite",
+      "name": "Sprite",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sro",
+      "kind": "creature_trait",
+      "slug": "sro",
+      "name": "SRO",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.starship",
+      "kind": "creature_trait",
+      "slug": "starship",
+      "name": "Starship",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.stheno",
+      "kind": "creature_trait",
+      "slug": "stheno",
+      "name": "Stheno",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.strix",
+      "kind": "creature_trait",
+      "slug": "strix",
+      "name": "Strix",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.suli",
+      "kind": "creature_trait",
+      "slug": "suli",
+      "name": "Suli",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.summoned",
+      "kind": "creature_trait",
+      "slug": "summoned",
+      "name": "Summoned",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.surki",
+      "kind": "creature_trait",
+      "slug": "surki",
+      "name": "Surki",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.swarm",
+      "kind": "creature_trait",
+      "slug": "swarm",
+      "name": "Swarm",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.sylph",
+      "kind": "creature_trait",
+      "slug": "sylph",
+      "name": "Sylph",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.talos",
+      "kind": "creature_trait",
+      "slug": "talos",
+      "name": "Talos",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.talphi",
+      "kind": "creature_trait",
+      "slug": "talphi",
+      "name": "Talphi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.tane",
+      "kind": "creature_trait",
+      "slug": "tane",
+      "name": "Tane",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.tanggal",
+      "kind": "creature_trait",
+      "slug": "tanggal",
+      "name": "Tanggal",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.tanuki",
+      "kind": "creature_trait",
+      "slug": "tanuki",
+      "name": "Tanuki",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.tech",
+      "kind": "creature_trait",
+      "slug": "tech",
+      "name": "Tech",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.tengu",
+      "kind": "creature_trait",
+      "slug": "tengu",
+      "name": "Tengu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.time",
+      "kind": "creature_trait",
+      "slug": "time",
+      "name": "Time",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.titan",
+      "kind": "creature_trait",
+      "slug": "titan",
+      "name": "Titan",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.tripkee",
+      "kind": "creature_trait",
+      "slug": "tripkee",
+      "name": "Tripkee",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.troll",
+      "kind": "creature_trait",
+      "slug": "troll",
+      "name": "Troll",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.troop",
+      "kind": "creature_trait",
+      "slug": "troop",
+      "name": "Troop",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.trox",
+      "kind": "creature_trait",
+      "slug": "trox",
+      "name": "Trox",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.undead",
+      "kind": "creature_trait",
+      "slug": "undead",
+      "name": "Undead",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.undine",
+      "kind": "creature_trait",
+      "slug": "undine",
+      "name": "Undine",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.unholy",
+      "kind": "creature_trait",
+      "slug": "unholy",
+      "name": "Unholy",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.urdefhan",
+      "kind": "creature_trait",
+      "slug": "urdefhan",
+      "name": "Urdefhan",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.urog",
+      "kind": "creature_trait",
+      "slug": "urog",
+      "name": "Urog",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.vampire",
+      "kind": "creature_trait",
+      "slug": "vampire",
+      "name": "Vampire",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.vanara",
+      "kind": "creature_trait",
+      "slug": "vanara",
+      "name": "Vanara",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.velstrac",
+      "kind": "creature_trait",
+      "slug": "velstrac",
+      "name": "Velstrac",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.verthani",
+      "kind": "creature_trait",
+      "slug": "verthani",
+      "name": "Verthani",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.vesk",
+      "kind": "creature_trait",
+      "slug": "vesk",
+      "name": "Vesk",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.vishkanya",
+      "kind": "creature_trait",
+      "slug": "vishkanya",
+      "name": "Vishkanya",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.vitality",
+      "kind": "creature_trait",
+      "slug": "vitality",
+      "name": "Vitality",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.vlaka",
+      "kind": "creature_trait",
+      "slug": "vlaka",
+      "name": "Vlaka",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.void",
+      "kind": "creature_trait",
+      "slug": "void",
+      "name": "Void",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.vulkarisu",
+      "kind": "creature_trait",
+      "slug": "vulkarisu",
+      "name": "Vulkarisu",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.water",
+      "kind": "creature_trait",
+      "slug": "water",
+      "name": "Water",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.wayang",
+      "kind": "creature_trait",
+      "slug": "wayang",
+      "name": "Wayang",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.werecreature",
+      "kind": "creature_trait",
+      "slug": "werecreature",
+      "name": "Werecreature",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.wight",
+      "kind": "creature_trait",
+      "slug": "wight",
+      "name": "Wight",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.wild-hunt",
+      "kind": "creature_trait",
+      "slug": "wild-hunt",
+      "name": "Wild Hunt",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.wood",
+      "kind": "creature_trait",
+      "slug": "wood",
+      "name": "Wood",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.worlanisi",
+      "kind": "creature_trait",
+      "slug": "worlanisi",
+      "name": "Worlanisi",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.wraith",
+      "kind": "creature_trait",
+      "slug": "wraith",
+      "name": "Wraith",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.wraithvine",
+      "kind": "creature_trait",
+      "slug": "wraithvine",
+      "name": "Wraithvine",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.wyrwood",
+      "kind": "creature_trait",
+      "slug": "wyrwood",
+      "name": "Wyrwood",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.xenometric-android",
+      "kind": "creature_trait",
+      "slug": "xenometric-android",
+      "name": "Xenometric Android",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.xulgath",
+      "kind": "creature_trait",
+      "slug": "xulgath",
+      "name": "Xulgath",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.yaksha",
+      "kind": "creature_trait",
+      "slug": "yaksha",
+      "name": "Yaksha",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.yaoguai",
+      "kind": "creature_trait",
+      "slug": "yaoguai",
+      "name": "Yaoguai",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    },
+    {
+      "id": "sf2e.creature-traits.zombie",
+      "kind": "creature_trait",
+      "slug": "zombie",
+      "name": "Zombie",
+      "sourceUrl": "https://github.com/foundryvtt/pf2e/blob/28d9d156f252d084371d994dc359509b49eadf18/src/scripts/config/traits.ts"
+    }
+  ]
+}

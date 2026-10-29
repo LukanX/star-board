@@ -7,10 +7,13 @@ import {
   imageJobStatusRequestTimeoutMs,
 } from "@/lib/ai/image-job-lifecycle";
 import type { ImageAspectRatio, ImageResolution, ImageSize } from "@/lib/ai/image-options";
+import type { ReferenceStatus } from "@/lib/references/types";
+import { referenceStatusesSchema } from "@/lib/validation/reference";
 
 export type ImageJobTargetKind = "character" | "npc" | "faction" | "job" | "place" | "enemy" | "visual-style";
 
 export type ImageDraft = {
+  references?: ReferenceStatus[];
   generationRunId: string;
   targetKind: ImageJobTargetKind;
   characterId?: string;
@@ -32,6 +35,7 @@ export type ImageDraft = {
 };
 
 export type ImageBackgroundJob = {
+  references?: ReferenceStatus[];
   generationRunId: string;
   status: "pending" | "running";
   targetKind: ImageJobTargetKind;
@@ -66,6 +70,7 @@ type ImageJobStatusResponse = {
     createdAt?: string;
     temporaryPath?: string;
     image?: ImageDraft["image"];
+    references?: ReferenceStatus[];
   };
 };
 
@@ -187,6 +192,7 @@ export async function waitForImageBackgroundJob(
           provider: "openrouter",
           model: result.job.model ?? job.model,
           image: result.job.image,
+          ...((result.job.references ?? job.references) ? { references: referenceStatusesSchema.parse(result.job.references ?? job.references) } : {}),
           createdAt: result.job.createdAt,
           temporaryPath: result.job.temporaryPath,
         };

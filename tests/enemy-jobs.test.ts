@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { librarySource } from "./support/library-reference";
 import {
   createEnemyBackgroundSignature,
   dispatchEnemyBackgroundJob,
@@ -29,6 +30,15 @@ describe("enemy background jobs", () => {
   it("validates the worker payload before dispatch", () => {
     expect(parseEnemyBackgroundJob(job).success).toBe(true);
     expect(parseEnemyBackgroundJob({ ...job, prompt: "" }).success).toBe(false);
+  });
+
+  it("keeps signatures stable after worker validation reorders nested provenance", () => {
+    const grounded = { ...job, references: [librarySource] };
+    const signature = createEnemyBackgroundSignature(grounded, "worker-secret");
+    const parsed = parseEnemyBackgroundJob(grounded);
+    expect(parsed.success).toBe(true);
+    expect(verifyEnemyBackgroundSignature(parsed.data!, signature, "worker-secret")).toBe(true);
+    expect(verifyEnemyBackgroundSignature({ ...grounded, references: [{ ...librarySource, revision: 8 }] }, signature, "worker-secret")).toBe(false);
   });
 
   it("dispatches to the Netlify background endpoint", async () => {

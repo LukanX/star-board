@@ -6,6 +6,8 @@ import AiModelPicker, { type AiModelOptions } from "@/components/archive/AiModel
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { waitForImageBackgroundJob, type ImageBackgroundJob, type ImageDraft } from "@/lib/ai/image-job-polling";
 import { imageGenerationRequestTimeoutMs } from "@/lib/ai/image-job-lifecycle";
+import type { NpcReferenceContext } from "@/lib/references/types";
+import ReferenceSources from "@/components/ui/ReferenceSources";
 import {
   artStudioSessionEvent,
   artStudioSessionKey,
@@ -43,6 +45,8 @@ type AiArtStudioProps = {
   characterId?: string;
   portraitAiRole?: "gm" | "player";
   parentPlaceId?: string | null;
+  npcReferenceContext?: NpcReferenceContext;
+  enemyReferenceContext?: { ancestryReference?: import("@/lib/references/types").ReferenceBinding | null };
   subject?: string;
   onSubjectChange?: (subject: string) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -90,6 +94,7 @@ async function restoreDraft(metadata: ArtStudioDraftMetadata): Promise<GalleryDr
       createdAt?: string;
       temporaryPath?: string;
       image?: ImageDraft["image"];
+      references?: ImageDraft["references"];
     };
   };
   if (!response.ok || result.job?.status !== "complete" || !result.job.image) return null;
@@ -104,6 +109,7 @@ async function restoreDraft(metadata: ArtStudioDraftMetadata): Promise<GalleryDr
       createdAt: result.job.createdAt ?? metadata.createdAt,
       temporaryPath: result.job.temporaryPath ?? metadata.temporaryPath,
       image: result.job.image,
+      ...((result.job.references ?? metadata.references) ? { references: result.job.references ?? metadata.references } : {}),
     },
   };
 }
@@ -133,6 +139,8 @@ function AiArtStudioContent({
   entityId,
   characterId,
   portraitAiRole,
+  npcReferenceContext,
+  enemyReferenceContext,
   parentPlaceId,
   subject,
   onSubjectChange,
@@ -333,6 +341,8 @@ function AiArtStudioContent({
           mode: requestedMode,
           targetKind: kind,
           characterId: characterId ?? undefined,
+          npcReferenceContext: kind === "npc" ? npcReferenceContext : undefined,
+          enemyReferenceContext: kind === "enemy" ? enemyReferenceContext : undefined,
           visualStyleId: requestedStyleId ?? undefined,
           parentPlaceId: parentPlaceId ?? undefined,
           model: canCustomizePortrait ? selectedModel ?? undefined : undefined,
@@ -489,6 +499,7 @@ function AiArtStudioContent({
     }
   };
 
+  const draftAncestry = draft?.references?.find((source) => source.kind === "ancestry");
   const previewUrl = draft?.image.base64
     ? `data:${draft.image.mediaType};base64,${draft.image.base64}`
     : (draft?.image.url ?? null);
@@ -698,6 +709,12 @@ function AiArtStudioContent({
             </>
           )}
         </button>
+        {draft ? <ReferenceSources sources={draft.references ?? []} campaignId={campaignId} characterId={kind === "character" ? characterId : undefined} purpose="image"
+          currentSelections={kind === "npc" ? [{ kind: "ancestry", binding: npcReferenceContext?.ancestryReference }] : kind === "enemy" ? [{ kind: "ancestry", binding: enemyReferenceContext?.ancestryReference }] : undefined} /> : null}
+        {draft && draftAncestry && kind === "npc" && (
+          (draftAncestry?.id ?? null) !== (npcReferenceContext?.ancestryReference?.id ?? null)
+          || (draftAncestry?.catalogVersion ?? null) !== (npcReferenceContext?.ancestryReference?.catalogVersion ?? null)
+        ) ? <p className="m-0 text-[10px] text-[var(--amber)]" role="status">This draft used an earlier ancestry selection. Review it before approving.</p> : null}
         {draft ? (
           <button
             className="h-[37px] inline-flex items-center justify-center gap-2 px-[14px] border border-[var(--line)] text-[var(--ink)] font-mono text-[9px] tracking-[.12em] cursor-pointer transition-[transform,background,border] duration-[200ms] whitespace-nowrap hover:-translate-y-px bg-[rgba(255,255,255,.035)] text-[var(--muted)] hover:border-[rgba(98,232,255,.45)] hover:text-[var(--ink)] min-h-[32px] !px-[10px] !text-[8px]"
