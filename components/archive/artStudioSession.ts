@@ -1,5 +1,5 @@
 import type { ImageDraft } from "@/lib/ai/image-job-polling";
-import { imageAspectRatioValues, imageSizeValues } from "@/lib/ai/image-options";
+import { imageAspectRatioValues, imageResolutionValues, imageSizeValues } from "@/lib/ai/image-options";
 import { referenceStatusesSchema } from "@/lib/validation/reference";
 
 export type ArtStudioKind = Exclude<ImageDraft["targetKind"], "visual-style">;
@@ -63,6 +63,7 @@ function parseDraftMetadata(value: unknown, kind: ArtStudioKind): ArtStudioDraft
     || typeof value.aspectRatio !== "string"
     || !imageAspectRatioValues.includes(value.aspectRatio as (typeof imageAspectRatioValues)[number])
     || (value.size !== undefined && (typeof value.size !== "string" || !imageSizeValues.includes(value.size as (typeof imageSizeValues)[number])))
+    || (value.resolution !== undefined && !imageResolutionValues.some((resolution) => resolution === value.resolution))
     || typeof value.prompt !== "string"
     || value.provider !== "openrouter"
     || typeof value.model !== "string"
@@ -85,6 +86,7 @@ function parseDraftMetadata(value: unknown, kind: ArtStudioKind): ArtStudioDraft
     subject: value.subject,
     aspectRatio: value.aspectRatio as ImageDraft["aspectRatio"],
     ...(typeof value.size === "string" ? { size: value.size as ImageDraft["size"] } : {}),
+    ...(typeof value.resolution === "string" ? { resolution: imageResolutionValues.find((resolution) => resolution === value.resolution) } : {}),
     prompt: value.prompt,
     provider: "openrouter",
     model: value.model,

@@ -10,11 +10,13 @@ export type CampaignSection =
   | "notes"
   | "library"
   | "members"
+  | "ai-studio"
+  | "art"
   | "settings";
 
-export type EntitySection = Exclude<CampaignSection, "overview" | "library" | "members" | "settings">;
+export type EntitySection = Exclude<CampaignSection, "overview" | "library" | "members" | "settings" | "ai-studio" | "art">;
 
-const campaignSections: readonly CampaignSection[] = ["overview", "jobs", "characters", "npcs", "factions", "places", "enemies", "episodes", "notes", "library", "members", "settings"];
+const campaignSections: readonly CampaignSection[] = ["overview", "jobs", "characters", "npcs", "factions", "places", "enemies", "episodes", "notes", "library", "members", "settings", "ai-studio", "art"];
 
 export type CampaignLibrarySection = "ancestries" | "creature-traits" | "access" | "generation";
 

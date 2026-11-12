@@ -8,6 +8,14 @@ export default async function handler(request: Request) {
 
   const cutoff = new Date(Date.now() - retentionWindowMs).toISOString();
   const supabase = getSupabaseServiceRoleClient();
+  const { data: cleanup, error: cleanupReadError } = await supabase.from("campaign_art_cleanup").select("campaign_id,path").order("created_at").limit(100);
+  if (cleanupReadError) throw new Error("Durable artwork cleanup could not be read.");
+  for (const object of cleanup ?? []) {
+    if (await removeCampaignArtIfUnreferenced(supabase, object.campaign_id, object.path)) {
+      const { error } = await supabase.from("campaign_art_cleanup").delete().eq("campaign_id", object.campaign_id).eq("path", object.path);
+      if (error) throw new Error("Durable artwork cleanup receipt could not be cleared.");
+    }
+  }
   const { data: expiredRuns, error: readError } = await supabase
     .from("ai_generation_runs")
     .select("campaign_id, image_path")

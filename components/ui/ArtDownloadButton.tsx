@@ -27,25 +27,28 @@ function sanitizeDownloadName(name: string) {
   );
 }
 
+export function downloadArtBlob(blob: Blob, name: string) {
+  const extension = extensionByMimeType[blob.type.toLowerCase()] ?? "img";
+  const anchor = document.createElement("a");
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    anchor.href = objectUrl;
+    anchor.download = `${sanitizeDownloadName(name)}.${extension}`;
+    document.body.appendChild(anchor);
+    anchor.click();
+  } finally {
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export async function downloadArtAsset(src: string, name: string) {
   try {
     const response = await fetch(src);
     if (!response.ok) throw new Error();
 
     const blob = await response.blob();
-    const extension = extensionByMimeType[blob.type.toLowerCase()] ?? "img";
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = `${sanitizeDownloadName(name)}.${extension}`;
-    document.body.appendChild(anchor);
-
-    try {
-      anchor.click();
-    } finally {
-      anchor.remove();
-      URL.revokeObjectURL(objectUrl);
-    }
+    downloadArtBlob(blob, name);
   } catch {
     throw new Error("Artwork could not be downloaded.");
   }

@@ -12,7 +12,7 @@ export function isExternalArtPath(path: string | null | undefined) {
 
 export function campaignArtSignedUrlLifetime(path: string, expiresIn = 3600, isEnemyArt = false) {
   const fileName = path.split("/").at(-1) ?? "";
-  return isEnemyArt || fileName.startsWith("enemy-") ? Math.min(expiresIn, enemyArtSignedUrlLifetime) : expiresIn;
+  return isEnemyArt || fileName.startsWith("enemy-") || fileName.startsWith("studio-") ? Math.min(expiresIn, enemyArtSignedUrlLifetime) : expiresIn;
 }
 
 export function validateCampaignArtPath(campaignId: string, path: string) {
@@ -93,9 +93,16 @@ export async function removeCampaignArtIfUnreferenced(supabase: SupabaseClient, 
 
     if (references.some(Boolean)) return false;
 
+    for (const table of ["campaign_art_assets", "campaign_art_publications"]) {
+      const { data, error } = await supabase.from(table).select("path").eq("campaign_id", campaignId).eq("path", path).limit(1);
+      if (error) throw new Error("Studio art references could not be verified.");
+      if (data?.length) return false;
+    }
+
     const { error } = await supabase.storage.from(campaignArtBucket).remove([path]);
     return !error;
-  } catch {
+  } catch (error) {
+    console.error("campaign_art_cleanup_failed", { name: error instanceof Error ? error.name : "unknown" });
     return false;
   }
 }

@@ -117,7 +117,7 @@ describe("campaign art storage helpers", () => {
     await expect(removeCampaignArtIfUnreferenced(client as never, campaignId, validPath)).resolves.toBe(true);
     expect(from).toHaveBeenCalledWith("campaign-art");
     expect(remove).toHaveBeenCalledWith([validPath]);
-    expect(query.limit).toHaveBeenCalledTimes(7);
+    expect(query.limit).toHaveBeenCalledTimes(9);
   });
 
   it("keeps an asset when another campaign record still references it", async () => {

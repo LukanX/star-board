@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   dispatchImageBackgroundJob: vi.fn(),
   markImageBackgroundDispatchFailed: vi.fn(),
   loadPlaceAiContext: vi.fn(),
+  resolveEditSource: vi.fn(),
+  loadEditSourceImage: vi.fn(),
+  resolveReferenceProviders: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM, getAuthenticatedUser: mocks.getAuthenticatedUser }));
@@ -27,15 +30,24 @@ vi.mock("@/lib/ai/route-support", async (importOriginal) => {
 });
 vi.mock("@/lib/ai/image-jobs", () => ({ dispatchImageBackgroundJob: mocks.dispatchImageBackgroundJob, markImageBackgroundDispatchFailed: mocks.markImageBackgroundDispatchFailed }));
 vi.mock("@/lib/ai/assistance", () => ({ loadPlaceAiContext: mocks.loadPlaceAiContext }));
+vi.mock("@/lib/ai/image-edit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/image-edit")>();
+  return { ...actual, resolveEditSource: mocks.resolveEditSource, loadEditSourceImage: mocks.loadEditSourceImage };
+});
+vi.mock("@/lib/ai/studio-references", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/studio-references")>();
+  return { ...actual, resolveReferenceProviders: mocks.resolveReferenceProviders };
+});
 
 import { POST } from "@/app/api/ai/image/route";
 import { AiProviderError } from "@/lib/ai/errors";
 import { searchReferences } from "@/lib/references/catalog";
+import { buildStudioPrompt, studioManifestHash } from "@/lib/ai/studio-context";
+import { studioCompositionSchema, studioManifestSchema } from "@/lib/validation/studio";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
 const parentId = "00000000-0000-4000-8000-000000000003";
-
 const placeContext = {
   hierarchy: [
     { name: "Asterion", kind: "planet" },
@@ -112,9 +124,16 @@ function createSupabaseMock() {
   generationInsert.select.mockReturnValue(generationInsert);
   const generationUpdate = {
     update: vi.fn(),
-    eq: vi.fn().mockResolvedValue({ error: null }),
+    eq: vi.fn(),
+    select: vi.fn(),
+    single: vi.fn().mockResolvedValue({
+      data: { id: "00000000-0000-4000-8000-000000000003", created_at: "2026-08-03T12:34:56+00:00" },
+      error: null,
+    }),
   };
   generationUpdate.update.mockReturnValue(generationUpdate);
+  generationUpdate.eq.mockReturnValue(generationUpdate);
+  generationUpdate.select.mockReturnValue(generationUpdate);
   const upload = vi.fn().mockResolvedValue({ error: null });
   const remove = vi.fn().mockResolvedValue({ error: null });
   const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl: "https://storage.example/image.png" }, error: null });
@@ -167,6 +186,216 @@ describe("POST /api/ai/image", () => {
     expect(response.status).toBe(400);
     expect(payload.error).toBe("Image request is invalid.");
     expect(mocks.requireCampaignGM).not.toHaveBeenCalled();
+  });
+
+  it.each(["1K", "2K", "4K"])("passes the selected native %s resolution to generation and review", async (resolution) => {
+    const supabase = createSupabaseMock();
+    const model = "test/native-image";
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: model, NETLIFY_IMAGE_GENERATION: "sync" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: [model] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{
+      id: model, capability: "image", compatible: true, inputModalities: ["text"],
+      supportedParameters: ["aspect_ratio", "resolution", "size"],
+      parameterValues: { resolution: ["1K", "2K", "4K"], aspect_ratio: ["1:1"] },
+    }] });
+    mocks.generateImage.mockResolvedValue({ image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" }, model });
+
+    const response = await POST(createRequest({
+      campaignId, mode: "create", targetKind: "npc", subject: "A station broker", model, resolution,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.generateImage).toHaveBeenCalledWith("campaign-key", expect.any(String), model, expect.objectContaining({ resolution }));
+    expect(mocks.generateImage.mock.calls[0][3]).not.toHaveProperty("size");
+    expect((await response.json()).draft.resolution).toBe(resolution);
+    expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({ requested_resolution: resolution }));
+  });
+
+  it("rejects unsupported native resolution before paid work", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "test/image" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["test/image"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{
+      id: "test/image", capability: "image", compatible: true,
+      supportedParameters: ["resolution"], parameterValues: { resolution: ["1K", "2K"] },
+    }] });
+    const response = await POST(createRequest({
+      campaignId, mode: "create", targetKind: "npc", subject: "A broker", resolution: "4K",
+    }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/resolution|4K/i);
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.dispatchImageBackgroundJob).not.toHaveBeenCalled();
+  });
+
+  it("preserves the native tier in background acknowledgement and signed dispatch", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "test/image", SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["test/image"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{
+      id: "test/image", capability: "image", compatible: true,
+      supportedParameters: ["resolution"], parameterValues: { resolution: ["1K", "4K"] },
+    }] });
+    const response = await POST(createRequest({
+      campaignId, mode: "create", targetKind: "npc", subject: "A broker", resolution: "4K",
+    }, previewImageUrl));
+    expect(response.status).toBe(202);
+    expect((await response.json()).job.resolution).toBe("4K");
+    expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith(previewImageUrl, expect.objectContaining({ resolution: "4K" }), "worker-secret");
+  });
+
+  it.each([
+    ["scene", false], ["battlemap", false], ["scene", true], ["battlemap", true],
+  ] as const)("keeps %s Studio provenance private in audit rows (background=%s)", async (kind, background) => {
+    const supabase = createSupabaseMock();
+    const studio = studioCompositionSchema.parse({ useCampaignStyle: false });
+    const manifest = studioManifestSchema.parse({ composition: studio, direction: "Private reactor encounter", sources: [], references: [], style: "" });
+    const prompt = buildStudioPrompt(kind, manifest);
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", ...(background ? { NETLIFY_IMAGE_GENERATION: "background", SUPABASE_SECRET_KEY: "worker-secret" } : {}) });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    mocks.generateImage.mockResolvedValue({ image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" }, model: "openai/gpt-image-1" });
+    const response = await POST(createRequest({
+      campaignId, mode: "create", targetKind: kind, purpose: "studio-art", studio, subject: manifest.direction, currentPrompt: prompt,
+    }));
+    expect(response.status).toBe(background ? 202 : 200);
+    const payload = await response.json();
+    expect((background ? payload.job : payload.draft).studioManifest).toEqual(manifest);
+    expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({
+      purpose: "studio-art", target_kind: kind, studio_manifest_hash: studioManifestHash(manifest), image_subject: `Studio ${kind}`,
+    }));
+    expect(JSON.stringify(supabase.generationInsert.insert.mock.calls)).not.toContain(manifest.direction);
+    if (background) {
+      expect(mocks.dispatchImageBackgroundJob).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ purpose: "studio-art", prompt }), "worker-secret");
+      expect(mocks.generateImage).not.toHaveBeenCalled();
+    } else {
+      expect(payload.draft.temporaryPath).toContain("/studio-draft-");
+      expect(mocks.generateImage).toHaveBeenCalledWith("campaign-key", prompt, "openai/gpt-image-1", expect.any(Object));
+    }
+  });
+
+  it("requires renewed prompt review when Studio context changes, before a charged request", async () => {
+    const supabase = createSupabaseMock();
+    mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [{ id: "openai/gpt-image-1", capability: "image", compatible: true }] });
+    const response = await POST(createRequest({
+      campaignId, mode: "create", targetKind: "scene", purpose: "studio-art", studio: {}, subject: "Reactor encounter", currentPrompt: "Stale reviewed prompt",
+    }));
+    expect(response.status).toBe(409);
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.dispatchImageBackgroundJob).not.toHaveBeenCalled();
+    expect(supabase.generationInsert.insert).not.toHaveBeenCalled();
+  });
+
+  describe("redo and edit lineage", () => {
+    const editableModel = { id: "openai/gpt-image-1", capability: "image", compatible: true, inputModalities: ["text", "image"] };
+    const instruction = "Replace the jacket with a crimson flight suit";
+    const editBody = { campaignId, mode: "refine", operation: "edit", targetKind: "npc", edit: { instruction, source: { type: "saved-art", entityId: "00000000-0000-4000-8000-000000000008" } } };
+
+    function arrangeEdit(models = [editableModel], env: Record<string, string> = {}) {
+      const supabase = createSupabaseMock();
+      mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+      mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1", ...env });
+      mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+      mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models });
+      mocks.resolveEditSource.mockResolvedValue({ path: `${campaignId}/${userId}/npc-source.png`, kind: "saved-art" });
+      mocks.resolveReferenceProviders.mockResolvedValue(["openai"]);
+      mocks.loadEditSourceImage.mockResolvedValue([{ dataUrl: "data:image/png;base64,c291cmNl" }]);
+      mocks.generateImage.mockResolvedValue({ image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" }, model: "openai/gpt-image-1" });
+      return supabase;
+    }
+
+    it("sends the source image to the provider and records edit lineage without the instruction", async () => {
+      const supabase = arrangeEdit();
+      const response = await POST(createRequest(editBody));
+      expect(response.status).toBe(200);
+      expect(mocks.resolveReferenceProviders).toHaveBeenCalledWith("campaign-key", "openai/gpt-image-1", 1);
+      expect(mocks.generateImage).toHaveBeenCalledWith("campaign-key", expect.stringContaining(instruction), "openai/gpt-image-1", expect.objectContaining({
+        imageReferences: [{ dataUrl: "data:image/png;base64,c291cmNl" }], referenceProviders: ["openai"],
+      }));
+      expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({ operation: "edit", edit_source_kind: "saved-art", mode: "refine" }));
+      expect(JSON.stringify(supabase.generationInsert.insert.mock.calls)).not.toContain(instruction);
+      expect((await response.json()).draft).toMatchObject({ operation: "edit", subject: "Edited artwork" });
+    });
+
+    it("links an edited draft to its source draft run", async () => {
+      const supabase = arrangeEdit();
+      mocks.resolveEditSource.mockResolvedValue({ path: `${campaignId}/${userId}/image-source.png`, kind: "draft", parentRunId: "00000000-0000-4000-8000-000000000009" });
+      const response = await POST(createRequest({ ...editBody, edit: { instruction, source: { type: "draft", generationRunId: "00000000-0000-4000-8000-000000000009" } } }));
+      expect(response.status).toBe(200);
+      expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({ operation: "edit", edit_source_kind: "draft", parent_run_id: "00000000-0000-4000-8000-000000000009" }));
+    });
+
+    it("queues an edit with a signed source path and no Studio references", async () => {
+      arrangeEdit([editableModel], { SUPABASE_SECRET_KEY: "worker-secret", NETLIFY_IMAGE_GENERATION: "background" });
+      const response = await POST(createRequest(editBody, previewImageUrl));
+      expect(response.status).toBe(202);
+      expect(mocks.generateImage).not.toHaveBeenCalled();
+      const job = mocks.dispatchImageBackgroundJob.mock.calls[0][1];
+      expect(job).toMatchObject({ editSource: { path: `${campaignId}/${userId}/npc-source.png` }, referenceProviders: ["openai"] });
+      expect(job).not.toHaveProperty("imageReferences");
+      expect((await response.json()).job).toMatchObject({ operation: "edit" });
+    });
+
+    it("refuses an edit when the selected model cannot accept image input", async () => {
+      const supabase = arrangeEdit([{ ...editableModel, inputModalities: ["text"] }]);
+      const response = await POST(createRequest(editBody));
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toMatch(/cannot edit images/i);
+      expect(mocks.resolveEditSource).not.toHaveBeenCalled();
+      expect(mocks.generateImage).not.toHaveBeenCalled();
+      expect(supabase.generationInsert.insert).not.toHaveBeenCalled();
+    });
+
+    it("does not call the provider when no endpoint supports image references", async () => {
+      arrangeEdit();
+      const { StudioError } = await import("@/lib/ai/studio-context");
+      mocks.resolveReferenceProviders.mockRejectedValue(new StudioError("This model has no verified endpoint supporting the selected image references.", 400));
+      const response = await POST(createRequest(editBody));
+      expect(response.status).toBe(400);
+      expect(mocks.generateImage).not.toHaveBeenCalled();
+    });
+
+    it("surfaces source authorization failures", async () => {
+      arrangeEdit();
+      const { StudioError } = await import("@/lib/ai/studio-context");
+      mocks.resolveEditSource.mockRejectedValue(new StudioError("The draft to edit is no longer available.", 404));
+      const response = await POST(createRequest(editBody));
+      expect(response.status).toBe(404);
+      expect(mocks.generateImage).not.toHaveBeenCalled();
+    });
+
+    it("rejects edit details on a plain generation", async () => {
+      const response = await POST(createRequest({ ...editBody, operation: "generate" }));
+      expect(response.status).toBe(400);
+    });
+
+    it("records a redo against a verified parent run", async () => {
+      const supabase = createSupabaseMock();
+      const parentQuery = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: { id: "00000000-0000-4000-8000-000000000009" }, error: null }) };
+      const original = supabase.from.getMockImplementation()!;
+      let parentServed = false;
+      supabase.from.mockImplementation((table: string) => {
+        if (table === "ai_generation_runs" && !parentServed) { parentServed = true; return parentQuery; }
+        return original(table);
+      });
+      mocks.requireCampaignGM.mockResolvedValue({ supabase, user: { id: userId }, role: "gm" });
+      mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
+      mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1"] } });
+      mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [editableModel] });
+      mocks.generateImage.mockResolvedValue({ image: { base64: "aW1hZ2U=", url: null, mediaType: "image/png" }, model: "openai/gpt-image-1" });
+
+      const response = await POST(createRequest({ campaignId, mode: "refine", operation: "redo", parentRunId: "00000000-0000-4000-8000-000000000009", targetKind: "npc", subject: "A masked station broker" }));
+      expect(response.status).toBe(200);
+      expect(supabase.generationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({ operation: "redo", parent_run_id: "00000000-0000-4000-8000-000000000009" }));
+      expect(supabase.generationInsert.insert.mock.calls[0][0]).not.toHaveProperty("edit_source_kind");
+    });
   });
 
   it("labels unexpected campaign credential failures without exposing their message", async () => {
@@ -605,6 +834,7 @@ describe("POST /api/ai/image", () => {
 
     expect(response.status).toBe(503);
     expect(payload.error).toContain("could not be started");
+    expect(payload.outcomeUnknown).toBe(true);
     expect(mocks.markImageBackgroundDispatchFailed).toHaveBeenCalledWith({
       campaignId,
       generationRunId: expect.any(String),

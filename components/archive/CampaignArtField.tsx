@@ -148,6 +148,7 @@ export default function CampaignArtField({
     url ?? (value?.startsWith("http") ? value : null),
   );
   const [artStudioOpen, setArtStudioOpen] = useState(false);
+  const [hasSavedArt] = useState(() => Boolean(value && !value.startsWith("http")));
   const [isUploading, setIsUploading] = useState(false);
   const [isArtStudioBusy, setIsArtStudioBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -353,6 +354,7 @@ export default function CampaignArtField({
             npcReferenceContext={npcReferenceContext}
             enemyReferenceContext={enemyReferenceContext}
             portraitAiRole={portraitAiRole}
+            hasSavedArt={hasSavedArt}
             parentPlaceId={parentPlaceId}
             subject={subject}
             onSubjectChange={onSubjectChange}

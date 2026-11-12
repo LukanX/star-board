@@ -41,6 +41,14 @@ describe("image background polling", () => {
     expect(fetchImpl).toHaveBeenCalledWith(expect.stringContaining(job.generationRunId), expect.objectContaining({ cache: "no-store", signal: expect.any(AbortSignal) }));
   });
 
+  it("retains the selected resolution in recovered review metadata", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(response({
+      job: { status: "complete", resolution: "4K", model: job.model, createdAt: "2026-08-27T12:01:00.000Z",
+        image: { base64: null, url: "https://storage.example/image.png", mediaType: "image/png" } },
+    }));
+    await expect(waitForImageBackgroundJob({ ...job, resolution: "4K" }, { fetchImpl, wait: waitImmediately, now: freshNow })).resolves.toMatchObject({ resolution: "4K" });
+  });
+
   it("stops on an explicit failed job", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(response({ job: { status: "failed" }, error: "Provider unavailable" }));
 

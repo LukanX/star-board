@@ -174,7 +174,7 @@ test("keeps generated image drafts and refinement notes through style changes an
     expect(Object.prototype.hasOwnProperty.call(imageRequests[1], "currentPrompt")).toBe(false);
 
     await page.getByLabel("Focused refinement").fill(latestRefinement);
-    await page.getByRole("button", { name: /^(GENERATE DRAFT|REFINE DRAFT)$/ }).click();
+    await page.getByRole("button", { name: /^(GENERATE DRAFT|REDO DRAFT)$/ }).click();
     await expect(thumbnails).toHaveCount(3);
     expect(imageRequests).toHaveLength(3);
     expect(imageRequests[2]).toMatchObject({
@@ -353,4 +353,67 @@ test("does not repeat a possibly billed background job without confirmation", as
   await retryClick;
 
   expect(generationRequests).toBe(1);
+});
+type EditRequestBody = { operation?: string; mode: string; parentRunId?: string; targetKind: string; subject?: string };
+
+test("edits a generated draft in place and sends redo lineage from the entity studio", async ({ page, campaign }) => {
+  test.setTimeout(60_000);
+  const timestamp = Date.now();
+  const parentName = `Art Edit Parent ${timestamp}`;
+  const requests: EditRequestBody[] = [];
+  const createdPlaceIds: string[] = [];
+  const created = await page.request.post(new URL(`/api/campaigns/${campaign.campaignId}/places`, "http://127.0.0.1:3100").toString(), {
+    data: { name: parentName, kind: "station", description: "Parent for edit test.", playerNotesMarkdown: "", gmNotesMarkdown: "", parentPlaceId: null, artSubject: "", artPath: null, artPrompt: null, artProvider: null },
+  });
+  expect(created.ok()).toBeTruthy();
+  const parentId = ((await created.json()) as { place: { id: string } }).place.id;
+  createdPlaceIds.push(parentId);
+
+  try {
+    await page.route("**/api/ai/image", async (route) => {
+      if (route.request().method() !== "POST") { await route.continue(); return; }
+      const body = route.request().postDataJSON() as EditRequestBody;
+      requests.push(body);
+      const runId = `00000000-0000-4000-8000-${String(requests.length).padStart(12, "0")}`;
+      await route.fulfill({ json: { draft: {
+        generationRunId: runId, targetKind: body.targetKind, purpose: "entity-art", mode: body.mode, operation: body.operation,
+        ...(body.parentRunId ? { parentRunId: body.parentRunId } : {}),
+        subject: body.subject ?? "Edited artwork", aspectRatio: "1:1", prompt: `Prompt ${requests.length}`, provider: "openrouter",
+        model: "openai/gpt-image-1", image: { base64: pixelPng, url: null, mediaType: "image/png" }, createdAt: new Date(Date.now() + requests.length * 1000).toISOString(),
+      } } });
+    });
+
+    await page.goto(`/campaigns/${campaign.campaignId}/places/${parentId}`);
+    await page.getByRole("button", { name: `Add child under ${parentName}`, exact: true }).click();
+    const placeForm = page.locator("form.character-form");
+    await placeForm.getByLabel("Name").fill(`Art Edit Child ${timestamp}`);
+    await placeForm.getByLabel("Kind").fill("room");
+    await page.getByRole("button", { name: "GENERATE ART", exact: true }).click();
+    await page.getByLabel("Artwork description").fill("A hidden transit room with blue lanterns.");
+    await expect(page.getByRole("button", { name: "APPLY EDIT" })).toHaveCount(0);
+    await page.getByRole("button", { name: "GENERATE DRAFT", exact: true }).click();
+    const thumbnails = page.getByRole("button", { name: /Select generated image/ });
+    await expect(thumbnails).toHaveCount(1);
+
+    await page.getByRole("button", { name: "REDO DRAFT", exact: true }).click();
+    await expect(thumbnails).toHaveCount(2);
+    expect(requests[1]).toMatchObject({ operation: "redo", mode: "refine", parentRunId: "00000000-0000-4000-8000-000000000001" });
+
+    await expect(page.getByRole("button", { name: "APPLY EDIT" })).toBeDisabled();
+    await page.getByLabel("Describe the change").fill("Swap the lanterns for red emergency lights");
+    await page.getByRole("button", { name: "APPLY EDIT" }).click();
+    await expect(thumbnails).toHaveCount(3);
+    expect(requests[2]).toMatchObject({
+      operation: "edit", mode: "refine", targetKind: "place",
+      edit: { instruction: "Swap the lanterns for red emergency lights", source: { type: "draft", generationRunId: "00000000-0000-4000-8000-000000000002" } },
+    });
+    expect(requests[2]).not.toHaveProperty("refinement");
+    await expect(page.getByLabel("Describe the change")).toHaveValue("");
+    await expect(thumbnails.nth(2)).toHaveAttribute("aria-pressed", "true");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  } finally {
+    for (const placeId of createdPlaceIds.reverse()) {
+      await page.request.delete(new URL(`/api/campaigns/${campaign.campaignId}/places/${placeId}`, "http://127.0.0.1:3100").toString(), { timeout: 5_000 });
+    }
+  }
 });

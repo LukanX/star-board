@@ -65,6 +65,17 @@ describe("OpenRouter AI client", () => {
     expect(result).toMatchObject({ generationId: "image-run", model: "openai/gpt-image-1", image: { base64: "aW1hZ2U=", mediaType: "image/webp" }, usage: { inputTokens: 4, outputTokens: 8, cost: 0.02 } });
   });
 
+  it.each(["openai/gpt-image-1", "bytedance-seed/seedream-5-0-lite"])("sends documented reference inputs and pinned routing for %s", async (model) => {
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ model, data: [{ b64_json: "aW1hZ2U=", media_type: "image/png" }] })));
+    await generateImage("test-key", "Crew fighting monsters", model, {
+      imageReferences: [{ dataUrl: "data:image/png;base64,cmVm" }], referenceProviders: ["verified-provider"],
+    });
+    expect(JSON.parse(mocks.fetch.mock.calls[0][1].body as string)).toMatchObject({
+      input_references: [{ type: "image_url", image_url: { url: "data:image/png;base64,cmVm" } }],
+      provider: { only: ["verified-provider"], allow_fallbacks: false },
+    });
+  });
+
   it("does not send exact pixels when a model supports aspect ratio only", async () => {
     mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "openai/gpt-image-1" });
     mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ model: "openai/gpt-image-1", data: [{ b64_json: "aW1hZ2U=", media_type: "image/png" }] }), { status: 200 }));
@@ -106,7 +117,7 @@ describe("OpenRouter AI client", () => {
 
     const failure = generateImage("test-key", "a station broker", "openai/gpt-image-1");
 
-    await expect(failure).rejects.toMatchObject({ status: 504, message: expect.stringContaining("timed out") });
+    await expect(failure).rejects.toMatchObject({ status: 504, outcomeUnknown: true, message: expect.stringContaining("timed out") });
   });
 
   it("keeps bounded provider bodies and generation IDs for diagnostics", async () => {

@@ -4,7 +4,8 @@ import { hashCredential } from "@/lib/ai/credential-crypto";
 import { fallbackAiModels, type AiCapability } from "@/lib/ai/model-catalog";
 
 const openRouterBaseUrl = "https://openrouter.ai/api/v1";
-const modelDiscoveryCacheMs = 5 * 60 * 1000;
+export const aiModelDiscoveryCacheMs = 5 * 60 * 1000;
+const modelDiscoveryCacheMs = aiModelDiscoveryCacheMs;
 const modelDiscoveryTimeoutMs = 3000;
 
 export const aiModelSorts = ["most-popular", "pricing-low-to-high", "pricing-high-to-low"] as const;

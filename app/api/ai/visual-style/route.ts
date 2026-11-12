@@ -5,13 +5,14 @@ import { generateJson } from "@/lib/ai/client";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { buildVisualStylePrompt } from "@/lib/ai/visual-style-prompt";
+import { trimPromptText } from "@/lib/ai/studio-context";
 import { normalizeVisualStyleReferences } from "@/lib/ai/visual-style-references";
 import { requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
 import { getAiProviderFailure, logAiProviderFailure } from "@/lib/ai/errors";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
-import { visualStyleDraftOutputSchema, visualStyleGenerationInputSchema } from "@/lib/validation/visual-style";
+import { generatedVisualStyleTextMaxLength, visualStyleDraftOutputSchema, visualStyleGenerationInputSchema, visualStyleProviderDraftSchema, type VisualStyleTrimming } from "@/lib/validation/visual-style";
 
 export const runtime = "nodejs";
 
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: failure.message, ...(failure.requestId ? { providerRequestId: failure.requestId } : {}) }, { status: failure.status, ...(headers ? { headers } : {}) });
     }
 
-    const draft = visualStyleDraftOutputSchema.safeParse(providerResult.data);
+    const draft = visualStyleProviderDraftSchema.safeParse(providerResult.data);
     if (!draft.success) {
       await recordAiGeneration(context.supabase, {
         campaignId: input.data.campaignId,
@@ -130,6 +131,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The AI response did not match the visual style draft format." }, { status: 502 });
     }
 
+    const visualStyle = trimPromptText(draft.data.visualStyle, generatedVisualStyleTextMaxLength);
+    const compactDraft = visualStyleDraftOutputSchema.parse({ ...draft.data, visualStyle });
+    const trimming: VisualStyleTrimming | undefined = visualStyle.length < draft.data.visualStyle.length
+      ? { originalLength: draft.data.visualStyle.length, includedLength: visualStyle.length }
+      : undefined;
+
     const { error: auditError } = await recordAiGeneration(context.supabase, {
       campaignId: input.data.campaignId,
       userId: context.user.id,
@@ -148,7 +155,7 @@ export async function POST(request: Request) {
 
     if (auditError) return NextResponse.json({ error: "Visual style draft metadata could not be saved." }, { status: 503 });
 
-    return NextResponse.json({ draft: draft.data, model: providerResult.model ?? selectedModel.id, referenceCount: referencesResult.references.length });
+    return NextResponse.json({ draft: compactDraft, model: providerResult.model ?? selectedModel.id, referenceCount: referencesResult.references.length, ...(trimming ? { trimming } : {}) });
   } catch {
     return NextResponse.json({ error: "Visual style assistance is temporarily unavailable." }, { status: 503 });
   }

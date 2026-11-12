@@ -11,7 +11,7 @@ import { canUseCharacterPortraitAi, loadCharacterPortraitAccess, type CharacterP
 import { getAuthenticatedUser, requireCampaignGM } from "@/lib/auth/permissions";
 import { getServerEnv } from "@/lib/env";
 import { AiModelSelectionError, resolveAiModel } from "@/lib/ai/model-catalog";
-import { defaultImageAspectRatio, getPreferredImageResolution, getSupportedImageAspectRatios } from "@/lib/ai/image-options";
+import { defaultImageAspectRatio, getPreferredImageResolution, getSupportedImageAspectRatios, getSupportedImageResolutions } from "@/lib/ai/image-options";
 import { loadCampaignAiSettings } from "@/lib/ai/campaign-settings";
 import { imageDraftSchema, imageGenerationInputSchema } from "@/lib/validation/image";
 import { getAiModelCatalog } from "@/lib/ai/model-discovery";
@@ -19,6 +19,10 @@ import { getAiProviderFailure, logAiProviderFailure, uncertainImageOutcomeMessag
 import { dispatchImageBackgroundJob, markImageBackgroundDispatchFailed } from "@/lib/ai/image-jobs";
 import { campaignCredentialErrorResponse, resolveCampaignCredential } from "@/lib/ai/route-support";
 import { campaignArtBucket, createCampaignArtSignedUrl } from "@/lib/storage/campaign-art";
+import { buildStudioManifest, buildStudioPrompt, effectiveStudioStyle, loadStudioSources, studioManifestHash, StudioError } from "@/lib/ai/studio-context";
+import { loadStudioReferenceImages, resolveReferenceProviders } from "@/lib/ai/studio-references";
+import { buildImageEditPrompt, loadEditSourceImage, resolveEditSource, type ResolvedEditSource } from "@/lib/ai/image-edit";
+import type { StudioManifest } from "@/lib/validation/studio";
 
 const imageMediaTypes = {
   "image/png": "png",
@@ -32,7 +36,14 @@ type ImageRequestContext = {
   role: "gm" | "player";
 };
 
-async function storeTemporaryImage(supabase: Parameters<typeof createCampaignArtSignedUrl>[0], campaignId: string, userId: string, generationRunId: string, image: Awaited<ReturnType<typeof generateImage>>["image"], prefix: "image" | "style-preview") {
+async function storeTemporaryImage(
+  supabase: Parameters<typeof createCampaignArtSignedUrl>[0],
+  campaignId: string,
+  userId: string,
+  generationRunId: string,
+  image: Awaited<ReturnType<typeof generateImage>>["image"],
+  prefix: "image" | "style-preview" | "studio-draft",
+) {
   const mediaType = image.mediaType in imageMediaTypes ? image.mediaType as keyof typeof imageMediaTypes : null;
   if (!mediaType) throw new Error("The AI provider returned an unsupported image type.");
 
@@ -106,6 +117,7 @@ export async function POST(request: Request) {
   }
 
   let diagnosticStage = "campaign-access";
+  const isEdit = input.data.operation === "edit";
   let diagnosticModel = input.data.model ?? null;
 
   try {
@@ -202,6 +214,7 @@ export async function POST(request: Request) {
     }
     const supportedParameters = selectedModelDetails.supportedParameters ?? [];
     const requestedSize = supportedParameters.includes("size") ? input.data.size : undefined;
+    let referenceProviders: string[] | undefined;
     const supportedAspectRatios = getSupportedImageAspectRatios(selectedModelDetails.supportedParameters, selectedModelDetails.parameterValues);
     if (supportedAspectRatios.length && !supportedAspectRatios.includes(input.data.aspectRatio)) {
       return NextResponse.json({ error: `The selected model does not support ${input.data.aspectRatio} aspect ratio.` }, { status: 400 });
@@ -210,7 +223,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The selected model chooses its own aspect ratio." }, { status: 400 });
     }
 
-    const imageResolution = getPreferredImageResolution(selectedModelDetails.parameterValues?.resolution);
+    const supportedResolutions = getSupportedImageResolutions(supportedParameters, selectedModelDetails.parameterValues);
+    if (input.data.resolution && !supportedResolutions.includes(input.data.resolution)) {
+      return NextResponse.json({ error: `The selected model does not support ${input.data.resolution} resolution.` }, { status: 400 });
+    }
+    const imageResolution = input.data.resolution ?? getPreferredImageResolution(supportedResolutions);
+    const resolutionColumns = imageResolution ? { requested_resolution: imageResolution } : {};
     const imageRequestOptions = {
       aspectRatio: input.data.aspectRatio,
       ...(requestedSize ? { size: requestedSize } : {}),
@@ -246,11 +264,11 @@ export async function POST(request: Request) {
 
       if (styleError) return NextResponse.json({ error: "The selected visual style could not be loaded." }, { status: 503 });
       if (!savedStyle) return NextResponse.json({ error: "The selected visual style was not found in this campaign." }, { status: 404 });
-      if (input.data.purpose === "entity-art" && savedStyle.status !== "ready") return NextResponse.json({ error: "Only ready visual styles can be used for campaign artwork." }, { status: 400 });
+      if (input.data.purpose !== "style-preview" && savedStyle.status !== "ready") return NextResponse.json({ error: "Only ready visual styles can be used for campaign artwork." }, { status: 400 });
       visualStyle = savedStyle.visual_style;
     }
 
-    const placeContextResult = input.data.targetKind === "place" && input.data.parentPlaceId
+    const placeContextResult = input.data.targetKind === "place" && input.data.parentPlaceId && !isEdit
       ? await loadPlaceAiContext(supabase, input.data.campaignId, input.data.parentPlaceId)
       : { context: undefined };
 
@@ -259,7 +277,7 @@ export async function POST(request: Request) {
     }
 
     diagnosticStage = "reference-context";
-    const referenceContext = await buildSystemReferenceContext(supabase, input.data.campaignId, characterAccess
+    const referenceContext = await buildSystemReferenceContext(supabase, input.data.campaignId, isEdit ? [] : characterAccess
       ? [{ kind: "ancestry", text: characterAccess.character.species, binding: readReferenceBinding(characterAccess.character, "ancestry") }]
       : input.data.npcReferenceContext
         ? [{ kind: "ancestry", text: input.data.npcReferenceContext.species, binding: input.data.npcReferenceContext.ancestryReference }]
@@ -269,8 +287,52 @@ export async function POST(request: Request) {
     const referenceMetadata = referenceContext.sources.length ? { references: referenceContext.sources } : {};
     const referenceColumns = referenceContext.sources.length ? { reference_sources: referenceContext.sources } : {};
     const visualStyleHash = createHash("sha256").update(visualStyle).digest("hex");
-    const prompt = buildArtPrompt(
-      input.data.subject,
+    let studioManifest: StudioManifest | undefined;
+    let editSource: ResolvedEditSource | undefined;
+    if (input.data.edit) {
+      diagnosticStage = "edit-source";
+      if (!selectedModelDetails.inputModalities.includes("image")) {
+        throw new StudioError("The selected model cannot edit images. Choose a model that accepts image input.");
+      }
+      editSource = await resolveEditSource({
+        supabase,
+        campaignId: input.data.campaignId,
+        userId: context.user.id,
+        role: context.role,
+        input: input.data,
+        edit: input.data.edit,
+      });
+      referenceProviders = await resolveReferenceProviders(campaignCredential.apiKey, selectedModel.id, 1);
+      studioManifest = editSource.manifest;
+    } else if (input.data.studio) {
+      const loaded = await loadStudioSources(supabase, input.data.campaignId, input.data.studio);
+      studioManifest = buildStudioManifest(input.data.studio, input.data.subject!, loaded, effectiveStudioStyle(input.data.studio, visualStyle));
+      if (loaded.references.length) {
+        if (!selectedModelDetails.inputModalities.includes("image")) throw new StudioError("The selected model does not accept image references. Choose another model or explicitly turn off references.");
+        referenceProviders = await resolveReferenceProviders(campaignCredential.apiKey, selectedModel.id, loaded.references.length);
+      }
+    }
+    const subject = input.data.subject ?? studioManifest?.direction ?? "Edited artwork";
+    const studioReferences = !isEdit && studioManifest?.references.length ? studioManifest.references : undefined;
+    let parentRunId = editSource?.parentRunId;
+    if (!isEdit && input.data.parentRunId) {
+      const { data: parentRun } = await supabase.from("ai_generation_runs").select("id")
+        .eq("campaign_id", input.data.campaignId).eq("id", input.data.parentRunId).eq("requested_by", context.user.id).maybeSingle();
+      parentRunId = parentRun?.id;
+    }
+    const lineageColumns = {
+      operation: input.data.operation,
+      ...(parentRunId ? { parent_run_id: parentRunId } : {}),
+      ...(editSource ? { edit_source_kind: editSource.kind } : {}),
+    };
+    const studioColumns = studioManifest ? { studio_manifest_hash: studioManifestHash(studioManifest) } : {};
+    const auditSubject = studioManifest ? `Studio ${input.data.targetKind}` : subject;
+    const prompt = isEdit
+      ? buildImageEditPrompt(input.data.edit!.instruction)
+      : studioManifest
+      ? buildStudioPrompt(input.data.targetKind as "scene" | "battlemap", studioManifest, input.data.refinement)
+      : buildArtPrompt(
+      subject,
       visualStyle,
       input.data.refinement,
       {
@@ -286,6 +348,8 @@ export async function POST(request: Request) {
           : undefined,
       },
     );
+    if (studioManifest && !isEdit && (!input.data.currentPrompt || input.data.currentPrompt !== prompt))
+      throw new StudioError("The effective prompt changed. Review it again before generating an image.", 409);
     const promptHash = createHash("sha256").update(prompt).digest("hex");
 
     if (shouldUseBackgroundImageGeneration(request, env)) {
@@ -305,13 +369,16 @@ export async function POST(request: Request) {
           prompt_hash: promptHash,
           purpose: input.data.purpose,
           visual_style_hash: visualStyleHash,
-          image_subject: input.data.subject,
+          image_subject: auditSubject,
           provider: "openrouter",
           effective_model: selectedModel.id,
           target_kind: input.data.targetKind,
           aspect_ratio: input.data.aspectRatio,
           size: requestedSize ?? null,
           status: "pending",
+          ...studioColumns,
+          ...lineageColumns,
+          ...resolutionColumns,
           ...referenceColumns,
           ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
         })
@@ -328,22 +395,33 @@ export async function POST(request: Request) {
         model: selectedModel.id,
         purpose: input.data.purpose,
         aspectRatio: input.data.aspectRatio,
+        ...(input.data.operation !== "generate" ? { operation: input.data.operation } : {}),
         ...(requestedSize ? { size: requestedSize } : {}),
         ...(imageResolution ? { resolution: imageResolution } : {}),
         supportedParameters,
         ...referenceMetadata,
+        ...(isEdit && editSource
+          ? { editSource: { path: editSource.path }, referenceProviders }
+          : studioReferences ? { imageReferences: studioReferences, referenceProviders } : {}),
       };
 
       try {
         await dispatchImageBackgroundJob(request.url, job, env.SUPABASE_SECRET_KEY);
       } catch {
-        await markImageBackgroundDispatchFailed({
-          campaignId: input.data.campaignId,
-          generationRunId: generationRun.id,
-          requestedBy: context.user.id,
-          targetCharacterId: characterAccess?.character.id ?? null,
-        }).catch(() => undefined);
-        return NextResponse.json({ error: "Image generation could not be started. Check the Netlify background function deployment." }, { status: 503 });
+        try {
+          await markImageBackgroundDispatchFailed({
+            campaignId: input.data.campaignId,
+            generationRunId: generationRun.id,
+            requestedBy: context.user.id,
+            targetCharacterId: characterAccess?.character.id ?? null,
+          });
+        } catch (error) {
+          logUnexpectedImageFailure("background-dispatch-failure-update", selectedModel.id, error);
+        }
+        return NextResponse.json({
+          error: "Image generation could not be started. Its billing outcome is unknown; recover the existing job before retrying.",
+          outcomeUnknown: true,
+        }, { status: 503 });
       }
 
       return NextResponse.json({
@@ -352,15 +430,19 @@ export async function POST(request: Request) {
           status: "pending",
           targetKind: input.data.targetKind,
           mode: input.data.mode,
+          ...(input.data.operation !== "generate" ? { operation: input.data.operation } : {}),
+          ...(parentRunId ? { parentRunId } : {}),
           purpose: input.data.purpose,
-          subject: input.data.subject,
+          subject,
           aspectRatio: input.data.aspectRatio,
           ...(requestedSize ? { size: requestedSize } : {}),
+          ...(imageResolution ? { resolution: imageResolution } : {}),
           prompt,
           createdAt: new Date(generationRun.created_at).toISOString(),
           statusUpdatedAt: new Date(generationRun.status_updated_at ?? generationRun.created_at).toISOString(),
           model: selectedModel.id,
           ...referenceMetadata,
+          ...(studioManifest ? { studioManifest } : {}),
           ...(characterAccess ? { characterId: characterAccess.character.id } : {}),
         },
         prompt,
@@ -371,29 +453,41 @@ export async function POST(request: Request) {
     let response;
 
     try {
-      response = await generateImage(campaignCredential.apiKey, prompt, selectedModel.id, imageRequestOptions);
+      response = await generateImage(campaignCredential.apiKey, prompt, selectedModel.id, {
+        ...imageRequestOptions,
+        ...(isEdit && editSource ? {
+          imageReferences: await loadEditSourceImage(supabase, input.data.campaignId, editSource.path),
+          referenceProviders,
+        } : studioReferences ? {
+          imageReferences: await loadStudioReferenceImages(supabase, input.data.campaignId, studioReferences),
+          referenceProviders,
+        } : {}),
+      });
     } catch (error: unknown) {
       logAiProviderFailure(error, { kind: "image", campaignId: input.data.campaignId, userId: context.user.id, model: selectedModel.id });
       const failure = getAiProviderFailure(error, "Art generation is temporarily unavailable.");
-      await supabase.from("ai_generation_runs").insert({
-        campaign_id: input.data.campaignId,
-        requested_by: context.user.id,
-        kind: "image",
-        mode: input.data.mode,
-        model: selectedModel.id,
-        prompt_hash: promptHash,
-        purpose: input.data.purpose,
-        visual_style_hash: visualStyleHash,
-        image_subject: input.data.subject,
-        target_kind: input.data.targetKind,
-        aspect_ratio: input.data.aspectRatio,
-        size: requestedSize ?? null,
-        provider: "openrouter",
-        effective_model: selectedModel.id,
-        status: "failed",
-        ...(failure.outcomeUnknown ? { error_message: uncertainImageOutcomeMessage } : {}),
-        ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
-      });
+        await supabase.from("ai_generation_runs").insert({
+          campaign_id: input.data.campaignId,
+          requested_by: context.user.id,
+          kind: "image",
+          mode: input.data.mode,
+          model: selectedModel.id,
+          prompt_hash: promptHash,
+          purpose: input.data.purpose,
+          visual_style_hash: visualStyleHash,
+          image_subject: auditSubject,
+          target_kind: input.data.targetKind,
+          aspect_ratio: input.data.aspectRatio,
+          size: requestedSize ?? null,
+          provider: "openrouter",
+          effective_model: selectedModel.id,
+          status: "failed",
+          ...studioColumns,
+          ...lineageColumns,
+          ...resolutionColumns,
+          ...(failure.outcomeUnknown ? { error_message: uncertainImageOutcomeMessage } : {}),
+          ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
+        });
       const headers = failure.retryAfter ? { "Retry-After": failure.retryAfter } : undefined;
       return NextResponse.json({
         error: failure.message,
@@ -407,55 +501,67 @@ export async function POST(request: Request) {
     const image = response.image;
 
     if (!image.base64 && !image.url) {
-      await supabase.from("ai_generation_runs").insert({
-        campaign_id: input.data.campaignId,
-        requested_by: context.user.id,
-        kind: "image",
-        mode: input.data.mode,
-        model: selectedModel.id,
-        prompt_hash: promptHash,
-        purpose: input.data.purpose,
-        visual_style_hash: visualStyleHash,
-        image_subject: input.data.subject,
-        target_kind: input.data.targetKind,
-        provider: "openrouter",
-        effective_model: selectedModel.id,
-        status: "failed",
-        ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
-      });
-      return NextResponse.json({ error: "The AI provider returned no image data." }, { status: 502 });
+        await supabase.from("ai_generation_runs").insert({
+          campaign_id: input.data.campaignId,
+          requested_by: context.user.id,
+          kind: "image",
+          mode: input.data.mode,
+          model: selectedModel.id,
+          prompt_hash: promptHash,
+          purpose: input.data.purpose,
+          visual_style_hash: visualStyleHash,
+          image_subject: auditSubject,
+          target_kind: input.data.targetKind,
+          provider: "openrouter",
+          effective_model: selectedModel.id,
+          status: "failed",
+          ...studioColumns,
+          ...lineageColumns,
+          ...resolutionColumns,
+          ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
+        });
+      return NextResponse.json({
+        error: "The AI provider returned no image data.",
+      }, { status: 502 });
     }
 
-    const { data: generationRun, error: generationRunError } = await supabase
-      .from("ai_generation_runs")
-      .insert({
-        campaign_id: input.data.campaignId,
-        requested_by: context.user.id,
-        kind: "image",
-        mode: input.data.mode,
-        model: response.model,
-        prompt_hash: promptHash,
-        purpose: input.data.purpose,
-        visual_style_hash: visualStyleHash,
-        image_subject: input.data.subject,
-        provider: "openrouter",
-        effective_model: response.model,
-        target_kind: input.data.targetKind,
-        ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
-        aspect_ratio: input.data.aspectRatio,
-        size: requestedSize ?? null,
-        generation_id: response.generationId,
-        input_tokens: response.usage?.inputTokens,
-        output_tokens: response.usage?.outputTokens,
-        cost_usd: response.usage?.cost,
-        status: "complete",
-        ...referenceColumns,
-      })
-      .select("id, created_at")
-      .single();
+    const completedRunFields = {
+      model: response.model,
+      effective_model: response.model,
+      generation_id: response.generationId,
+      input_tokens: response.usage?.inputTokens,
+      output_tokens: response.usage?.outputTokens,
+      cost_usd: response.usage?.cost,
+      status: "complete",
+      status_updated_at: new Date().toISOString(),
+
+    };
+    const generationResult = await supabase.from("ai_generation_runs").insert({
+          campaign_id: input.data.campaignId,
+          requested_by: context.user.id,
+          kind: "image",
+          mode: input.data.mode,
+          prompt_hash: promptHash,
+          purpose: input.data.purpose,
+          visual_style_hash: visualStyleHash,
+          image_subject: auditSubject,
+          provider: "openrouter",
+          target_kind: input.data.targetKind,
+          ...(characterAccess ? { target_character_id: characterAccess.character.id } : {}),
+          aspect_ratio: input.data.aspectRatio,
+          size: requestedSize ?? null,
+          ...completedRunFields,
+          ...studioColumns,
+          ...lineageColumns,
+          ...resolutionColumns,
+          ...referenceColumns,
+        }).select("id, created_at").single();
+    const { data: generationRun, error: generationRunError } = generationResult;
 
     if (generationRunError || !generationRun) {
-      return NextResponse.json({ error: "Image draft metadata could not be saved." }, { status: 503 });
+      return NextResponse.json({
+        error: "Image draft metadata could not be saved.",
+      }, { status: 503 });
     }
 
     let imageDraft = { base64: image.base64, url: image.url, mediaType: image.mediaType };
@@ -480,7 +586,10 @@ export async function POST(request: Request) {
     } else {
       let storedImage: Awaited<ReturnType<typeof storeTemporaryImage>> | null = null;
       try {
-        storedImage = await storeTemporaryImage(supabase, input.data.campaignId, context.user.id, generationRun.id, image, "image");
+        storedImage = await storeTemporaryImage(
+          supabase, input.data.campaignId, context.user.id, generationRun.id, image,
+          input.data.purpose === "studio-art" ? "studio-draft" : "image",
+        );
         const { data: attached, error: metadataError } = await supabase.rpc("attach_ai_generation_image", {
           p_generation_run_id: generationRun.id,
           p_image_path: storedImage.path,
@@ -495,7 +604,9 @@ export async function POST(request: Request) {
         if (storedImage) {
           await supabase.storage.from(campaignArtBucket).remove([storedImage.path]);
         }
-        return NextResponse.json({ error: "The generated image could not be stored for review." }, { status: 503 });
+        return NextResponse.json({
+          error: "The generated image could not be stored for review.",
+          }, { status: 503 });
       }
     }
 
@@ -507,24 +618,32 @@ export async function POST(request: Request) {
       ...(characterAccess ? { characterId: characterAccess.character.id } : {}),
       purpose: input.data.purpose,
       mode: input.data.mode,
-      subject: input.data.subject,
+      operation: input.data.operation,
+      ...(parentRunId ? { parentRunId } : {}),
+      subject,
       aspectRatio: input.data.aspectRatio,
       ...(requestedSize ? { size: requestedSize } : {}),
+      ...(imageResolution ? { resolution: imageResolution } : {}),
       prompt,
       image: imageDraft,
       provider: "openrouter",
       model: response.model,
       createdAt,
       temporaryPath,
+      ...(studioManifest ? { studioManifest } : {}),
       ...referenceMetadata,
     });
 
     if (!draft.success) {
-      return NextResponse.json({ error: "The AI response did not match the image draft format.", issues: draft.error.flatten() }, { status: 502 });
+      return NextResponse.json({
+        error: "The AI response did not match the image draft format.",
+        issues: draft.error.flatten(),
+      }, { status: 502 });
     }
 
     return NextResponse.json({ draft: draft.data, model: response.model });
   } catch (error: unknown) {
+    if (error instanceof StudioError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ReferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ImagePromptBudgetError) return NextResponse.json({ error: error.message }, { status: 400 });
     logUnexpectedImageFailure(diagnosticStage, diagnosticModel, error);
