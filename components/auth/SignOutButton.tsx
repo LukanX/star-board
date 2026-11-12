@@ -4,6 +4,8 @@ import { LogOut } from "lucide-react";
 import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { clearArtStudioSessions } from "@/components/archive/artStudioSession";
+import { clearCampaignStudioSessions } from "@/components/ai-studio/studioSession";
+import { useOptionalDirtyForm } from "@/components/campaign-shell/DirtyFormProvider";
 
 type SignOutButtonProps = {
   className?: string;
@@ -18,16 +20,22 @@ export default function SignOutButton({
 }: SignOutButtonProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dirtyForm = useOptionalDirtyForm();
 
   async function signOut() {
     setIsSigningOut(true);
     setError(null);
 
     try {
+      if (dirtyForm && !await dirtyForm.prepareNavigation()) {
+        setIsSigningOut(false);
+        return;
+      }
       const { error: signOutError } =
         await getSupabaseBrowserClient().auth.signOut();
       if (signOutError) throw signOutError;
       clearArtStudioSessions();
+      clearCampaignStudioSessions(sessionStorage);
       window.location.assign("/");
     } catch (signOutError: unknown) {
       setError(

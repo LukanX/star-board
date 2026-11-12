@@ -7,6 +7,8 @@ import { getCampaignCredentialForGeneration } from "../../lib/ai/campaign-creden
 import { canUseCharacterPortraitAi, loadCharacterPortraitAccess } from "../../lib/ai/character-portrait-access";
 import { campaignArtBucket } from "../../lib/storage/campaign-art";
 import { getSupabaseServiceRoleClient } from "../../lib/supabase/service";
+import { loadStudioReferenceImages } from "../../lib/ai/studio-references";
+import { loadEditSourceImage } from "../../lib/ai/image-edit";
 
 const imageMediaTypes = {
   "image/png": "png",
@@ -126,7 +128,7 @@ export default async function handler(request: Request) {
     .eq("id", input.data.generationRunId)
     .eq("status", "pending")
     .gte("status_updated_at", new Date(Date.now() - imageJobPendingTimeoutMs).toISOString())
-    .select("id, campaign_id, requested_by, purpose, kind, target_kind, target_character_id")
+    .select("id, campaign_id, requested_by, purpose, kind, target_kind, target_character_id, operation")
     .maybeSingle();
 
   if (claimError) {
@@ -142,6 +144,17 @@ export default async function handler(request: Request) {
   logWorkerEvent("claimed", { generationRunId: claimedRun.id, model: input.data.model });
 
   try {
+    if (claimedRun.purpose === "studio-art") {
+      const { data: membership, error } = await supabase.from("campaign_members").select("role")
+        .eq("campaign_id", claimedRun.campaign_id).eq("user_id", claimedRun.requested_by).maybeSingle();
+      if (error || membership?.role !== "gm") throw new Error("GM access for this Studio job is no longer available.");
+    }
+    if (input.data.imageReferences?.length && claimedRun.purpose !== "studio-art")
+      throw new Error("Visual references require a Studio job.");
+    if (input.data.editSource && claimedRun.operation !== "edit")
+      throw new Error("Image edit sources require an edit job.");
+    if (input.data.operation && input.data.operation !== claimedRun.operation)
+      throw new Error("The signed image operation does not match the queued job.");
     const characterAccess = claimedRun.target_kind === "character"
       ? claimedRun.target_character_id
         ? await loadCharacterPortraitAccess(supabase, claimedRun.campaign_id, claimedRun.target_character_id, claimedRun.requested_by)
@@ -162,9 +175,16 @@ export default async function handler(request: Request) {
       ...(input.data.resolution ? { resolution: input.data.resolution } : {}),
       ...(input.data.supportedParameters ? { supportedParameters: input.data.supportedParameters } : {}),
       timeoutMs: imageJobProviderTimeoutMs,
+      ...(input.data.editSource ? {
+        imageReferences: await loadEditSourceImage(supabase, claimedRun.campaign_id, input.data.editSource.path),
+        referenceProviders: input.data.referenceProviders,
+      } : input.data.imageReferences?.length ? {
+        imageReferences: await loadStudioReferenceImages(supabase, claimedRun.campaign_id, input.data.imageReferences),
+        referenceProviders: input.data.referenceProviders,
+      } : {}),
     });
     const storedImage = await getStoredImage(response.image);
-    const filePrefix = claimedRun.purpose === "style-preview" ? "style-preview" : "image";
+    const filePrefix = claimedRun.purpose === "style-preview" ? "style-preview" : claimedRun.purpose === "studio-art" ? "studio-draft" : "image";
     const path = `${claimedRun.campaign_id}/${claimedRun.requested_by}/${filePrefix}-${claimedRun.id}.${imageMediaTypes[storedImage.mediaType]}`;
     const { error: uploadError } = await supabase.storage.from(campaignArtBucket).upload(path, storedImage.body, {
       cacheControl: "3600",

@@ -137,4 +137,4 @@ export function logAiProviderFailure(error: unknown, context: { kind: string; ca
   }));
 }
 
-export const uncertainImageOutcomeMessage = "OpenRouter connection closed after the request was sent. The image may have been billed; check OpenRouter activity before generating again.";
+export const uncertainImageOutcomeMessage = "The image request may have been billed; check OpenRouter activity before generating again.";

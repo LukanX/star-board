@@ -164,6 +164,8 @@ export type ImageGenerationOptions = {
   supportedParameters?: readonly string[];
   outputFormat?: "png" | "jpeg" | "webp";
   timeoutMs?: number;
+  imageReferences?: readonly { dataUrl: string }[];
+  referenceProviders?: readonly string[];
 };
 
 const seedreamModelPrefix = "bytedance-seed/seedream-";
@@ -210,12 +212,18 @@ export async function generateImage(apiKey: string, prompt: string, requestedMod
     response = await fetch(`${openRouterBaseUrl}/images`, {
       method: "POST",
       headers,
-      body: JSON.stringify(buildImageRequestBody(requestedModel, prompt, options)),
+      body: JSON.stringify({
+        ...buildImageRequestBody(requestedModel, prompt, options),
+        ...(options.imageReferences?.length ? {
+          input_references: options.imageReferences.map((reference) => ({ type: "image_url", image_url: { url: reference.dataUrl } })),
+          provider: { only: options.referenceProviders, allow_fallbacks: false },
+        } : {}),
+      }),
       signal: AbortSignal.timeout(options.timeoutMs ?? defaultImageGenerationTimeoutMs),
     });
   } catch (error: unknown) {
     if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
-      throw new AiProviderError("OpenRouter image generation timed out. Try again, or use background generation for long-running requests.", { status: 504 });
+      throw new AiProviderError("OpenRouter image generation timed out. The request may have been billed; check OpenRouter activity before retrying.", { status: 504, outcomeUnknown: true });
     }
 
     const normalized = normalizeProviderError(error, "OpenRouter image generation request failed.");

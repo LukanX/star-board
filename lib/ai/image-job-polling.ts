@@ -9,16 +9,21 @@ import {
 import type { ImageAspectRatio, ImageResolution, ImageSize } from "@/lib/ai/image-options";
 import type { ReferenceStatus } from "@/lib/references/types";
 import { referenceStatusesSchema } from "@/lib/validation/reference";
+import type { StudioManifest } from "@/lib/validation/studio";
 
-export type ImageJobTargetKind = "character" | "npc" | "faction" | "job" | "place" | "enemy" | "visual-style";
+export type ImageJobTargetKind = "character" | "npc" | "faction" | "job" | "place" | "enemy" | "visual-style" | "scene" | "battlemap";
 
 export type ImageDraft = {
   references?: ReferenceStatus[];
   generationRunId: string;
   targetKind: ImageJobTargetKind;
   characterId?: string;
-  purpose: "entity-art" | "style-preview";
+  purpose: "entity-art" | "style-preview" | "studio-art";
+  studioManifest?: StudioManifest;
   mode: "create" | "refine";
+  operation?: "generate" | "redo" | "edit";
+  parentRunId?: string;
+  resolution?: ImageResolution;
   subject: string;
   aspectRatio: ImageAspectRatio;
   size?: ImageSize;
@@ -40,8 +45,11 @@ export type ImageBackgroundJob = {
   status: "pending" | "running";
   targetKind: ImageJobTargetKind;
   characterId?: string;
-  purpose?: "entity-art" | "style-preview";
+  purpose?: "entity-art" | "style-preview" | "studio-art";
+  studioManifest?: StudioManifest;
   mode: "create" | "refine";
+  operation?: "generate" | "redo" | "edit";
+  parentRunId?: string;
   subject: string;
   aspectRatio: ImageAspectRatio;
   size?: ImageSize;
@@ -71,6 +79,7 @@ type ImageJobStatusResponse = {
     temporaryPath?: string;
     image?: ImageDraft["image"];
     references?: ReferenceStatus[];
+    resolution?: ImageResolution;
   };
 };
 
@@ -179,23 +188,28 @@ export async function waitForImageBackgroundJob(
           throw new Error("The completed image job has no usable image data.");
         }
 
-        return {
+        const draft = {
+          ...(job.studioManifest ? { studioManifest: job.studioManifest } : {}),
           generationRunId: job.generationRunId,
           targetKind: job.targetKind,
           ...(job.characterId ? { characterId: job.characterId } : {}),
           purpose: job.purpose ?? "entity-art",
           mode: job.mode,
+          ...(job.operation ? { operation: job.operation } : {}),
+          ...(job.parentRunId ? { parentRunId: job.parentRunId } : {}),
+          ...((result.job.resolution ?? job.resolution) ? { resolution: result.job.resolution ?? job.resolution } : {}),
           subject: job.subject,
           aspectRatio: job.aspectRatio,
           ...(job.size ? { size: job.size } : {}),
           prompt: job.prompt,
-          provider: "openrouter",
+          provider: "openrouter" as const,
           model: result.job.model ?? job.model,
           image: result.job.image,
           ...((result.job.references ?? job.references) ? { references: referenceStatusesSchema.parse(result.job.references ?? job.references) } : {}),
           createdAt: result.job.createdAt,
           temporaryPath: result.job.temporaryPath,
         };
+        return draft;
       }
 
       if (result.job?.status !== "pending" && result.job?.status !== "running") {

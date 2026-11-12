@@ -28,6 +28,7 @@ vi.mock("@/lib/ai/route-support", () => ({
 }));
 
 import { POST } from "@/app/api/ai/visual-style/route";
+import { visualStyleDraftOutputSchema } from "@/lib/validation/visual-style";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000002";
@@ -68,9 +69,68 @@ describe("visual style assistance route", () => {
 
     expect(response.status).toBe(200);
     expect(payload.draft).toEqual(draft);
+    expect(payload).not.toHaveProperty("trimming");
     expect(mocks.buildVisualStylePrompt).toHaveBeenCalledWith(expect.objectContaining({ campaignId, campaignVibe: "Hopeful but dangerous" }), expect.objectContaining({ system: "Starfinder 2e" }));
     expect(mocks.generateJson).toHaveBeenCalledWith("campaign-key", "visual-style-prompt", expect.anything(), "openai/gpt-4o-mini", { imageReferences: [] });
     expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ kind: "visual-style", status: "complete" }));
+  });
+
+  it("requests the compact structured output schema and leaves exactly 300 characters unchanged", async () => {
+    const exactDraft = { ...draft, visualStyle: "x".repeat(300) };
+    mocks.generateJson.mockResolvedValue({ data: exactDraft });
+
+    const response = await POST(request({ campaignId }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.draft).toEqual(exactDraft);
+    expect(payload).not.toHaveProperty("trimming");
+    expect(mocks.generateJson.mock.calls[0][2]).toBe(visualStyleDraftOutputSchema);
+  });
+
+  it.each([
+    ["clause boundaries", "Crisp ink contours; cyan and amber palette; dramatic rim lighting; readable silhouettes; restrained grain. ".repeat(8)],
+    ["word boundaries", "Atmospheric layered paint with muted colors and grounded materials ".repeat(12)],
+    ["no delimiters", "x".repeat(301)],
+    ["provider safety boundary", "x".repeat(1200)],
+  ])("trims overlong valid output at %s without another provider call", async (_label, visualStyle) => {
+    mocks.generateJson.mockResolvedValue({ data: { ...draft, visualStyle: visualStyle.trim() }, model: "openai/gpt-4o-mini", generationId: "trimmed-style-run" });
+
+    const response = await POST(request({ campaignId }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.draft).toMatchObject({ name: draft.name, rationale: draft.rationale });
+    expect(payload.draft.visualStyle.length).toBeLessThanOrEqual(300);
+    expect(payload.draft.visualStyle.length).toBeGreaterThan(0);
+    expect(payload.draft.visualStyle.endsWith("…")).toBe(true);
+    expect(visualStyle.trim().startsWith(payload.draft.visualStyle.slice(0, -1))).toBe(true);
+    expect(visualStyleDraftOutputSchema.safeParse(payload.draft).success).toBe(true);
+    expect(payload.trimming).toEqual({ originalLength: visualStyle.trim().length, includedLength: payload.draft.visualStyle.length });
+    expect(mocks.generateJson).toHaveBeenCalledTimes(1);
+    expect(mocks.recordAiGeneration).toHaveBeenCalledTimes(1);
+    expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ kind: "visual-style", status: "complete", generationId: "trimmed-style-run" }));
+    const audit = mocks.recordAiGeneration.mock.calls[0][1];
+    expect(JSON.stringify(audit)).not.toContain(visualStyle.trim());
+  });
+
+  it.each([
+    { ...draft, visualStyle: "" },
+    { ...draft, visualStyle: " padded" },
+    { ...draft, visualStyle: "padded " },
+    { ...draft, visualStyle: "x".repeat(1201) },
+    { ...draft, visualStyle: 42 },
+    { ...draft, name: "x".repeat(81) },
+    { ...draft, rationale: "x".repeat(601) },
+    { name: draft.name, visualStyle: draft.visualStyle },
+  ])("rejects invalid provider output rather than trimming it into a valid draft: %j", async (data) => {
+    mocks.generateJson.mockResolvedValue({ data });
+
+    const response = await POST(request({ campaignId }));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "The AI response did not match the visual style draft format." });
+    expect(mocks.recordAiGeneration).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: "failed" }));
+    expect(mocks.generateJson).toHaveBeenCalledTimes(1);
   });
 
   it("passes bounded example images only to a vision-capable text model", async () => {

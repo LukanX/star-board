@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getCampaignMembership } from "@/lib/auth/permissions";
 import { campaignEntityPath, type EntitySection } from "@/lib/campaign/routes";
+import { z } from "zod";
+import { searchableEntitySections } from "@/lib/campaign/entity-search";
 
 type RouteContext = { params: Promise<{ campaignId: string }> };
 type EntitySearchResult = {
@@ -37,6 +39,12 @@ export async function GET(request: Request, { params }: RouteContext) {
   const query = searchParams.get("q")?.trim() ?? "";
   const requestedAudience = searchParams.get("audience") ?? "player";
   const noteId = searchParams.get("noteId");
+  const sectionInput = searchParams.get("sections");
+  const sections = z.array(z.enum(searchableEntitySections)).min(1).max(7).safeParse(
+    sectionInput === null ? [...searchableEntitySections] : sectionInput.split(","),
+  );
+  if (!sections.success) return NextResponse.json({ error: "Entity search sections are invalid." }, { status: 400 });
+  const selected = new Set(sections.data);
 
   if (query.length > 80) {
     return NextResponse.json({ error: "Entity search query is too long." }, { status: 400 });
@@ -77,17 +85,17 @@ export async function GET(request: Request, { params }: RouteContext) {
 
     const pattern = `%${escapeLikeSearch(query)}%`;
     const [characters, npcs, places, factions, jobs, enemies, episodes] = await Promise.all([
-      context.supabase.from("characters").select("id, name, species, class_name").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit),
-      context.supabase.from("npcs").select("id, name, species, role").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit),
-      context.supabase.from("places").select("id, name, kind").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit),
-      context.supabase.from("factions").select("id, name, status").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit),
-      context.supabase.from("jobs").select("id, title, status").eq("campaign_id", campaignId).ilike("title", pattern).limit(perTypeLimit),
-      context.supabase.from("enemies").select("id, name, is_revealed").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit),
-      context.supabase.from("episodes").select("id, title, status").eq("campaign_id", campaignId).ilike("title", pattern).limit(perTypeLimit),
+      selected.has("characters") ? context.supabase.from("characters").select("id, name, species, class_name").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit) : { data: [] },
+      selected.has("npcs") ? context.supabase.from("npcs").select("id, name, species, role").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit) : { data: [] },
+      selected.has("places") ? context.supabase.from("places").select("id, name, kind").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit) : { data: [] },
+      selected.has("factions") ? context.supabase.from("factions").select("id, name, status").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit) : { data: [] },
+      selected.has("jobs") ? context.supabase.from("jobs").select("id, title, status").eq("campaign_id", campaignId).ilike("title", pattern).limit(perTypeLimit) : { data: [] },
+      selected.has("enemies") ? context.supabase.from("enemies").select("id, name, is_revealed").eq("campaign_id", campaignId).ilike("name", pattern).limit(perTypeLimit) : { data: [] },
+      selected.has("episodes") ? context.supabase.from("episodes").select("id, title, status").eq("campaign_id", campaignId).ilike("title", pattern).limit(perTypeLimit) : { data: [] },
     ]);
 
     const queryResults = [characters, npcs, places, factions, jobs, enemies, episodes];
-    if (queryResults.some((result) => result.error)) {
+    if (queryResults.some((result) => "error" in result && result.error)) {
       return NextResponse.json({ error: "Unable to search campaign entities." }, { status: 503 });
     }
 

@@ -1,4 +1,4 @@
-import type { VisualStyleGenerationInput } from "@/lib/validation/visual-style";
+import { generatedVisualStyleTextMaxLength, type VisualStyleGenerationInput } from "@/lib/validation/visual-style";
 
 export type VisualStylePromptContext = {
   system: string;
@@ -30,8 +30,8 @@ export function buildVisualStylePrompt(input: VisualStyleGenerationInput, contex
     input.campaignVibe ? `General campaign vibe: ${input.campaignVibe}` : "General campaign vibe: choose a coherent direction from the campaign context.",
     `Art direction: ${directionLabels[input.artDirection]}`,
     input.directionNotes ? `Additional art direction: ${input.directionNotes}` : "",
-    "Describe the palette, medium or surface treatment, lighting, texture, atmosphere, and composition. State one concise focal-point or silhouette rule and one concise continuity rule.",
-    "Keep visualStyle to approximately 500-700 characters. Select the strongest repeatable cues; do not echo the campaign brief, describe a subject, repeat safety rules, or restate the same visual idea.",
+    "Use short, semicolon-separated rendering cues, not explanatory sentences. Put medium or linework first, then palette, lighting, and the strongest texture or silhouette cue. Include only the most distinctive repeatable cues; do not try to cover every category.",
+    `Target 200-${generatedVisualStyleTextMaxLength} characters for visualStyle; never exceed ${generatedVisualStyleTextMaxLength} characters. Shorter is fine when sufficient. Do not echo the campaign brief, describe a subject, repeat safety rules, or restate the same visual idea.`,
     "Name the style with a memorable but practical campaign-library label.",
     "The visualStyle field must be a standalone prompt fragment suitable for applying separately to future image subjects. Do not include a subject, action, character, location, written text, or output dimensions.",
     "Fields: name, visualStyle, rationale.",

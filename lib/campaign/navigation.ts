@@ -19,6 +19,8 @@ export const campaignNavigation = [
   { id: "enemies", label: "Enemies", group: "Archive" },
   { id: "notes", label: "Campaign notes", group: "Archive" },
   { id: "library", label: "Library", group: "Archive" },
+  { id: "art", label: "Art gallery", group: "Archive" },
+  { id: "ai-studio", label: "AI Studio", group: "Control" },
   { id: "members", label: "Campaign members", group: "Control" },
   { id: "settings", label: "Campaign settings", group: "Control" },
 ] as const satisfies readonly CampaignNavigationItem[];

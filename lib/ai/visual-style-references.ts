@@ -7,7 +7,7 @@ type VisualStyleReference = {
   dataUrl: string;
 };
 
-function hasImageSignature(bytes: Uint8Array, mediaType: string) {
+export function hasImageSignature(bytes: Uint8Array, mediaType: string) {
   if (mediaType === "image/png") {
     return bytes.length >= 8 && bytes.slice(0, 8).every((value, index) => value === [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][index]);
   }

@@ -1,14 +1,9 @@
 import { Extension } from "@tiptap/core";
 import { Suggestion, type SuggestionProps } from "@tiptap/suggestion";
 import type { NoteVisibility } from "@/lib/campaign/types";
+import { searchCampaignEntities, type CampaignEntitySearchResult } from "@/lib/campaign/entity-search";
 
-export type NoteEntitySearchResult = {
-  id: string;
-  type: string;
-  label: string;
-  meta: string;
-  href: string;
-};
+export type NoteEntitySearchResult = CampaignEntitySearchResult;
 
 type NoteEntitySuggestionOptions = {
   campaignId: string;
@@ -96,15 +91,9 @@ export const NoteEntitySuggestion = Extension.create<NoteEntitySuggestionOptions
       minQueryLength: 2,
       debounce: 250,
       items: async ({ query, signal }) => {
-        const params = new URLSearchParams({ q: query, audience });
-        if (noteId) params.set("noteId", noteId);
-        const response = await fetch(
-          `/api/campaigns/${encodeURIComponent(campaignId)}/entities/search?${params.toString()}`,
-          { signal },
-        );
-        if (!response.ok) return [];
-        const result = await response.json() as { entities?: NoteEntitySearchResult[] };
-        return [...(result.entities ?? [])].sort((left, right) => {
+        const result = await searchCampaignEntities({ campaignId, query, audience, noteId, signal });
+        if ("error" in result) return [];
+        return [...result.entities].sort((left, right) => {
           const leftType = entityTypeOrder.indexOf(left.type);
           const rightType = entityTypeOrder.indexOf(right.type);
           return leftType - rightType || left.label.localeCompare(right.label);

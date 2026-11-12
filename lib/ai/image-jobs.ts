@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { imageBackgroundJobSchema, type ImageBackgroundJob } from "@/lib/validation/image";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { referenceStatusesSchema } from "@/lib/validation/reference";
+import { uncertainImageOutcomeMessage } from "@/lib/ai/errors";
 
 export const imageBackgroundFunctionName = "generate-image-background";
 
@@ -12,10 +13,14 @@ function canonicalImageBackgroundJob(job: ImageBackgroundJob) {
     model: job.model,
     purpose: job.purpose ?? "entity-art",
     aspectRatio: job.aspectRatio,
+    ...(job.operation ? { operation: job.operation } : {}),
     ...(job.size ? { size: job.size } : {}),
     ...(job.resolution ? { resolution: job.resolution } : {}),
     ...(job.supportedParameters ? { supportedParameters: job.supportedParameters } : {}),
     ...(job.references ? { references: referenceStatusesSchema.parse(job.references) } : {}),
+    ...(job.imageReferences ? { imageReferences: job.imageReferences } : {}),
+    ...(job.referenceProviders ? { referenceProviders: job.referenceProviders } : {}),
+    ...(job.editSource ? { editSource: job.editSource } : {}),
   };
 }
 
@@ -61,7 +66,7 @@ export async function markImageBackgroundDispatchFailed(input: {
     .update({
       status: "failed",
       status_updated_at: new Date().toISOString(),
-      error_message: "The image background worker could not be reached.",
+      error_message: uncertainImageOutcomeMessage,
     })
     .eq("id", input.generationRunId)
     .eq("campaign_id", input.campaignId)

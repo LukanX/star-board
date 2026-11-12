@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
-import { createImageBackgroundSignature, dispatchImageBackgroundJob, parseImageBackgroundJob, verifyImageBackgroundSignature } from "@/lib/ai/image-jobs";
+const mocks = vi.hoisted(() => ({ getSupabaseServiceRoleClient: vi.fn() }));
+vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceRoleClient: mocks.getSupabaseServiceRoleClient }));
+import { createImageBackgroundSignature, dispatchImageBackgroundJob, markImageBackgroundDispatchFailed, parseImageBackgroundJob, verifyImageBackgroundSignature } from "@/lib/ai/image-jobs";
 import { librarySource } from "./support/library-reference";
 
 const job = {
@@ -58,6 +60,18 @@ describe("image background jobs", () => {
     expect(parseImageBackgroundJob({ ...job, size: "1024x1024" }).success).toBe(false);
   });
 
+  it("signs the edit source and requires verified provider routing for it", () => {
+    const editJob = { ...job, editSource: { path: "00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002/npc-a.png" }, referenceProviders: ["openai"] };
+    const signature = createImageBackgroundSignature(editJob, "worker-secret");
+
+    expect(parseImageBackgroundJob(editJob).success).toBe(true);
+    expect(verifyImageBackgroundSignature(editJob, signature, "worker-secret")).toBe(true);
+    expect(verifyImageBackgroundSignature({ ...editJob, editSource: { path: "a/b/c.png" } }, signature, "worker-secret")).toBe(false);
+    expect(verifyImageBackgroundSignature({ ...editJob, editSource: undefined }, signature, "worker-secret")).toBe(false);
+    expect(parseImageBackgroundJob({ ...editJob, referenceProviders: undefined }).success).toBe(false);
+    expect(parseImageBackgroundJob({ ...editJob, editSource: { path: "../x" } }).success).toBe(false);
+  });
+
   it("dispatches to the Netlify background endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -70,5 +84,25 @@ describe("image background jobs", () => {
     expect(options.method).toBe("POST");
     expect(headers["X-Star-Board-Image-Signature"]).toBe(createImageBackgroundSignature(job, "worker-secret"));
     expect(options.body).toBe(JSON.stringify(job));
+  });
+
+  it("persists ambiguous dispatch failures as potentially billed", async () => {
+    const query = { update: vi.fn(), eq: vi.fn(), is: vi.fn() };
+    query.update.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    query.is.mockReturnValue(query);
+    mocks.getSupabaseServiceRoleClient.mockReturnValue({ from: vi.fn().mockReturnValue(query) });
+
+    await markImageBackgroundDispatchFailed({
+      campaignId: "00000000-0000-4000-8000-000000000001",
+      generationRunId: job.generationRunId,
+      requestedBy: "00000000-0000-4000-8000-000000000002",
+      targetCharacterId: null,
+    });
+
+    expect(query.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: "failed",
+      error_message: "The image request may have been billed; check OpenRouter activity before generating again.",
+    }));
   });
 });

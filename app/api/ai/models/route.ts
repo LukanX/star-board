@@ -11,14 +11,14 @@ export const runtime = "nodejs";
 
 const capabilitySchema = z.enum(aiCapabilities);
 const sortSchema = z.enum(aiModelSorts);
-
 export async function GET(request: Request) {
   const searchParams = new URL(request.url).searchParams;
   const campaignId = searchParams.get("campaignId");
   const capabilityResult = capabilitySchema.safeParse(searchParams.get("capability"));
   const sortResult = sortSchema.safeParse(searchParams.get("sort") ?? "most-popular");
+  const defaultOnly = searchParams.get("defaultOnly") === "true";
 
-  if (!campaignId || !capabilityResult.success || !sortResult.success) {
+  if (!campaignId || !capabilityResult.success || !sortResult.success || searchParams.has("operation")) {
     return NextResponse.json({ error: "A campaign ID, supported AI capability, and supported model sort are required." }, { status: 400 });
   }
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     let playerAccess = false;
 
     if (!context) {
-      if (capability !== "structured-text") {
+      if (capability !== "structured-text" && !(capability === "image" && defaultOnly)) {
         return NextResponse.json({ error: "GM access is required to view AI models." }, { status: 403 });
       }
 
@@ -65,7 +65,18 @@ export async function GET(request: Request) {
     const env = getServerEnv();
     const configuredDefault = capability === "image" ? env.OPENROUTER_IMAGE_MODEL : env.OPENROUTER_TEXT_MODEL;
     const enabledModelIds = settingsResult.settings.enabledModelIds;
+
     const defaultModel = enabledModelIds.includes(configuredDefault) ? configuredDefault : enabledModelIds.find((modelId) => availableModels.some((model) => model.id === modelId && model.capability === capability)) ?? null;
+
+    if (defaultOnly) {
+      const enabledModels = availableModels.filter((model) => model.capability === capability && enabledModelIds.includes(model.id));
+      const generationDefault = enabledModels.find((model) => model.id === configuredDefault) ?? enabledModels[0];
+      return NextResponse.json({
+        capability, defaultModel: generationDefault?.id ?? null,
+        enabledModelIds: generationDefault ? [generationDefault.id] : [], status: catalog.status,
+        models: generationDefault ? [{ ...generationDefault, enabled: true }] : [],
+      });
+    }
 
     return NextResponse.json({ capability, defaultModel, enabledModelIds, status: catalog.status, models: catalog.models.map((model) => ({ ...model, enabled: enabledModelIds.includes(model.id) })) });
   } catch {

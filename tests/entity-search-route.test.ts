@@ -127,4 +127,21 @@ describe("campaign entity search route", () => {
     expect(payload.error).toContain("GM access");
     expect(supabase.from).not.toHaveBeenCalled();
   });
+  it("filters queried sections before ranking without changing GM visibility", async () => {
+    mocks.getCampaignMembership.mockResolvedValue({ role: "gm" });
+    const { supabase } = createSupabase({
+      npcs: [queryFor([{ id: "npc-1", name: "Astra Guide", species: "Human", role: "Guide" }])],
+      enemies: [queryFor([{ id: "enemy-1", name: "Astra Mimic", is_revealed: false }])],
+    });
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase, user: { id: userId } });
+    const response = await GET(request("q=Astra&audience=gm&sections=npcs,enemies"), routeContext());
+    expect(response.status).toBe(200);
+    expect((await response.json()).entities).toHaveLength(2);
+    expect(supabase.from.mock.calls.map(([table]) => table)).toEqual(["npcs", "enemies"]);
+  });
+  it.each(["", "notes", "places,unknown"])("rejects unsupported section filters %s before querying", async (sections) => {
+    const response = await GET(request(`q=Astra&sections=${sections}`), routeContext());
+    expect(response.status).toBe(400);
+    expect(mocks.getAuthenticatedUser).not.toHaveBeenCalled();
+  });
 });

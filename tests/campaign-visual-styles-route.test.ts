@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({ requireCampaignGM: vi.fn() }));
 vi.mock("@/lib/auth/permissions", () => ({ requireCampaignGM: mocks.requireCampaignGM }));
 
 import { POST } from "@/app/api/campaigns/[campaignId]/visual-styles/route";
+import { PATCH } from "@/app/api/campaigns/[campaignId]/visual-styles/[styleId]/route";
 
 const campaignId = "00000000-0000-4000-8000-000000000001";
 const generationRunId = "00000000-0000-4000-8000-000000000003";
@@ -91,5 +92,20 @@ describe("campaign visual styles route", () => {
     }), routeContext());
 
     expect(response.status).toBe(400);
+  });
+
+  it("preserves the full manual style allowance when creating and editing saved styles", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "style-id", error: null });
+    mocks.requireCampaignGM.mockResolvedValue({ supabase: { rpc }, user: { id: "user-id" }, role: "gm" });
+    const visualStyle = "x".repeat(1200);
+    const body = { name: "Detailed manual style", visualStyle, status: "ready", wizardInputs: { artDirection: "choose-for-me" } };
+
+    const created = await POST(request(body), routeContext());
+    expect(created.status).toBe(201);
+    expect(rpc).toHaveBeenLastCalledWith("create_campaign_visual_style", expect.objectContaining({ p_visual_style: visualStyle }));
+
+    const updated = await PATCH(request({ ...body, expectedRevision: 1 }), { params: Promise.resolve({ campaignId, styleId: "style-id" }) });
+    expect(updated.status).toBe(200);
+    expect(rpc).toHaveBeenLastCalledWith("update_campaign_visual_style", expect.objectContaining({ p_visual_style: visualStyle, p_expected_revision: 1 }));
   });
 });

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const visualStyleNameMaxLength = 80;
 export const visualStyleTextMaxLength = 1200;
+export const generatedVisualStyleTextMaxLength = 300;
 export const visualStyleVibeMaxLength = 600;
 export const visualStyleDirectionNotesMaxLength = 600;
 
@@ -74,11 +75,17 @@ export const visualStylePreviewAttachInputSchema = visualStylePreviewSaveSchema.
   expectedRevision: z.number().int().positive(),
 });
 
-export const visualStyleDraftOutputSchema = z.object({
+export const visualStyleProviderDraftSchema = z.object({
   name: visualStyleNameSchema,
   visualStyle: visualStyleTextSchema,
   rationale: z.string().max(600),
 });
+
+export const visualStyleDraftOutputSchema = visualStyleProviderDraftSchema.extend({
+  visualStyle: trimmedText(generatedVisualStyleTextMaxLength, "Generated visual style"),
+});
+
+export type VisualStyleTrimming = { originalLength: number; includedLength: number };
 
 export type VisualStyleDirection = (typeof visualStyleDirections)[number];
 export type VisualStyleStatus = (typeof visualStyleStatuses)[number];

@@ -182,6 +182,14 @@ function AiDraftAssistantContent({
       || (candidate && requestContextKey !== undefined && candidateRequestContextKey !== requestContextKey),
   );
 
+  const startSession = () => {
+    if (hasStarted) return;
+    setBriefValues(visibleBriefValues);
+    setStagedContextValues(baseContextValues);
+    setProtectedFields([...visibleProtectedFields]);
+    setHasStarted(true);
+  };
+
   const candidateFromResult = (
     draft: Record<string, unknown>,
   ): Record<string, string> =>
@@ -227,6 +235,8 @@ function AiDraftAssistantContent({
     const requestController = new AbortController();
     activeRequestRef.current = requestController;
     markDirty();
+    // A successful first request starts the session with the context it used.
+    if (!hasStarted) setStagedContextValues(baseContextValues);
     setIsGenerating(true);
     setError(null);
 
@@ -304,7 +314,7 @@ function AiDraftAssistantContent({
 
   const toggleProtected = (key: string) => {
     markDirty();
-    setHasStarted(true);
+    startSession();
     setProtectedFields(
       visibleProtectedFields.includes(key)
         ? visibleProtectedFields.filter((field) => field !== key)
@@ -405,8 +415,8 @@ function AiDraftAssistantContent({
                   onChange={(event) => {
                     if (stageContextFields) {
                       markDirty();
-                      setHasStarted(true);
-                      setStagedContextValues((current) => ({ ...current, [field.key]: event.target.value }));
+                      startSession();
+                      setStagedContextValues({ ...visibleContextValues, [field.key]: event.target.value });
                     } else {
                       field.onChange(event.target.value);
                     }
@@ -441,7 +451,7 @@ function AiDraftAssistantContent({
             {briefFields.map((field) => {
               const change = (value: string) => {
                 markDirty();
-                setHasStarted(true);
+                startSession();
                 setBriefValues({ ...visibleBriefValues, [field.key]: value });
               };
               return <div key={field.key} className="min-w-0">{renderBriefField?.({ field, value: visibleBriefValues[field.key] ?? "", onChange: (value) => { change(value); updateCandidate(field.key, value); }, disabled: isGenerating }) ?? <label
@@ -477,7 +487,7 @@ function AiDraftAssistantContent({
         audience={mentionAudience}
         onChange={(value) => {
           markDirty();
-          setHasStarted(true);
+          startSession();
           setFocus(value);
         }}
       />

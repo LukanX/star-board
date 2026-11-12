@@ -8,7 +8,7 @@ import VisualStylePreview, { type VisualStylePreviewRecord } from "@/components/
 import { panelClassName } from "@/components/ui/recordStyles";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import type { ImageDraft } from "@/lib/ai/image-job-polling";
-import { visualStyleDirections, type VisualStyleDirection, type VisualStyleWizardInput } from "@/lib/validation/visual-style";
+import { generatedVisualStyleTextMaxLength, visualStyleDirections, visualStyleTextMaxLength, type VisualStyleDirection, type VisualStyleDraftOutput, type VisualStyleTrimming, type VisualStyleWizardInput } from "@/lib/validation/visual-style";
 
 export type EditableVisualStyle = {
   id: string;
@@ -28,7 +28,8 @@ type VisualStyleWizardProps = {
 };
 
 type DraftResponse = {
-  draft?: { name: string; visualStyle: string; rationale: string };
+  draft?: VisualStyleDraftOutput;
+  trimming?: VisualStyleTrimming;
   model?: string;
   error?: string;
 };
@@ -54,6 +55,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
   const [name, setName] = useState(style?.name ?? "");
   const [visualStyle, setVisualStyle] = useState(style?.visualStyle ?? "");
   const [rationale, setRationale] = useState("");
+  const [trimming, setTrimming] = useState<VisualStyleTrimming | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [references, setReferences] = useState<File[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -78,6 +80,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
 
   const generateDraft = async () => {
     setIsGenerating(true);
+    setTrimming(null);
     setError(null);
     setSavedNotice(null);
 
@@ -97,6 +100,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
       setName(result.draft.name);
       setVisualStyle(result.draft.visualStyle);
       setRationale(result.draft.rationale);
+      setTrimming(result.trimming ?? null);
       setStep(2);
       setDirty();
     } catch (generationError: unknown) {
@@ -197,7 +201,7 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
           <div className="grid gap-3 border-t border-[var(--line)] pt-4">
             <AiModelPicker campaignId={campaignId} capability="structured-text" requiresImageInput={references.length > 0} value={selectedModel} onChange={setSelectedModel} />
             <div className="flex flex-wrap justify-between gap-2">
-              <button className={secondaryButtonClassName} type="button" onClick={() => { setName(""); setVisualStyle(""); setRationale(""); setStep(2); setError(null); }}>START BLANK DRAFT</button>
+              <button className={secondaryButtonClassName} type="button" onClick={() => { setName(""); setVisualStyle(""); setRationale(""); setTrimming(null); setStep(2); setError(null); }}>START BLANK DRAFT</button>
               <button className={primaryButtonClassName} type="button" disabled={isGenerating} onClick={() => void generateDraft()}>
                 {isGenerating ? <LoaderCircle className="animate-spin" size={14} /> : <Sparkles size={14} />} {isGenerating ? "DRAFTING..." : "DRAFT VISUAL STYLE"}
               </button>
@@ -215,9 +219,11 @@ export default function VisualStyleWizard({ campaignId, style, onSaved, onCancel
             <input className={controlClassName} maxLength={80} value={name} onChange={(event) => { setName(event.target.value); markChanged(); }} placeholder="A memorable library name" />
           </label>
           <label className={labelClassName}>
-            VISUAL STYLE DETAILS <span className="text-[var(--dim)] tracking-normal">{visualStyle.length}/1200</span>
-            <textarea className={`${controlClassName} min-h-[180px] resize-y leading-[1.5]`} maxLength={1200} value={visualStyle} onChange={(event) => { setVisualStyle(event.target.value); markChanged(); }} placeholder="Palette, light, materials, line treatment, texture, and composition rules..." />
+            VISUAL STYLE DETAILS <span className="text-[var(--dim)] tracking-normal">{visualStyle.length}/{visualStyleTextMaxLength}</span>
+            <textarea className={`${controlClassName} min-h-[180px] resize-y leading-[1.5]`} maxLength={visualStyleTextMaxLength} value={visualStyle} onChange={(event) => { setVisualStyle(event.target.value); setTrimming(null); markChanged(); }} placeholder="Palette, light, materials, line treatment, texture, and composition rules..." />
           </label>
+          <p className="m-0 text-[var(--dim)] text-[10px] leading-[1.5]">AI drafts target 200-{generatedVisualStyleTextMaxLength} characters to leave room for subjects. Manual edits can use up to {visualStyleTextMaxLength}.</p>
+          {trimming ? <p className="m-0 min-w-0 break-words text-[var(--amber)] text-[10px] leading-[1.5]" role="status">Style trimmed from {trimming.originalLength} to {trimming.includedLength} characters. Review before saving.</p> : null}
           {visualStyle.trim() ? <VisualStylePreview campaignId={campaignId} style={style ?? undefined} visualStyleOverride={visualStyle} canRetain={false} onDraftChange={handlePreviewDraftChange} /> : null}
           {error ? <p className="m-0 text-[var(--pink)] text-[10px]" role="alert">{error}</p> : null}
           {savedNotice ? <p className="m-0 text-[var(--green)] font-mono text-[8px] tracking-[.08em]" role="status">{savedNotice}</p> : null}

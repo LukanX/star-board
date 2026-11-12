@@ -75,6 +75,33 @@ describe("GET /api/ai/models", () => {
     expect(response.status).toBe(403);
     expect(mocks.resolveCampaignCredential).not.toHaveBeenCalled();
   });
+  it("exposes only the enabled default image model capabilities to opted-in players", async () => {
+    mocks.requireCampaignGM.mockResolvedValue(null);
+    mocks.getAuthenticatedUser.mockResolvedValue({ supabase: {}, user: { id: "player-id" } });
+    mocks.getCampaignMembership.mockResolvedValue({ role: "player" });
+    mocks.resolveCampaignCredential.mockResolvedValue({ apiKey: "campaign-key", status: { allowPlayerAi: true } });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["openai/gpt-image-1", "other/image"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [
+      { id: "openai/gpt-image-1", capability: "image", compatible: true, supportedParameters: ["resolution"], parameterValues: { resolution: ["1K", "2K"] } },
+      { id: "other/image", capability: "image", compatible: true },
+    ] });
+    const response = await GET(new Request(`http://localhost/api/ai/models?campaignId=${campaignId}&capability=image&defaultOnly=true`));
+    const payload = await response.json();
+    expect(response.status).toBe(200);
+    expect(payload.defaultModel).toBe("openai/gpt-image-1");
+    expect(payload.models.map((model: { id: string }) => model.id)).toEqual(["openai/gpt-image-1"]);
+    expect(payload.models[0].parameterValues.resolution).toEqual(["1K", "2K"]);
+  });
+  it("uses the generation fallback order for default-only image capabilities", async () => {
+    mocks.getServerEnv.mockReturnValue({ OPENROUTER_IMAGE_MODEL: "disabled/image" });
+    mocks.loadCampaignAiSettings.mockResolvedValue({ settings: { enabledModelIds: ["test/second", "test/first"] } });
+    mocks.getAiModelCatalog.mockResolvedValue({ status: "live", models: [
+      { id: "test/first", capability: "image", compatible: true },
+      { id: "test/second", capability: "image", compatible: true },
+    ] });
+    const response = await GET(new Request(`http://localhost/api/ai/models?campaignId=${campaignId}&capability=image&defaultOnly=true`));
+    expect((await response.json()).defaultModel).toBe("test/first");
+  });
 
   it("rejects a player when campaign AI opt-in is disabled", async () => {
     mocks.requireCampaignGM.mockResolvedValue(null);

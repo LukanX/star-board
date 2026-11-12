@@ -14,6 +14,8 @@ import {
   SlidersHorizontal,
   UserRound,
   UsersRound,
+  Sparkles,
+  Images,
 } from "lucide-react";
 import CampaignShell from "@/components/campaign-shell/CampaignShell";
 import CampaignSidebar, {
@@ -42,6 +44,8 @@ const icons = {
   library: BookOpen,
   members: UsersRound,
   settings: SlidersHorizontal,
+  "ai-studio": Sparkles,
+  art: Images,
 } satisfies Record<CampaignSection, typeof Gauge>;
 
 export default function CampaignRouteShell({
@@ -63,7 +67,7 @@ export default function CampaignRouteShell({
 
   const groups = campaignNavigation.reduce<CampaignSidebarNavGroup[]>(
     (result, item) => {
-      if (item.id === "settings" && !isGM) return result;
+      if ((item.id === "settings" || item.id === "ai-studio") && !isGM) return result;
       const existing = result.find((group) => group.label === item.group);
       const navItem = {
         ...item,

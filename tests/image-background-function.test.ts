@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   logAiProviderFailure: vi.fn(),
   getCampaignCredentialForGeneration: vi.fn(),
   loadCharacterPortraitAccess: vi.fn(),
+  loadEditSourceImage: vi.fn(),
   canUseCharacterPortraitAi: vi.fn((access: { role: string; isOwner: boolean }, allowPlayerAi: boolean) => access.role === "gm" || (access.isOwner && allowPlayerAi)),
 }));
 
@@ -25,6 +26,10 @@ vi.mock("@/lib/ai/errors", async (importOriginal) => ({
   logAiProviderFailure: mocks.logAiProviderFailure,
 }));
 vi.mock("@/lib/ai/campaign-credentials", () => ({ getCampaignCredentialForGeneration: mocks.getCampaignCredentialForGeneration }));
+vi.mock("@/lib/ai/image-edit", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/ai/image-edit")>(),
+  loadEditSourceImage: mocks.loadEditSourceImage,
+}));
 vi.mock("@/lib/ai/character-portrait-access", () => ({ loadCharacterPortraitAccess: mocks.loadCharacterPortraitAccess, canUseCharacterPortraitAi: mocks.canUseCharacterPortraitAi }));
 
 import handler, { config } from "@/netlify/functions/generate-image-background";
@@ -67,12 +72,11 @@ function createSupabaseMock(options: {
   });
   const completionQuery = createQuery(options.completion ?? { data: { id: job.generationRunId } });
   const failureQuery = createQuery(options.failure ?? { data: { id: job.generationRunId } });
+  const membershipQuery = createQuery({ data: { role: "gm" } });
   const upload = vi.fn().mockResolvedValue({ error: null });
   const remove = vi.fn().mockResolvedValue({ error: null });
-  const from = vi.fn()
-    .mockReturnValueOnce(claimQuery)
-    .mockReturnValueOnce(completionQuery)
-    .mockReturnValueOnce(failureQuery);
+  const runQueries = [claimQuery, completionQuery, failureQuery];
+  const from = vi.fn((table: string) => table === "campaign_members" ? membershipQuery : runQueries.shift() ?? failureQuery);
   const supabase = {
     from,
     storage: { from: vi.fn().mockReturnValue({ upload, remove }) },
@@ -166,6 +170,65 @@ describe("generate-image-background", () => {
     expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "complete", status_updated_at: expect.any(String) }));
   });
 
+  it("sends a native resolution to the worker provider without a fixed pixel size", async () => {
+    const { supabase } = createSupabaseMock();
+    mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
+    const nativeJob = { ...job, size: undefined, resolution: "4K" as const, supportedParameters: ["resolution"] };
+    const response = await handler(new Request("https://star-board.test/.netlify/functions/generate-image-background", {
+      method: "POST",
+      headers: { "content-type": "application/json", "X-Star-Board-Image-Signature": createImageBackgroundSignature(nativeJob, secret) },
+      body: JSON.stringify(nativeJob),
+    }));
+    expect(response.status).toBe(202);
+    expect(mocks.generateImage).toHaveBeenCalledWith("campaign-key", job.prompt, job.model, expect.objectContaining({ resolution: "4K" }));
+    expect(mocks.generateImage.mock.calls[0][3]).not.toHaveProperty("size");
+  });
+
+  describe("image edits", () => {
+    const campaignId = "00000000-0000-4000-8000-000000000001";
+    const userId = "00000000-0000-4000-8000-000000000002";
+    const editJob = {
+      ...job,
+      editSource: { path: `${campaignId}/${userId}/npc-source.png` },
+      referenceProviders: ["openai"],
+    };
+    const signedRequest = (value: typeof editJob) => new Request("https://star-board.test/.netlify/functions/generate-image-background", {
+      method: "POST",
+      headers: { "content-type": "application/json", "X-Star-Board-Image-Signature": createImageBackgroundSignature(value, secret) },
+      body: JSON.stringify(value),
+    });
+
+    it("loads the source image and sends it as the only provider reference", async () => {
+      const { supabase } = createSupabaseMock({ claim: { data: { id: job.generationRunId, campaign_id: campaignId, requested_by: userId, operation: "edit" } } });
+      mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
+      mocks.loadEditSourceImage.mockResolvedValue([{ dataUrl: "data:image/png;base64,c291cmNl" }]);
+
+      expect((await handler(signedRequest(editJob))).status).toBe(202);
+
+      expect(mocks.loadEditSourceImage).toHaveBeenCalledWith(supabase, campaignId, editJob.editSource.path);
+      expect(mocks.generateImage).toHaveBeenCalledWith("campaign-key", job.prompt, job.model, expect.objectContaining({
+        imageReferences: [{ dataUrl: "data:image/png;base64,c291cmNl" }], referenceProviders: ["openai"],
+      }));
+    });
+
+    it("refuses an edit source on a run that was not recorded as an edit", async () => {
+      const { supabase, completionQuery } = createSupabaseMock({ claim: { data: { id: job.generationRunId, campaign_id: campaignId, requested_by: userId, operation: "generate" } } });
+      mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
+
+      expect((await handler(signedRequest(editJob))).status).toBe(202);
+
+      expect(mocks.loadEditSourceImage).not.toHaveBeenCalled();
+      expect(mocks.generateImage).not.toHaveBeenCalled();
+      expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "failed" }));
+    });
+
+    it("rejects an unsigned edit source", async () => {
+      const request = signedRequest(editJob);
+      request.headers.set("X-Star-Board-Image-Signature", createImageBackgroundSignature(job, secret));
+      expect((await handler(request)).status).toBe(401);
+    });
+  });
+
   it("marks provider failures as terminal failures", async () => {
     const { supabase, completionQuery } = createSupabaseMock();
     mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
@@ -253,5 +316,22 @@ describe("generate-image-background", () => {
     expect(response.status).toBe(202);
     expect(mocks.generateImage).not.toHaveBeenCalled();
     expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "failed", error_message: "Player AI assistance is no longer enabled for this campaign." }));
+  });
+
+  it("does not generate a Studio image after the requesting GM loses access", async () => {
+    const { supabase, claimQuery, completionQuery } = createSupabaseMock({
+      claim: { data: { id: job.generationRunId, campaign_id: "00000000-0000-4000-8000-000000000001", requested_by: "00000000-0000-4000-8000-000000000002", purpose: "studio-art", kind: "image", target_kind: "scene" } },
+    });
+    const membership = createQuery({ data: { role: "player" } });
+    supabase.from.mockReset().mockImplementation((table: string) => {
+      if (table === "campaign_members") return membership;
+      return supabase.from.mock.calls.filter(([name]) => name === "ai_generation_runs").length === 1 ? claimQuery : completionQuery;
+    });
+    mocks.getSupabaseServiceRoleClient.mockReturnValue(supabase);
+    const response = await handler(createRequest());
+    expect(response.status).toBe(202);
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.getCampaignCredentialForGeneration).not.toHaveBeenCalled();
+    expect(completionQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: "failed", error_message: "GM access for this Studio job is no longer available." }));
   });
 });

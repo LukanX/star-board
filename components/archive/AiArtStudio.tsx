@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Sparkles, UploadCloud, X } from "lucide-react";
 import AiModelPicker, { type AiModelOptions } from "@/components/archive/AiModelPicker";
+import ImageResolutionPicker from "@/components/archive/ImageResolutionPicker";
 import { eyebrowClassName } from "@/components/ui/terminalStyles";
 import { waitForImageBackgroundJob, type ImageBackgroundJob, type ImageDraft } from "@/lib/ai/image-job-polling";
 import { imageGenerationRequestTimeoutMs } from "@/lib/ai/image-job-lifecycle";
 import type { NpcReferenceContext } from "@/lib/references/types";
 import ReferenceSources from "@/components/ui/ReferenceSources";
+import ArtEditPanel from "@/components/ui/ArtEditPanel";
+import type { ImageEdit } from "@/lib/validation/image";
 import {
   artStudioSessionEvent,
   artStudioSessionKey,
@@ -20,7 +23,9 @@ import {
 import {
   defaultImageAspectRatio,
   getSupportedImageAspectRatios,
+  getSupportedImageResolutions,
   type ImageAspectRatio,
+  type ImageResolution,
 } from "@/lib/ai/image-options";
 
 type ArtKind = "character" | "npc" | "faction" | "job" | "place" | "enemy";
@@ -44,6 +49,7 @@ type AiArtStudioProps = {
   entityId?: string;
   characterId?: string;
   portraitAiRole?: "gm" | "player";
+  hasSavedArt?: boolean;
   parentPlaceId?: string | null;
   npcReferenceContext?: NpcReferenceContext;
   enemyReferenceContext?: { ancestryReference?: import("@/lib/references/types").ReferenceBinding | null };
@@ -139,6 +145,7 @@ function AiArtStudioContent({
   entityId,
   characterId,
   portraitAiRole,
+  hasSavedArt,
   npcReferenceContext,
   enemyReferenceContext,
   parentPlaceId,
@@ -155,11 +162,14 @@ function AiArtStudioContent({
   const [styleSelectionChanged, setStyleSelectionChanged] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [selectedModelOptions, setSelectedModelOptions] = useState<AiModelOptions | null>(null);
+  const [selectedResolution, setSelectedResolution] = useState<ImageResolution>();
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<ImageAspectRatio>(
     defaultImageAspectRatio,
   );
   const [localSubjectDraft, setLocalSubjectDraft] = useState(subject ?? "");
   const [refinement, setRefinement] = useState("");
+  const [editInstruction, setEditInstruction] = useState("");
+  const [editSourceType, setEditSourceType] = useState<"draft" | "saved-art">("draft");
   const [isGenerating, setIsGenerating] = useState(false);
   const [outcomeUnknown, setOutcomeUnknown] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -171,6 +181,8 @@ function AiArtStudioContent({
 
   const subjectDraft = onSubjectChange ? (subject ?? "") : localSubjectDraft;
   const availableAspectRatios = getSupportedImageAspectRatios(selectedModelOptions?.supportedParameters, selectedModelOptions?.parameterValues);
+  const availableResolutions = getSupportedImageResolutions(selectedModelOptions?.supportedParameters, selectedModelOptions?.parameterValues);
+  const resolution = availableResolutions.find((value) => value === selectedResolution) ?? availableResolutions[0];
   const aspectRatio = availableAspectRatios.find((ratio) => ratio === selectedAspectRatio)
     ?? availableAspectRatios[0]
     ?? selectedAspectRatio;
@@ -187,6 +199,32 @@ function AiArtStudioContent({
     && selectedEntry.styleId === effectiveSelectedStyleId
     && selectedEntry.contextPlaceId === generationContextPlaceId,
   );
+  const savedArtEntityId = hasSavedArt ? entityId ?? characterId : undefined;
+  const effectiveEditSource = draft && (editSourceType === "draft" || !savedArtEntityId)
+    ? "draft"
+    : savedArtEntityId
+      ? "saved-art"
+      : null;
+  const modelCannotEdit = selectedModelOptions ? !selectedModelOptions.inputModalities?.includes("image") : false;
+  const editableAspectRatio = (ratio: ImageAspectRatio) => availableAspectRatios.length
+    ? availableAspectRatios.includes(ratio)
+    : ratio === defaultImageAspectRatio;
+
+  useEffect(() => {
+    if (!campaignId || canCustomizePortrait) return;
+    const active = new AbortController();
+    const query = new URLSearchParams({ campaignId, capability: "image", defaultOnly: "true" });
+    void fetch(`/api/ai/models?${query}`, { signal: active.signal })
+      .then(async (response) => {
+        const result = await response.json() as { models?: AiModelOptions[]; error?: string };
+        if (!response.ok || !result.models) throw new Error(result.error ?? "Default image model capabilities could not be loaded.");
+        if (!active.signal.aborted) setSelectedModelOptions(result.models[0] ?? null);
+      })
+      .catch((failure: unknown) => {
+        if (!active.signal.aborted) setError(failure instanceof Error ? failure.message : "Default image model capabilities could not be loaded.");
+      });
+    return () => active.abort();
+  }, [campaignId, canCustomizePortrait]);
 
   useEffect(() => {
     if (!campaignId || (isCharacterPortrait && portraitAiRole !== "gm")) return;
@@ -225,6 +263,7 @@ function AiArtStudioContent({
         setStyleSelectionChanged(canCustomizePortrait && session.styleSelectionChanged);
         setGallery(restoredGallery);
         setDraft(selectedDraft?.draft ?? null);
+        setSelectedResolution(selectedDraft?.draft.resolution);
         setIsSessionReady(true);
       });
 
@@ -297,7 +336,7 @@ function AiArtStudioContent({
     setSelectedAspectRatio(nextAspectRatio);
   };
 
-  const generate = async () => {
+  const generate = async (edit?: ImageEdit) => {
     if (!campaignId) {
       setError("Select a campaign before using the AI art studio.");
       return;
@@ -307,14 +346,16 @@ function AiArtStudioContent({
 
     const requestedStyleId = effectiveSelectedStyleId;
     const requestedContextPlaceId = generationContextPlaceId;
-    const requestedMode = canRefineSelectedDraft ? "refine" : "create";
+    const requestedMode = edit || canRefineSelectedDraft ? "refine" : "create";
+    const requestedOperation = edit ? "edit" : canRefineSelectedDraft ? "redo" : "generate";
+    const parentRunId = requestedOperation === "redo" ? draft?.generationRunId : undefined;
 
     if (subjectDraft.length > 1200) {
       setError("Visual direction must be 1200 characters or fewer.");
       return;
     }
 
-    if (!subjectDraft.trim()) {
+    if (!edit && !subjectDraft.trim()) {
       setError("Add a subject before generating art.");
       return;
     }
@@ -339,6 +380,9 @@ function AiArtStudioContent({
         body: JSON.stringify({
           campaignId,
           mode: requestedMode,
+          operation: requestedOperation,
+          parentRunId,
+          edit,
           targetKind: kind,
           characterId: characterId ?? undefined,
           npcReferenceContext: kind === "npc" ? npcReferenceContext : undefined,
@@ -346,9 +390,10 @@ function AiArtStudioContent({
           visualStyleId: requestedStyleId ?? undefined,
           parentPlaceId: parentPlaceId ?? undefined,
           model: canCustomizePortrait ? selectedModel ?? undefined : undefined,
-          subject: subjectDraft,
-          aspectRatio,
-          refinement: refinement.trim() || undefined,
+          subject: edit && !subjectDraft.trim() ? undefined : subjectDraft,
+          aspectRatio: edit?.source.type === "draft" && draft && editableAspectRatio(draft.aspectRatio) ? draft.aspectRatio : aspectRatio,
+          resolution,
+          refinement: edit ? undefined : refinement.trim() || undefined,
         }),
       });
       const result = (await response.json()) as {
@@ -366,6 +411,7 @@ function AiArtStudioContent({
       if (response.status === 202 && result.job) {
         const nextDraft = await waitForImageBackgroundJob(result.job, { signal: generationController.signal });
         setOutcomeUnknown(false);
+        if (edit) setEditInstruction("");
         setGallery((current) => [
           ...current.filter((entry) => entry.draft.generationRunId !== nextDraft.generationRunId),
           { draft: nextDraft, styleId: requestedStyleId, contextPlaceId: requestedContextPlaceId },
@@ -407,6 +453,7 @@ function AiArtStudioContent({
         { draft: result.draft!, styleId: requestedStyleId, contextPlaceId: requestedContextPlaceId },
       ]);
       setOutcomeUnknown(false);
+      if (edit) setEditInstruction("");
       setDraft(result.draft);
     } catch (generationError: unknown) {
       if (generationController.signal.aborted && !generationRequestTimedOut) return;
@@ -425,6 +472,17 @@ function AiArtStudioContent({
       }
       window.clearTimeout(generationRequestTimeoutId);
     }
+  };
+
+  const applyEdit = async () => {
+    const instruction = editInstruction.trim();
+    if (!instruction || !effectiveEditSource) return;
+    if (effectiveEditSource === "draft" && !draft) return;
+    if (effectiveEditSource === "saved-art" && !savedArtEntityId) return;
+    const source: ImageEdit["source"] = effectiveEditSource === "draft"
+      ? { type: "draft", generationRunId: draft!.generationRunId }
+      : { type: "saved-art", entityId: savedArtEntityId! };
+    await generate({ instruction, source });
   };
 
   const refreshDraftImage = async (generationRunId: string) => {
@@ -570,9 +628,11 @@ function AiArtStudioContent({
             capability="image"
             value={selectedModel}
             onChange={setSelectedModel}
+            onUserChange={() => setSelectedResolution(undefined)}
             onModelOptionsChange={setSelectedModelOptions}
           />
         </div> : null}
+        <ImageResolutionPicker options={selectedModelOptions} value={resolution} disabled={isGenerating || isApproving} onChange={setSelectedResolution} />
       </div>
       <div className="grid grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-[10px] items-start max-[600px]:grid-cols-1">
         {previewUrl ? (
@@ -617,7 +677,7 @@ function AiArtStudioContent({
                   aria-pressed={entry.draft.generationRunId === draft?.generationRunId}
                   className={`w-[64px] h-[64px] overflow-hidden border bg-[#0a1118] p-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--pink)] focus-visible:outline-offset-2 ${entry.draft.generationRunId === draft?.generationRunId ? "border-[var(--pink)] shadow-[inset_0_0_0_1px_rgba(255,92,154,.3)]" : "border-[var(--line)] hover:border-[var(--cyan)]"}`}
                   type="button"
-                  onClick={() => setDraft(entry.draft)}
+                  onClick={() => { setDraft(entry.draft); setSelectedResolution(entry.draft.resolution); }}
                 >
                   {thumbnailUrl ? (
                     <img
@@ -705,7 +765,7 @@ function AiArtStudioContent({
             </>
           ) : (
             <>
-              <Sparkles size={14} /> {canRefineSelectedDraft ? "REFINE DRAFT" : "GENERATE DRAFT"}
+              <Sparkles size={14} /> {canRefineSelectedDraft ? "REDO DRAFT" : "GENERATE DRAFT"}
             </>
           )}
         </button>
@@ -734,6 +794,35 @@ function AiArtStudioContent({
           </button>
         ) : null}
       </div>
+      {draft || savedArtEntityId ? (
+        <ArtEditPanel
+          tone="pink"
+          sourceLabel={effectiveEditSource === "saved-art" ? "SAVED ARTWORK" : "SELECTED DRAFT"}
+          instruction={editInstruction}
+          busy={isGenerating}
+          disabled={isApproving || !effectiveEditSource}
+          blockedReason={modelCannotEdit ? "The selected image model cannot edit images. Choose a model that accepts image input to use Edit." : null}
+          onInstructionChange={setEditInstruction}
+          onSubmit={() => void applyEdit()}
+        >
+          {draft && savedArtEntityId ? (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Image to edit">
+              {([["draft", "SELECTED DRAFT"], ["saved-art", "SAVED ARTWORK"]] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={effectiveEditSource === value}
+                  disabled={isGenerating || isApproving}
+                  className="min-h-8 px-[10px] border border-[var(--line)] bg-transparent text-[var(--dim)] font-mono text-[8px] tracking-[.1em] cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--pink)] focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:border-[var(--pink)] aria-pressed:text-[var(--pink)]"
+                  onClick={() => setEditSourceType(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </ArtEditPanel>
+      ) : null}
       {draft ? (
         <p className="m-0 text-[var(--dim)] font-mono text-[8px] tracking-[.08em]">
           {draft.model.toUpperCase()} / {draft.aspectRatio} /{" "}

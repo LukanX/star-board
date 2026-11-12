@@ -48,6 +48,11 @@ export function getPreferredImageResolution(supportedResolutions: readonly strin
   return imageResolutionValues.find((resolution) => supportedResolutions?.includes(resolution));
 }
 
+export function getSupportedImageResolutions(supportedParameters: readonly string[] | undefined, parameterValues: Record<string, string[]> | undefined): ImageResolution[] {
+  if (!supportedParameters?.includes("resolution")) return [];
+  return imageResolutionValues.filter((resolution) => parameterValues?.resolution?.includes(resolution));
+}
+
 export function getSupportedImageAspectRatios(supportedParameters: readonly string[] | undefined, parameterValues: Record<string, string[]> | undefined): ImageAspectRatio[] {
   if (!supportedParameters) return [defaultImageAspectRatio];
   if (!supportedParameters.includes("aspect_ratio")) return [];
